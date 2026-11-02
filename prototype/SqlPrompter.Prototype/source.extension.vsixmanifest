@@ -6,8 +6,8 @@
     <Description xml:space="preserve">Diagnosticky prototyp: vypisuje typy obsahu editoru, nabizi staticky navrh "hello" a zkouma pripojeni aktivniho okna. Log: %LOCALAPPDATA%\SqlPrompter\prototype.log</Description>
   </Metadata>
   <Installation>
-    <!-- HYPOTEZA: Id a rozsah verzi pro SSMS 22 nejsou zdokumentovane. Overit v SSMS 22,
-         napr. porovnanim s manifestem jineho rozsireni pro SSMS 22 (viz prototype/README.md). -->
+    <!-- Id "Microsoft.VisualStudio.Ssms" pouzivaji vestavena rozsireni SSMS 22.11 (s Version="[22.0,)").
+         Ze VSIXInstaller nasi VSIX do SSMS opravdu nainstaluje, zatim overeno neni. -->
     <InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,23.0)">
       <ProductArchitecture>amd64</ProductArchitecture>
     </InstallationTarget>

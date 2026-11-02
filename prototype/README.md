@@ -2,7 +2,7 @@
 
 Diagnostické VSIX rozšíření, které má v SSMS 22 odpovědět na tři otázky z [`docs/architecture.md`](../docs/architecture.md#prototyp). Kód se nepoužije pro MVP. Měří, nic nestaví.
 
-**Stav:** kód je napsaný, ale zatím se nesestavil ani nespustil v SSMS 22. Nic z toho, co následuje, není ověřené.
+**Stav:** VSIX se sestaví (Windows, .NET SDK 10.0.403, bez Visual Studia). V SSMS 22 zatím neběželo, takže nic z toho, co následuje, není ověřené.
 
 Všechno se zapisuje do `%LOCALAPPDATA%\SqlPrompter\prototype.log`. Řádky jsou označené `[host]`, `[q1]`, `[q2]` a `[q3]` a uvádějí vlákno (`UI` = vlákno UI).
 
@@ -20,16 +20,18 @@ SQL editor se pozná podle typu obsahu, jehož název nebo bázový typ obsahuje
 
 ## Sestavení
 
-- Na Windows s Visual Studiem 2022 nebo 2026 a pracovní zátěží *Vývoj rozšíření VS*: `msbuild prototype\SqlPrompter.Prototype\SqlPrompter.Prototype.csproj /restore /p:Configuration=Release`.
+Projekt je ve formátu SDK, takže Visual Studio ani VS SDK není potřeba. Nástroje pro VSIX dodává balík `Microsoft.VSSDK.BuildTools` a referenční sestavení .NET Frameworku si SDK stáhne samo.
+
+- Na Windows s .NET SDK 8 nebo novějším: `dotnet build prototype\SqlPrompter.Prototype\SqlPrompter.Prototype.csproj -c Release`.
 - Nebo stáhněte artefakt z workflow [Prototyp VSIX](../.github/workflows/prototype.yml) na Windows runneru GitHub Actions.
 
-Výsledek je `bin\Release\SqlPrompter.Prototype.vsix`.
+Výsledek je `prototype\SqlPrompter.Prototype\bin\Release\net48\SqlPrompter.Prototype.vsix`. Soubor [`nuget.config`](../nuget.config) v kořeni repozitáře omezuje zdroje balíčků na nuget.org, aby sestavení nezáviselo na lokální konfiguraci NuGetu.
 
 ## Instalace do SSMS 22
 
-Manifest cílí na `Microsoft.VisualStudio.Ssms` `[22.0,23.0)`. **To je hypotéza.** Id ani rozsah verzí nejsou zdokumentované.
+Manifest cílí na `Microsoft.VisualStudio.Ssms` `[22.0,23.0)`. Stejné Id (s `Version="[22.0,)"`) používají vestavěná rozšíření SSMS 22.11 v `Common7\IDE\Extensions`. Jestli VSIXInstaller naši VSIX do SSMS nainstaluje, zatím ověřené není.
 
-1. Zavřete SSMS a poklepejte na `.vsix`. Pokud VSIXInstaller SSMS 22 nenabídne, zjistěte správné Id. Například rozbalte `.vsix` jiného rozšíření pro SSMS 22 (je to ZIP) a podívejte se do `extension.vsixmanifest`, nebo hledejte `Ssms` v souborech `*.isolation.ini` / `*.vsixmanifest` v instalačním adresáři SSMS. Opravte manifest a výsledek zapište do `docs/architecture.md`.
+1. Zavřete SSMS a poklepejte na `.vsix`. Pokud VSIXInstaller SSMS 22 nenabídne, zapište chybu z jeho logu (odkaz je v okně instalátoru) do `docs/architecture.md`.
 2. Pokud instalace selže na prerekvizitě `Microsoft.VisualStudio.Component.CoreEditor`, odeberte ji z manifestu a zapište to.
 3. Spusťte SSMS a ověřte, že log obsahuje `=== Prototyp SQL Prompter načten ===`.
 
@@ -69,7 +71,8 @@ Vyplňte po běhu v SSMS 22 a přeneste do `docs/architecture.md`.
 
 | Bod | Výsledek | Verze SSMS, datum |
 |---|---|---|
-| Id a verze `InstallationTarget` | neověřeno | |
+| VSIX se sestaví bez Visual Studia | ano | 2026-11-02 |
+| Id `InstallationTarget` | `Microsoft.VisualStudio.Ssms` podle vestavěných rozšíření, instalace neověřena | 22.11.3, 2026-11-02 |
 | Balíček se načte, nabídka je vidět | neověřeno | |
 | Typ obsahu SQL editoru a jeho bázové typy | neověřeno | |
 | `IAsyncCompletionSource` funguje v SQL editoru | neověřeno | |

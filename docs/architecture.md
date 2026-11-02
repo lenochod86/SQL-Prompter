@@ -79,11 +79,17 @@ Bez kladných odpovědí nemá smysl stavět zbytek:
 
 ### Stav prototypu
 
-Kód je v [`prototype/`](../prototype/README.md): diagnostické VSIX, které vše zapisuje do `%LOCALAPPDATA%\SqlPrompter\prototype.log`. README obsahuje postup testu a tabulku výsledků. Zatím se nesestavilo ani nespustilo v SSMS 22, žádná ze tří otázek tedy není zodpovězená.
+Kód je v [`prototype/`](../prototype/README.md): diagnostické VSIX, které vše zapisuje do `%LOCALAPPDATA%\SqlPrompter\prototype.log`. README obsahuje postup testu a tabulku výsledků. VSIX se sestaví příkazem `dotnet build` bez Visual Studia (projekt ve formátu SDK s balíkem `Microsoft.VSSDK.BuildTools` 17.14). V SSMS 22 zatím neběželo, takže žádná ze tří otázek není zodpovězená.
+
+Zjištěno z instalace SSMS 22.11.3:
+
+- `productId` je `Microsoft.VisualStudio.Product.Ssms`.
+- Vestavěná rozšíření používají `InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,)"`.
+- Mezi instalovanými balíčky je `Microsoft.VisualStudio.Component.CoreEditor`.
 
 Hypotézy, které prototyp ověřuje navíc:
 
-- `InstallationTarget Id="Microsoft.VisualStudio.Ssms"` s verzemi `[22.0,23.0)` a prerekvizita `Microsoft.VisualStudio.Component.CoreEditor` ve VSIX manifestu.
+- VSIXInstaller nainstaluje do SSMS 22 VSIX s cílem `Microsoft.VisualStudio.Ssms` `[22.0,23.0)` a prerekvizitou `Microsoft.VisualStudio.Component.CoreEditor`.
 - Rozšíření jde zaregistrovat pro typ obsahu `any` a SQL editor poznat za běhu podle názvu typu obsahu.
 - `ScriptFactory` je dosažitelný reflexí, bez odkazu na sestavení SSMS při sestavení.
 - Vlastní připojení může používat `Microsoft.Data.SqlClient`, který už je v procesu SSMS načtený, takže ho VSIX nemusí přibalovat.

@@ -19,11 +19,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: microsoft/setup-msbuild@v2
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
       - name: Sestavení VSIX
-        run: msbuild prototype/SqlPrompter.Prototype/SqlPrompter.Prototype.csproj /restore /p:Configuration=Release /p:DeployExtension=false /v:minimal
+        run: dotnet build prototype/SqlPrompter.Prototype/SqlPrompter.Prototype.csproj -c Release -v:minimal
       - uses: actions/upload-artifact@v4
         with:
           name: SqlPrompter.Prototype
-          path: prototype/SqlPrompter.Prototype/bin/Release/*.vsix
+          path: prototype/SqlPrompter.Prototype/bin/Release/net48/*.vsix
           if-no-files-found: error
