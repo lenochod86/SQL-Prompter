@@ -41,6 +41,12 @@
           <ButtonText>Otevřít log prototypu</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidPrototypeCmdSet" id="cmdidToggleHello" priority="0x0103" type="Button">
+        <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
+        <Strings>
+          <ButtonText>Návrhy hello zapnuté</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
 
@@ -53,6 +59,7 @@
       <IDSymbol name="cmdidDumpConnection" value="0x0100" />
       <IDSymbol name="cmdidTestConnection" value="0x0101" />
       <IDSymbol name="cmdidOpenLog" value="0x0102" />
+      <IDSymbol name="cmdidToggleHello" value="0x0103" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>

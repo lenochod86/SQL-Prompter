@@ -25,6 +25,7 @@ namespace SqlPrompter.Prototype
         public const int DumpConnectionId = 0x0100;
         public const int TestConnectionId = 0x0101;
         public const int OpenLogId = 0x0102;
+        public const int ToggleHelloId = 0x0103;
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
@@ -42,6 +43,7 @@ namespace SqlPrompter.Prototype
                 commands.AddCommand(new MenuCommand((s, e) => DumpConnection(), new CommandID(CommandSet, DumpConnectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => TestConnection(), new CommandID(CommandSet, TestConnectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
+                commands.AddCommand(new MenuCommand(ToggleHello, new CommandID(CommandSet, ToggleHelloId)) { Checked = HelloCompletionSource.Enabled });
                 Log.Write("host", "Příkazy zaregistrovány.");
             }
             else
@@ -109,6 +111,17 @@ namespace SqlPrompter.Prototype
             }
 
             _ = JoinableTaskFactory.RunAsync(() => ConnectionProbe.TestConnectionAsync(snapshot, DisposalToken));
+        }
+
+        private static void ToggleHello(object sender, EventArgs e)
+        {
+            HelloCompletionSource.Enabled = !HelloCompletionSource.Enabled;
+            if (sender is MenuCommand command)
+            {
+                command.Checked = HelloCompletionSource.Enabled;
+            }
+
+            Log.Write("q2", "Návrhy hello " + (HelloCompletionSource.Enabled ? "zapnuty" : "vypnuty") + ".");
         }
 
         private void OpenLog()

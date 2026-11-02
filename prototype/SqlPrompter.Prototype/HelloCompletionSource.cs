@@ -37,9 +37,12 @@ namespace SqlPrompter.Prototype
     {
         public const string Description = "Statický návrh z prototypu SQL Prompter.";
 
+        /// <summary>Otázka 2: vypnutím lze porovnat chování vestavěného IntelliSense s naším zdrojem a bez něj.</summary>
+        public static volatile bool Enabled = true;
+
         public CompletionStartData InitializeCompletion(CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
         {
-            if (!SqlContentTypes.IsSql(triggerLocation.Snapshot.ContentType))
+            if (!Enabled || !SqlContentTypes.IsSql(triggerLocation.Snapshot.ContentType))
             {
                 return CompletionStartData.DoesNotParticipateInCompletion;
             }

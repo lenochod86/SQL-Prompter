@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="SqlPrompter.Prototype.c9efd892-d89f-4178-8e0d-a9b7f925e617" Version="0.0.1" Language="en-US" Publisher="SQL Prompter" />
+    <Identity Id="SqlPrompter.Prototype.c9efd892-d89f-4178-8e0d-a9b7f925e617" Version="0.0.2" Language="en-US" Publisher="SQL Prompter" />
     <DisplayName>SQL Prompter (prototyp)</DisplayName>
     <Description xml:space="preserve">Diagnosticky prototyp: vypisuje typy obsahu editoru, nabizi staticky navrh "hello" a zkouma pripojeni aktivniho okna. Log: %LOCALAPPDATA%\SqlPrompter\prototype.log</Description>
   </Metadata>

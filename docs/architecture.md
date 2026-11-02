@@ -79,18 +79,38 @@ Bez kladných odpovědí nemá smysl stavět zbytek:
 
 ### Stav prototypu
 
-Kód je v [`prototype/`](../prototype/README.md): diagnostické VSIX, které vše zapisuje do `%LOCALAPPDATA%\SqlPrompter\prototype.log`. README obsahuje postup testu a tabulku výsledků. VSIX se sestaví příkazem `dotnet build` bez Visual Studia (projekt ve formátu SDK s balíkem `Microsoft.VSSDK.BuildTools` 17.14). V SSMS 22 zatím neběželo, takže žádná ze tří otázek není zodpovězená.
+Kód je v [`prototype/`](../prototype/README.md): diagnostické VSIX, které vše zapisuje do `%LOCALAPPDATA%\SqlPrompter\prototype.log`. README obsahuje postup testu a tabulku výsledků. VSIX se sestaví příkazem `dotnet build` bez Visual Studia (projekt ve formátu SDK s balíkem `Microsoft.VSSDK.BuildTools` 17.14). První běh v SSMS 22.11.3 proběhl 2026-11-02.
+
+**Otázka 1: ano.** MEF rozšíření se načte a v SQL editoru funguje `IAsyncCompletionSource`: po napsání `hel` se nabídne `hello`.
+
+- Typ obsahu SQL editoru je `"SQL"` s bázovými typy `"code"` → `"text"` → `"any"`. Pohled leží nad projekčním bufferem `"projection"`.
+- `IAsyncCompletionBroker.IsCompletionSupported` vrací pro `"SQL"` hodnotu `True`. `GetCompletionContextAsync` běží mimo vlákno UI.
+- Sestavení editoru v SSMS mají verzi 18.0.0.0. Rozšíření sestavené proti `Microsoft.VisualStudio.SDK` 17.14 se na ně naváže, takže hypotéza o SDK 17.14 platí.
+- V SSMS je načtený `Microsoft.Data.SqlClient` 6.0.0.0. DTE hlásí `Version=18.0` a `Edition=SSMS`.
+- Vlastnosti bufferu SQL okna neobsahují nic, co by souviselo s připojením.
+
+**Otázka 2: předběžně bez duplicit, nutný kontrolní test.**
+
+- Při psaní (`CREATE TABLE …`) se zobrazil jen seznam s `hello`. Vestavěné IntelliSense žádný vlastní seznam neukázalo a do asynchronní relace nepřidalo žádné položky.
+- S vypnutým vestavěným IntelliSense `hello` zůstává.
+- Neověřeno je, jestli vestavěný seznam potlačuje naše relace, nebo jestli v testovaných místech nic nenabízel. Prototyp 0.0.2 má v nabídce příkaz pro vypnutí `hello`, takže jde porovnat stejné místo s naším zdrojem a bez něj.
+
+**Otázka 3: `ScriptFactory` v SSMS 22 funguje, zbývá vlastní připojení a další typy ověření.**
+
+- `ScriptFactory.Instance.CurrentlyActiveWndConnectionInfo` (`SQLEditors.dll` 22.200) je dosažitelný reflexí. `UIConnectionInfo` (`Microsoft.SqlServer.RegSvrEnum` 18.100) obsahuje `ServerName`, `UserName`, `AuthenticationType` (SQL Server = 1), `Password` a `InMemoryPassword` (`SecureString`) a `RenewableToken` (u SQL přihlášení `null`, kandidát pro Entra ID).
+- `AdvancedOptions` obsahuje `DATABASE`, `ENCRYPT_CONNECTION`, `TRUST_SERVER_CERTIFICATE`, `CONNECTION_TIMEOUT`, `PACKET_SIZE` a údaje o serveru. Vlastní připojení musí šifrování převzít, jinak SqlClient 6 (`Encrypt=Mandatory`) selže na certifikátu podepsaném sám sebou.
+- Mezi kandidátními typy je `Microsoft.SqlServer.Management.ServerInformation.IServerConnectionInformation` (`Microsoft.SqlServer.Management.SDK.SqlStudio` 22.200). Může se hodit jako náhrada.
+- Neověřeno: úspěšné vlastní připojení, přihlášení přes Windows a Entra ID s MFA a to, jestli `DATABASE` sleduje změnu databáze v okně.
 
 Zjištěno z instalace SSMS 22.11.3:
 
 - `productId` je `Microsoft.VisualStudio.Product.Ssms`.
 - Vestavěná rozšíření používají `InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,)"`.
 - Mezi instalovanými balíčky je `Microsoft.VisualStudio.Component.CoreEditor`.
+- VSIXInstaller nainstaluje VSIX s cílem `Microsoft.VisualStudio.Ssms` `[22.0,23.0)` a prerekvizitou `Microsoft.VisualStudio.Component.CoreEditor` (ověřeno).
 
 Hypotézy, které prototyp ověřuje navíc:
 
-- VSIXInstaller nainstaluje do SSMS 22 VSIX s cílem `Microsoft.VisualStudio.Ssms` `[22.0,23.0)` a prerekvizitou `Microsoft.VisualStudio.Component.CoreEditor`.
-- Rozšíření jde zaregistrovat pro typ obsahu `any` a SQL editor poznat za běhu podle názvu typu obsahu.
 - `ScriptFactory` je dosažitelný reflexí, bez odkazu na sestavení SSMS při sestavení.
 - Vlastní připojení může používat `Microsoft.Data.SqlClient`, který už je v procesu SSMS načtený, takže ho VSIX nemusí přibalovat.
 

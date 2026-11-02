@@ -30,6 +30,8 @@ namespace SqlPrompter.Prototype
             public string UserName;
             public string Password;
             public string AuthenticationType;
+            public string Encrypt;
+            public string TrustServerCertificate;
         }
 
         public static Snapshot DumpActiveConnection()
@@ -110,6 +112,18 @@ namespace SqlPrompter.Prototype
                     builder["Initial Catalog"] = snapshot.DatabaseName;
                 }
 
+                // Šifrování přebíráme z nastavení okna v SSMS. Výchozí hodnoty SqlClient 6
+                // (Encrypt=Mandatory) by u serveru s certifikátem podepsaným sám sebou selhaly.
+                if (!string.IsNullOrEmpty(snapshot.Encrypt))
+                {
+                    builder["Encrypt"] = snapshot.Encrypt;
+                }
+
+                if (!string.IsNullOrEmpty(snapshot.TrustServerCertificate))
+                {
+                    builder["Trust Server Certificate"] = snapshot.TrustServerCertificate;
+                }
+
                 var mode = ChooseAuthentication(snapshot, connectionType, builder);
                 Log.Write(Area, "Režim ověření pro test: " + mode + "; připojovací řetězec bez tajemství: " + Redact(builder));
 
@@ -185,12 +199,14 @@ namespace SqlPrompter.Prototype
             if (type.GetProperty("AdvancedOptions")?.GetValue(ui) is NameValueCollection options)
             {
                 snapshot.DatabaseName = options["DATABASE"];
+                snapshot.Encrypt = options["ENCRYPT_CONNECTION"];
+                snapshot.TrustServerCertificate = options["TRUST_SERVER_CERTIFICATE"];
             }
 
             Log.Write(Area, string.Format(
-                "Shrnutí: server={0}, databáze={1}, uživatel={2}, typOvěření={3}, heslo k dispozici={4}",
+                "Shrnutí: server={0}, databáze={1}, uživatel={2}, typOvěření={3}, heslo k dispozici={4}, encrypt={5}, trustServerCertificate={6}",
                 snapshot.ServerName, snapshot.DatabaseName ?? "(nezadáno)", snapshot.UserName, snapshot.AuthenticationType,
-                !string.IsNullOrEmpty(snapshot.Password)));
+                !string.IsNullOrEmpty(snapshot.Password), snapshot.Encrypt ?? "(nezadáno)", snapshot.TrustServerCertificate ?? "(nezadáno)"));
             return snapshot;
         }
 
