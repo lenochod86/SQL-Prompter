@@ -2,7 +2,7 @@
 
 Rozšíření s vlastním IntelliSense pro SQL Server Management Studio 22.
 
-**Stav:** návrh a nespuštěný prototyp. V SSMS 22 zatím nic neběželo. Závěry označené jako hypotéza musí potvrdit prototyp (viz [Prototyp](#prototyp)).
+**Stav:** prototyp v SSMS 22.11 odpověděl na všechny tři otázky (viz [Prototyp](#prototyp)). MVP je napsané a otestované jednotkovými testy, v SSMS zatím neběželo (viz [MVP](#mvp)).
 
 ## Shrnutí
 
@@ -20,9 +20,9 @@ Microsoft uvádí, že rozšíření třetích stran nejsou v SSMS podporovaná.
 | Doplněk v SSMS | .NET Framework 4.8, AnyCPU | SSMS je 64bitové a existuje i pro Arm64 ([FAQ][faq]) |
 | Jádro | .NET Standard 2.0 | Sestavení a testy i mimo Windows |
 | Napojení na editor | MEF a `IAsyncCompletionSource` ([walkthrough][completion]) | Moderní API s výpočtem na pozadí |
-| Metadata | `Microsoft.Data.SqlClient`, dotazy na `sys.*` | Rychlé, jen pro čtení, bez závislosti na SMO |
+| Metadata | Dotazy na `sys.*` přes `System.Data.Common`, připojení z `Microsoft.Data.SqlClient` v procesu SSMS | Rychlé, jen pro čtení, bez závislosti na SMO a bez druhé kopie SqlClient |
 
-SSMS 22 je postavené na Visual Studiu 2026 ([FAQ][faq]). Podle [poznámek autora jiného rozšíření][sqlfluff] se používá `Microsoft.VisualStudio.SDK` 17.14, protože balík 18.x neexistuje. Sám autor uvádí, že to zatím neověřil v praxi, takže jde o hypotézu.
+SSMS 22 je postavené na Visual Studiu 2026 ([FAQ][faq]). Podle [poznámek autora jiného rozšíření][sqlfluff] se používá `Microsoft.VisualStudio.SDK` 17.14, protože balík 18.x neexistuje. Prototyp to v SSMS 22.11 potvrdil.
 
 VisualStudio.Extensibility se nepoužívá: podporu v SSMS žádný dokument nepotvrzuje a podle [stejného zdroje][sqlfluff] chybí náhrady části rozhraní editoru.
 
@@ -48,18 +48,17 @@ VisualStudio.Extensibility se nepoužívá: podporu v SSMS žádný dokument nep
 | Projekt | Cíl | Smí záviset na |
 |---|---|---|
 | `SqlPrompter.Core` | netstandard2.0 | Nic z VS, SSMS ani databáze |
-| `SqlPrompter.Metadata` | netstandard2.0 | `Microsoft.Data.SqlClient` |
+| `SqlPrompter.Metadata` | netstandard2.0 | Core a `System.Data.Common`; konkrétní `DbConnection` dodá hostitel |
 | `SqlPrompter.Ssms` | net48, VSIX | VS SDK, API SSMS, oba projekty výše |
 | Testy | Aktuální .NET | Core a Metadata, případy typu `SELECT u.| FROM dbo.Users u` s vyznačenou pozicí kurzoru |
 
 ## Průběh našeptání
 
-1. Rychlá kontrola na vlákně UI podle tokenů zjistí, jestli má našeptávání na dané pozici smysl.
-2. Na pozadí se vyřízne aktuální příkaz a určí se kontext, třeba „sloupec aliasu `u`“.
-3. Kontext se spojí s metadaty z cache a s objekty ze skriptu (CTE, dočasné tabulky, proměnné).
-4. Výsledek se seřadí a zobrazí.
+1. Na vlákně UI (`InitializeCompletion`) se vyřízne dávka mezi řádky `GO`, rozdělí se na tokeny a určí se kontext, třeba „sloupec aliasu `u`“. Rozhodnutí o účasti musí padnout tady, protože naše účast vestavěné IntelliSense potlačí.
+2. Ve stejném kroku se ověří, jestli metadata v cache stačí na úplný seznam. Když ne, spustí se jejich načtení na pozadí a rozšíření se našeptání neúčastní, takže nabídne vestavěné IntelliSense.
+3. Na pozadí (`GetCompletionContextAsync`) se z kontextu a snímku metadat sestaví a seřadí návrhy.
 
-Na databázi se v tomto průběhu nikdy nečeká. Když sloupce ještě nejsou načtené, doplní se při dalším našeptání.
+Na databázi se v tomto průběhu nikdy nečeká. Když sloupce ještě nejsou načtené, doplní se při dalším našeptání. Objekty ze skriptu (CTE, dočasné tabulky, proměnné) jsou etapa 3; do té doby jejich kontext obsluhuje vestavěné IntelliSense.
 
 ## Rozhodnutí
 
@@ -68,6 +67,11 @@ Na databázi se v tomto průběhu nikdy nečeká. Když sloupce ještě nejsou n
 - **Metadata jako neměnné snímky.** Každá databáze má vlastní snímek a sloupce se načítají až při potřebě. Obnova proběhne podle `sys.objects.modify_date`, po DDL v okně a ručním příkazem.
 - **Zabezpečení.** Hesla se nikam neukládají. Metadata na disk jen volitelně, protože i názvy objektů můžou být citlivé. Žádná telemetrie.
 - **Cílové výkonnostní limity (návrh).** Do 50 ms pro seznam z cache a žádné čekání na síť ve vlákně UI.
+- **Účast jen s úplným seznamem.** Naše účast vestavěné IntelliSense potlačí (prototyp, otázka 2). Rozšíření se proto účastní jen tam, kde zná kontext i všechny zdroje v aktuálním bloku a má načtené jejich sloupce. Jinak vrací `DoesNotParticipateInCompletion`, např. u proměnných, dočasných tabulek, CTE, odvozených tabulek ve výrazu, třídílných názvů, `VALUES`, `EXEC` nebo typů za `AS`.
+- **SqlClient z procesu SSMS.** Vlastní připojení vytváří `Microsoft.Data.SqlClient.SqlConnection` z kopie, kterou má SSMS načtenou (ověřeno prototypem, verze 6.0.0.0). VSIX žádný SqlClient nepřibaluje a Metadata pracuje jen s `DbConnection`. Balík SqlClient 6 navíc netstandard2.0 nepodporuje.
+- **Systémové objekty.** Metadata se čtou ze `sys.all_objects` a `sys.all_columns`, takže `sys.objects` nebo `INFORMATION_SCHEMA.TABLES` fungují stejně jako ve vestavěném IntelliSense. Bez schématu se systémové objekty nenabízejí.
+- **Vkládání.** Návrh se vkládá jen klávesou Tab nebo Enter, aby psaní aliasů nepřepsal první návrh. Tam, kde uživatel nejspíš píše vlastní název (za zdrojem tabulky nebo za hodnotou), je výběr jen naznačený (`SoftSelection`). Klíčová slova se vkládají malými písmeny, když je tak uživatel začal psát.
+- **Obnova metadat v MVP.** Nejvýš jednou za 30 s se při našeptání ověří otisk `sys.objects` (počet a nejnovější `modify_date`) a po změně se snímek načte znovu. K tomu slouží ruční příkaz Nástroje → SQL Prompter → Obnovit metadata. Obnova po DDL v okně zatím chybí.
 
 ## Prototyp
 
@@ -112,11 +116,24 @@ Zjištěno z instalace SSMS 22.11.3:
 - Vestavěná rozšíření používají `InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,)"`.
 - Mezi instalovanými balíčky je `Microsoft.VisualStudio.Component.CoreEditor`.
 - VSIXInstaller nainstaluje VSIX s cílem `Microsoft.VisualStudio.Ssms` `[22.0,23.0)` a prerekvizitou `Microsoft.VisualStudio.Component.CoreEditor` (ověřeno).
+- `ScriptFactory` je dosažitelný reflexí, bez odkazu na sestavení SSMS při sestavení (ověřeno).
+- Vlastní připojení může používat `Microsoft.Data.SqlClient`, který už je v procesu SSMS načtený, takže ho VSIX nemusí přibalovat (ověřeno).
+- SSMS 22.11 nemá v nabídce správce rozšíření; odinstaluje se přes `VSIXInstaller.exe /uninstall:<Id>`.
+- Pokud manifest povoluje i Visual Studio, VSIXInstaller může rozšíření nainstalovat tam místo do SSMS. Manifest proto cílí jen na SSMS.
+- Po změně `.vsct` je potřeba zvýšit verzi v `ProvideMenuResource`, jinak SSMS zobrazí nabídky z mezipaměti.
 
-Hypotézy, které prototyp ověřuje navíc:
+## MVP
 
-- `ScriptFactory` je dosažitelný reflexí, bez odkazu na sestavení SSMS při sestavení.
-- Vlastní připojení může používat `Microsoft.Data.SqlClient`, který už je v procesu SSMS načtený, takže ho VSIX nemusí přibalovat.
+Kód je v `src/` a testy v `tests/`. Sestavení: `dotnet build SqlPrompter.slnx -c Release` na Windows, testy `dotnet test tests/SqlPrompter.Tests` kdekoli. Postup ručního testu je v [README](../README.md).
+
+Co MVP umí:
+
+- Klíčová slova na začátku příkazu, za zdrojem tabulky (`WHERE`, `JOIN` …) a ve výrazech.
+- Tabulky, pohledy a tabulkové funkce za `FROM`, `JOIN`, `APPLY`, `UPDATE`, `INSERT INTO`, `DELETE FROM`, `MERGE`, `USING` a `TRUNCATE`/`DROP`/`ALTER TABLE`, i se schématem (`sales.|`). Bez schématu se vkládají jako `schema.tabulka`.
+- Sloupce aliasu nebo tabulky (`u.|`, `dbo.Users.|`) a ve výrazech (`SELECT`, `WHERE`, `ON`, `GROUP BY`, `HAVING`, `ORDER BY`, `SET`) sloupce všech zdrojů bloku, aliasy a běžné vestavěné funkce. Sloupec, který je ve více zdrojích, se vkládá s aliasem.
+- Bloky dotazu: poddotaz ve výrazu vidí zdroje vnějšího dotazu, odvozená tabulka a CTE ne; `UNION` odděluje bloky. Příkazy se oddělují i bez středníku.
+
+Stav: jednotkové testy procházejí, VSIX se sestaví. Ověření v SSMS 22 zbývá.
 
 ## Etapy
 
@@ -127,12 +144,12 @@ Hypotézy, které prototyp ověřuje navíc:
 
 ## Prostředí pro vývoj
 
-Core, Metadata a jejich testy jdou vyvíjet v cloudu. VSIX se sestavuje na Windows a SSMS v cloudovém prostředí nepoběží, takže prototyp a ruční testy běží na Windows s SSMS 22, případně přes Remote Control. VSIX může sestavovat Windows runner v GitHub Actions.
+Core, Metadata a jejich testy jdou vyvíjet v cloudu. VSIX se sestavuje na Windows a SSMS v cloudovém prostředí nepoběží, takže prototyp a ruční testy běží na Windows s SSMS 22, případně přes Remote Control. Visual Studio ke sestavení potřeba není, stačí .NET SDK 8 nebo novější. VSIX sestavuje i Windows runner v GitHub Actions (`.github/workflows/build.yml`).
 
 ## Otevřené otázky
 
 - Bude rozšíření veřejné, nebo interní? U veřejné verze je potřeba řešit licenci, podepisování a název, protože „SQL Prompter“ se hodně podobá produktu SQL Prompt od Redgate.
-- Je na vývojovém počítači Visual Studio 2026 s nástroji pro vývoj rozšíření?
+- Přihlášení přes Windows a Entra ID s MFA: ověřit `AuthenticationType` a jestli jde z `RenewableToken` vytvořit vlastní připojení. Do té doby se pro Entra ID metadata nenačítají a nabízí se jen klíčová slova.
 
 ## Zdroje
 

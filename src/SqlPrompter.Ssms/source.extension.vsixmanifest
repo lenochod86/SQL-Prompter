@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <Identity Id="SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6" Version="0.1.0" Language="en-US" Publisher="SQL Prompter" />
+    <DisplayName>SQL Prompter</DisplayName>
+    <Description xml:space="preserve">Vlastni IntelliSense pro SQL editor v SSMS 22: klicova slova, schemata, tabulky, sloupce a aliasy. Log: %LOCALAPPDATA%\SqlPrompter\sqlprompter.log</Description>
+  </Metadata>
+  <Installation>
+    <!-- Overeno prototypem v SSMS 22.11. Vestavena rozsireni SSMS pouzivaji stejne Id. -->
+    <InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,23.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,23.0)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+    <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%|" />
+  </Assets>
+</PackageManifest>

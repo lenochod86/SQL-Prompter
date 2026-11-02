@@ -1,0 +1,54 @@
+<Project>
+  <!-- Tenká vrstva v procesu SSMS 22. Sestavuje se na Windows: dotnet build -c Release.
+       Cíle VSSDK se importují explicitně až za Sdk.targets, VSToolsPath nastavuje balík Microsoft.VSSDK.BuildTools. -->
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>SqlPrompter.Ssms</RootNamespace>
+    <AssemblyName>SqlPrompter.Ssms</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>true</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>true</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+    <!-- V SSMS se testuje instalací .vsix, ne nasazením do experimentální instance VS. -->
+    <DeployExtension>false</DeployExtension>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="SqlPrompterCommands.vsct" />
+    <VSCTCompile Include="SqlPrompterCommands.vsct">
+      <ResourceName>Menus.ctmenu</ResourceName>
+    </VSCTCompile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="System.Design" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SqlPrompter.Core\SqlPrompter.Core.csproj" />
+    <ProjectReference Include="..\SqlPrompter.Metadata\SqlPrompter.Metadata.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ověřeno prototypem: SDK 17.14 se v SSMS 22 naváže na sestavení editoru 18.0. -->
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="Exists('$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets')" />
+</Project>

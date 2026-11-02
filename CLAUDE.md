@@ -6,7 +6,7 @@ Před návrhem nebo změnou architektury si přečti `docs/architecture.md`.
 
 ## Aktuální stav
 
-Prototyp v `prototype/` běžel v SSMS 22.11 a na všechny tři otázky odpověděl kladně (výsledky v `docs/architecture.md`). Neověřené zůstává jen připojení přes Windows a Entra ID s MFA. Další krok je MVP.
+Prototyp v `prototype/` na všechny tři otázky odpověděl kladně. MVP je v `src/` a `tests/`, testy procházejí, ale v SSMS 22 ještě neběželo. Další krok je ruční test podle `README.md`. Neověřené zůstává i připojení přes Windows a Entra ID s MFA.
 
 ## Pravidla
 
@@ -15,6 +15,9 @@ Prototyp v `prototype/` běžel v SSMS 22.11 a na všechny tři otázky odpověd
 - Na vlákně UI nedělej nic pomalého a při našeptávání nikdy nečekej na databázi.
 - Metadata čti jen pro čtení. Neukládej hesla a nepřidávej telemetrii.
 - API SSMS je nepodporované a nezdokumentované. Předpoklady ověřuj za běhu v SSMS a výsledky zapisuj do `docs/architecture.md`.
+- Kde se náš zdroj našeptávání účastní, potlačí vestavěné IntelliSense. Účastni se jen tam, kde umíš nabídnout úplný seznam, jinak vrať `DoesNotParticipateInCompletion`.
+- Nový kontext v `ContextAnalyzer` pokryj testem s kurzorem vyznačeným `|`.
+- Sestavení: `dotnet test tests/SqlPrompter.Tests`, VSIX `dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release` (jen Windows). Po změně `.vsct` zvyš verzi v `ProvideMenuResource` a po změně manifestu verzi rozšíření.
 
 ## Prostředí
 
