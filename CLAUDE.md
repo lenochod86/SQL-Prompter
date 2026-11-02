@@ -15,9 +15,10 @@ Prototyp v `prototype/` na všechny tři otázky odpověděl kladně. MVP je v `
 - Na vlákně UI nedělej nic pomalého a při našeptávání nikdy nečekej na databázi.
 - Metadata čti jen pro čtení. Neukládej hesla a nepřidávej telemetrii.
 - API SSMS je nepodporované a nezdokumentované. Předpoklady ověřuj za běhu v SSMS a výsledky zapisuj do `docs/architecture.md`.
-- Kde se náš zdroj našeptávání účastní, potlačí vestavěné IntelliSense. Účastni se jen tam, kde umíš nabídnout úplný seznam, jinak vrať `DoesNotParticipateInCompletion`.
+- Uživatel chce vidět jen náš seznam. Náš zdroj se proto účastní všude mimo řetězce a komentáře a tím vestavěný seznam potlačí. Kde nic nevíme, nabídni prázdný seznam (`ContextKind.Name`) nebo klíčová slova (`ContextKind.Fallback`), nikdy `DoesNotParticipateInCompletion`.
+- Nové příkazy patří do menu SQL Prompter v hlavní liště (`SqlPrompterCommands.vsct`).
 - Nový kontext v `ContextAnalyzer` pokryj testem s kurzorem vyznačeným `|`.
-- Sestavení: `dotnet test tests/SqlPrompter.Tests`, VSIX `dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release` (jen Windows). Po změně `.vsct` zvyš verzi v `ProvideMenuResource` a po změně manifestu verzi rozšíření.
+- Sestavení: `dotnet test tests/SqlPrompter.Tests`, VSIX `dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release` (jen Windows). Po změně `.vsct` zvyš verzi v `ProvideMenuResource` a s každým VSIX pro uživatele verzi v manifestu, jinak se přes starou nenainstaluje.
 
 ## Prostředí
 

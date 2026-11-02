@@ -33,7 +33,15 @@ SELECT name FROM sys.schemas WHERE schema_id < 16384 ORDER BY name;
 SELECT o.object_id, s.name, o.name, o.type, o.is_ms_shipped
 FROM sys.all_objects AS o
 JOIN sys.schemas AS s ON s.schema_id = o.schema_id
-WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT');";
+WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT');
+
+-- Sloupce uživatelských objektů hned, systémových až při potřebě.
+SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable
+FROM sys.columns AS c
+JOIN sys.objects AS o ON o.object_id = c.object_id
+JOIN sys.types AS t ON t.user_type_id = c.user_type_id
+WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT') AND o.is_ms_shipped = 0
+ORDER BY c.object_id, c.column_id;";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -82,9 +90,12 @@ FROM sys.objects;";
                             reader.GetBoolean(4)));
                     }
 
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    var columns = await ReadColumnsAsync(reader, cancellationToken).ConfigureAwait(false);
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
-                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version);
+                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns);
                 }
             }
         }
@@ -118,31 +129,32 @@ JOIN sys.types AS t ON t.user_type_id = c.user_type_id
 WHERE c.object_id IN (" + string.Join(", ", names) + @")
 ORDER BY c.object_id, c.column_id;";
 
-                var lists = new Dictionary<int, List<DbColumn>>();
                 using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                    {
-                        var objectId = reader.GetInt32(0);
-                        if (!lists.TryGetValue(objectId, out var list))
-                        {
-                            lists[objectId] = list = new List<DbColumn>();
-                        }
-
-                        list.Add(new DbColumn(
-                            reader.GetString(1),
-                            FormatType(reader.GetString(2), reader.GetInt16(3), reader.GetByte(4), reader.GetByte(5)),
-                            reader.GetBoolean(6)));
-                    }
+                    return await ReadColumnsAsync(reader, cancellationToken).ConfigureAwait(false);
                 }
-
-                foreach (var pair in lists)
-                {
-                    result[pair.Key] = pair.Value;
-                }
-
-                return result;
             }
+        }
+
+        /// <summary>Čte řádky (object_id, název, typ, max_length, precision, scale, is_nullable) seřazené podle objektu.</summary>
+        private static async Task<IReadOnlyDictionary<int, IReadOnlyList<DbColumn>>> ReadColumnsAsync(DbDataReader reader, CancellationToken cancellationToken)
+        {
+            var lists = new Dictionary<int, List<DbColumn>>();
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var objectId = reader.GetInt32(0);
+                if (!lists.TryGetValue(objectId, out var list))
+                {
+                    lists[objectId] = list = new List<DbColumn>();
+                }
+
+                list.Add(new DbColumn(
+                    reader.GetString(1),
+                    FormatType(reader.GetString(2), reader.GetInt16(3), reader.GetByte(4), reader.GetByte(5)),
+                    reader.GetBoolean(6)));
+            }
+
+            return lists.ToDictionary(p => p.Key, p => (IReadOnlyList<DbColumn>)p.Value);
         }
 
         public async Task<string> GetVersionAsync(CancellationToken cancellationToken)

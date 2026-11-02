@@ -39,9 +39,9 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
-        public void ThreePartNameIsLeftToBuiltIn()
+        public void ThreePartNameOffersNothing()
         {
-            Assert.Equal(ContextKind.None, Analyze("SELECT * FROM other.dbo.|").Kind);
+            Assert.Equal(ContextKind.Name, Analyze("SELECT * FROM other.dbo.|").Kind);
         }
 
         [Fact]
@@ -88,9 +88,9 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
-        public void UnknownQualifierIsLeftToBuiltIn()
+        public void UnknownQualifierOffersNothing()
         {
-            Assert.Equal(ContextKind.None, Analyze("SELECT x.| FROM dbo.Users u").Kind);
+            Assert.Equal(ContextKind.Name, Analyze("SELECT x.| FROM dbo.Users u").Kind);
         }
 
         [Fact]
@@ -291,21 +291,45 @@ namespace SqlPrompter.Tests
         [InlineData("SELECT 'abc|")]
         [InlineData("-- SELECT * FROM |")]
         [InlineData("/* SELECT * FROM | */")]
+        [InlineData("SELECT 12|")]
+        public void NoCompletion(string sql)
+        {
+            Assert.Equal(ContextKind.None, Analyze(sql).Kind);
+        }
+
+        [Theory]
         [InlineData("SELECT * FROM dbo.Users AS |")]
         [InlineData("SELECT Name AS | FROM dbo.Users")]
-        [InlineData("SELECT CAST(Id AS |) FROM dbo.Users")]
         [InlineData("SELECT @|")]
         [InlineData("SELECT @va|")]
         [InlineData("SELECT * FROM #t|")]
-        [InlineData("SELECT 12|")]
+        [InlineData("SELECT @t.|")]
+        public void NewOrUnknownNameOffersEmptyList(string sql)
+        {
+            Assert.Equal(ContextKind.Name, Analyze(sql).Kind);
+        }
+
+        [Theory]
+        [InlineData("SELECT CAST(Id AS |) FROM dbo.Users")]
+        [InlineData("SELECT TRY_CAST(Id AS nv|) FROM dbo.Users")]
+        [InlineData("DECLARE @x |")]
+        [InlineData("DECLARE @a int, @b |")]
+        public void DataTypePositions(string sql)
+        {
+            Assert.Equal(ContextKind.DataType, Analyze(sql).Kind);
+        }
+
+        [Theory]
         [InlineData("INSERT INTO dbo.Users (|")]
         [InlineData("INSERT INTO dbo.Users VALUES (|")]
-        [InlineData("DECLARE @x |")]
         [InlineData("EXEC |")]
         [InlineData("SET @x = |")]
-        public void LeftToBuiltIn(string sql)
+        public void UnknownPositionsFallBackToKeywords(string sql)
         {
-            Assert.Equal(ContextKind.None, Analyze(sql).Kind);
+            var context = Analyze(sql);
+
+            Assert.Equal(ContextKind.Fallback, context.Kind);
+            Assert.True(context.SoftSelection);
         }
 
         [Fact]

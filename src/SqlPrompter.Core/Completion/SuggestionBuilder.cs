@@ -17,6 +17,7 @@ namespace SqlPrompter.Core.Completion
         Column,
         Alias,
         Function,
+        DataType,
     }
 
     public sealed class Suggestion
@@ -67,8 +68,33 @@ namespace SqlPrompter.Core.Completion
                     return ObjectSuggestions(context, metadata).ToList();
                 case ContextKind.Expression:
                     return ExpressionSuggestions(context, metadata).ToList();
+                case ContextKind.DataType:
+                    return DataTypeSuggestions(context, 0).ToList();
+                case ContextKind.Fallback:
+                    return KeywordSuggestions(context, 0)
+                        .Concat(FunctionSuggestions(context, 2))
+                        .Concat(DataTypeSuggestions(context, 3))
+                        .ToList();
                 default:
                     return Array.Empty<Suggestion>();
+            }
+        }
+
+        private static IEnumerable<Suggestion> FunctionSuggestions(CaretContext context, int group)
+        {
+            foreach (var function in Keywords.BuiltInFunctions)
+            {
+                var text = Keywords.ApplyCase(function, context.TypedPrefix);
+                yield return new Suggestion(SuggestionKind.Function, text, text, text, null, "vestavěná funkce", group);
+            }
+        }
+
+        private static IEnumerable<Suggestion> DataTypeSuggestions(CaretContext context, int group)
+        {
+            foreach (var type in Keywords.DataTypes)
+            {
+                var text = Keywords.ApplyCase(type, context.TypedPrefix);
+                yield return new Suggestion(SuggestionKind.DataType, text, text, text, null, "datový typ", group);
             }
         }
 
@@ -193,10 +219,9 @@ namespace SqlPrompter.Core.Completion
                     source.ReferenceName, source.Alias != null ? target : null, (source.Alias != null ? "alias " : "zdroj ") + target, 1);
             }
 
-            foreach (var function in Keywords.BuiltInFunctions)
+            foreach (var function in FunctionSuggestions(context, 3))
             {
-                var text = Keywords.ApplyCase(function, context.TypedPrefix);
-                yield return new Suggestion(SuggestionKind.Function, text, text, text, null, "vestavěná funkce", 3);
+                yield return function;
             }
 
             foreach (var keyword in KeywordSuggestions(context, 4))

@@ -40,13 +40,17 @@ namespace SqlPrompter.Ssms
     }
 
     /// <summary>
-    /// Kde se zdroj účastní, nahrazuje vestavěné IntelliSense (ověřeno prototypem).
-    /// Proto se účastní jen tam, kde umí nabídnout úplný seznam; jinak vrací
-    /// DoesNotParticipateInCompletion a nechá místo vestavěnému IntelliSense.
+    /// Kde se zdroj účastní, potlačí vestavěný seznam IntelliSense (ověřeno prototypem).
+    /// Účastní se proto všude mimo řetězce a komentáře, aby se ukazovaly jen jeho návrhy;
+    /// vestavěné IntelliSense dál podtrhává chyby a zobrazuje popisky.
     /// </summary>
     internal sealed class SqlCompletionSource : IAsyncCompletionSource
     {
         private const string DescriptionKey = "SqlPrompter.Description";
+
+        /// <summary>Tlačítko dole v seznamu, podle kterého je vidět, že seznam je od SQL Prompteru.</summary>
+        private static readonly ImmutableArray<CompletionFilter> Filters = ImmutableArray.Create(
+            new CompletionFilter("SQL Prompter", "Q", Icon(KnownMonikers.Database, "SQL Prompter")));
 
         private static readonly IReadOnlyDictionary<SuggestionKind, ImageElement> Icons = new Dictionary<SuggestionKind, ImageElement>
         {
@@ -58,6 +62,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Column] = Icon(KnownMonikers.Column, "Sloupec"),
             [SuggestionKind.Alias] = Icon(KnownMonikers.LocalVariable, "Alias"),
             [SuggestionKind.Function] = Icon(KnownMonikers.ScalarFunction, "Funkce"),
+            [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Datový typ"),
         };
 
         private readonly MetadataService service;
@@ -129,23 +134,15 @@ namespace SqlPrompter.Ssms
             }
 
             var context = ContextAnalyzer.Analyze(batch, triggerLocation.Position - batchStart);
+            var insertion = trigger.Reason == CompletionTriggerReason.Insertion;
             if (context.Kind == ContextKind.None ||
-                (trigger.Character == ' ' && trigger.Reason == CompletionTriggerReason.Insertion && context.Kind != ContextKind.ObjectName) ||
-                (trigger.Character == '.' && trigger.Reason == CompletionTriggerReason.Insertion && context.Qualifier.Count == 0))
+                (insertion && trigger.Character == ' ' && context.Kind != ContextKind.ObjectName) ||
+                (insertion && trigger.Character == '.' && context.Qualifier.Count == 0 && context.Kind != ContextKind.Name))
             {
                 return CompletionStartData.DoesNotParticipateInCompletion;
             }
 
-            IDatabaseMetadata metadata = null;
-            if (context.Kind != ContextKind.Keyword)
-            {
-                metadata = PrepareMetadata(context, out var ready);
-                if (!ready)
-                {
-                    return CompletionStartData.DoesNotParticipateInCompletion;
-                }
-            }
-
+            var metadata = PrepareMetadata(context);
             pending = new Prepared(snapshot, context, metadata);
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
@@ -153,40 +150,27 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>
-        /// Vrátí metadata z cache a případně spustí jejich načtení na pozadí. Na databázi se nečeká:
-        /// co ještě není načtené, nabídne vestavěné IntelliSense a naše návrhy přijdou při dalším našeptání.
+        /// Vrátí metadata z cache a případně spustí načtení chybějících částí na pozadí. Na databázi se nečeká:
+        /// seznam se sestaví z toho, co je k dispozici, a doplní se při dalším našeptání.
         /// </summary>
-        private IDatabaseMetadata PrepareMetadata(CaretContext context, out bool ready)
+        private IDatabaseMetadata PrepareMetadata(CaretContext context)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var settings = SsmsConnection.GetActive();
-            IDatabaseMetadata metadata = null;
-            if (settings != null && settings.CanConnect)
+            var cache = service.CacheForActiveWindow(out var loader);
+            var metadata = cache?.Current;
+            if (cache == null || metadata == null)
             {
-                var cache = service.Caches.Get(settings);
-                var loader = service.CreateLoader(settings);
-                metadata = cache.Current;
-                if (metadata == null)
-                {
-                    _ = cache.EnsureLoaded(loader);
-                }
-                else
-                {
-                    _ = cache.CheckForChanges(loader);
-                }
-
-                var readiness = Readiness.Evaluate(context, metadata);
-                if (readiness.State == ReadinessState.NeedsColumns)
-                {
-                    _ = cache.RequestColumns(readiness.MissingColumns, loader);
-                }
-
-                ready = readiness.State == ReadinessState.Ready;
                 return metadata;
             }
 
-            ready = Readiness.Evaluate(context, null).State == ReadinessState.Ready;
-            return null;
+            _ = cache.CheckForChanges(loader);
+            var readiness = Readiness.Evaluate(context, metadata);
+            if (readiness.State == ReadinessState.NeedsColumns)
+            {
+                _ = cache.RequestColumns(readiness.MissingColumns, loader);
+            }
+
+            return metadata;
         }
 
         private static bool IsTrigger(CompletionTrigger trigger)
@@ -198,7 +182,7 @@ namespace SqlPrompter.Ssms
                     return true;
                 case CompletionTriggerReason.Insertion:
                     var c = trigger.Character;
-                    return char.IsLetter(c) || c == '_' || c == '.' || c == '[' || c == ' ';
+                    return char.IsLetter(c) || c == '_' || c == '.' || c == '[' || c == ' ' || c == '@' || c == '#';
                 default:
                     return false;
             }
@@ -210,7 +194,7 @@ namespace SqlPrompter.Ssms
                 suggestion.DisplayText,
                 this,
                 Icons[suggestion.Kind],
-                ImmutableArray<CompletionFilter>.Empty,
+                Filters,
                 suggestion.Suffix ?? string.Empty,
                 suggestion.InsertText,
                 suggestion.SortText,

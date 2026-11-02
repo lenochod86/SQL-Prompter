@@ -36,12 +36,15 @@ VSIX vznikne v `src\SqlPrompter.Ssms\bin\Release\net48\SqlPrompter.Ssms.vsix`. T
 
 Odinstalace: `VSIXInstaller.exe /uninstall:SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6`.
 
-V nabídce **Tools → SQL Prompter** jsou příkazy **Obnovit metadata** a **Otevřít log**. Log je v `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` a obsahuje jen načítání metadat a chyby, žádná hesla ani obsah skriptů.
+Pokud SSMS po odebrání rozšíření hlásí, že se balíček (např. `PrototypePackage`) nenačetl, drží ještě starou registraci. Při zavřeném SSMS pomůže `SSMS.exe /updateconfiguration` ze složky `Common7\IDE`.
+
+V hlavní liště je menu **SQL Prompter** s příkazy **Obnovit metadata** a **Otevřít log**. Log je v `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` a obsahuje jen načítání metadat a chyby, žádná hesla ani obsah skriptů.
 
 ## Jak se chová
 
-- Kde rozšíření umí nabídnout úplný seznam, nahradí vestavěné IntelliSense. Jinde (proměnné, dočasné tabulky, CTE, `EXEC`, typy …) se neúčastní a funguje vestavěné IntelliSense.
-- Při prvním našeptání v databázi se metadata teprve načítají na pozadí, takže se ještě ukáže vestavěné IntelliSense. Naše návrhy se objeví při dalším našeptání. Stejně je to se sloupci tabulky, která se v okně objeví poprvé.
+- Seznam našeptávání je vždy od SQL Prompteru a poznáte ho podle tlačítka filtru **SQL Prompter** dole. Vestavěné IntelliSense zůstává zapnuté kvůli podtrhávání chyb a popiskům, jeho seznam se ale neukazuje.
+- Kde rozšíření kontext nezná (`EXEC`, `VALUES`, `SET @x =` …), nabídne klíčová slova, funkce a datové typy. U nových názvů (alias za `AS`, `@proměnná`, `#tabulka`) nenabídne nic.
+- Metadata se začnou načítat po aktivaci okna dotazu, včetně sloupců. Těsně po připojení k nové databázi můžou návrhy tabulek a sloupců chvíli chybět.
 - Návrh se vkládá klávesou Tab nebo Enter, mezera ani tečka ho nevkládají.
 - Seznam tabulek se otevře i po napsání mezery za `FROM`, `JOIN` a podobně.
 
@@ -57,5 +60,7 @@ Připojte okno k databázi s několika tabulkami a vyzkoušejte:
 | `SELECT * FROM dbo.T t WHERE t.` | Sloupce tabulky |
 | `SELECT  FROM dbo.A a JOIN dbo.B b ON 1=1` s kurzorem za `SELECT` a Ctrl+Mezerník | Sloupce obou tabulek, společné s aliasem |
 | `SELECT * FROM dbo.T t ` | `WHERE`, `JOIN` … bez pevného výběru: Enter odřádkuje |
-| `DECLARE @x int; SELECT @` | Vestavěné IntelliSense (proměnné) |
-| Okno přihlášené přes Entra ID | Jen klíčová slova, jinak vestavěné IntelliSense |
+| `DECLARE @x int; SELECT @` | Žádný seznam (proměnné zatím rozšíření nezná) |
+| `SELECT CAST(1 AS ` | Datové typy |
+| `EXEC ` a Ctrl+Mezerník | Klíčová slova a funkce bez pevného výběru |
+| Okno přihlášené přes Entra ID | Klíčová slova a funkce, bez tabulek a sloupců |

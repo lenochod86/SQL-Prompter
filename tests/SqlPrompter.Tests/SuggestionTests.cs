@@ -102,6 +102,48 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void NameContextIsEmpty()
+        {
+            Assert.Empty(SuggestionBuilder.Build(Analyze("SELECT * FROM dbo.Users AS |"), SampleDatabase()));
+        }
+
+        [Fact]
+        public void DataTypeContextOffersTypes()
+        {
+            var items = SuggestionBuilder.Build(Analyze("DECLARE @x nv|"), null);
+
+            Assert.All(items, i => Assert.Equal(SuggestionKind.DataType, i.Kind));
+            Assert.Contains(items, i => i.InsertText == "nvarchar");
+        }
+
+        [Fact]
+        public void FallbackOffersKeywordsFunctionsAndTypes()
+        {
+            var items = SuggestionBuilder.Build(Analyze("EXEC |"), null);
+
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Keyword);
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Function);
+            Assert.Contains(items, i => i.Kind == SuggestionKind.DataType);
+        }
+
+        [Fact]
+        public void KnownColumnsAreOfferedNextToUnknownSource()
+        {
+            var items = SuggestionBuilder.Build(Analyze("SELECT | FROM dbo.Users u JOIN #tmp t ON t.Id = u.Id"), SampleDatabase());
+
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == "Email");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Alias && i.InsertText == "t");
+        }
+
+        [Fact]
+        public void UnknownQualifiedSourceGivesEmptyList()
+        {
+            var items = SuggestionBuilder.Build(Analyze("WITH c AS (SELECT 1 AS x) SELECT c.| FROM c"), SampleDatabase());
+
+            Assert.Empty(items);
+        }
+
+        [Fact]
         public void ReadinessRequestsMissingColumns()
         {
             var readiness = Readiness.Evaluate(Analyze("SELECT u.| FROM dbo.Users u"), SampleDatabase(withColumns: false));

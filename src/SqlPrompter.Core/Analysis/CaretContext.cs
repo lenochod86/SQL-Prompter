@@ -5,8 +5,20 @@ namespace SqlPrompter.Core.Analysis
 {
     public enum ContextKind
     {
-        /// <summary>Rozšíření se neúčastní a nechá našeptávání vestavěnému IntelliSense.</summary>
+        /// <summary>Žádné našeptávání: řetězec, komentář, číslo.</summary>
         None,
+
+        /// <summary>
+        /// Uživatel píše nový nebo neznámý název (alias za AS, proměnná, #tabulka, neznámý kvalifikátor).
+        /// Seznam je prázdný, ale rozšíření se účastní, aby se neukázal vestavěný seznam.
+        /// </summary>
+        Name,
+
+        /// <summary>Datový typ: CAST(x AS …), DECLARE @x ….</summary>
+        DataType,
+
+        /// <summary>Místo, kterému rozšíření zatím nerozumí: klíčová slova, funkce a datové typy.</summary>
+        Fallback,
 
         /// <summary>Jen klíčová slova: začátek příkazu nebo místo za zdrojem tabulky.</summary>
         Keyword,

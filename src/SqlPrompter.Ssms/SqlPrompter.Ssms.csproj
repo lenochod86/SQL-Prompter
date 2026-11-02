@@ -51,4 +51,9 @@
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="Exists('$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets')" />
+
+  <!-- Přírůstkové sestavení jinak nepřebalí VSIX po změně source.extension.vsixmanifest (např. verze). -->
+  <Target Name="RefreshIntermediateVsixManifest" BeforeTargets="DetokenizeVsixManifestFile" Condition="'$(IntermediateVsixManifest)' != ''">
+    <Delete Files="$(IntermediateVsixManifest)" />
+  </Target>
 </Project>

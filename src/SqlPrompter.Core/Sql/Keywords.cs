@@ -80,6 +80,15 @@ namespace SqlPrompter.Core.Sql
             "TRANSLATE", "TRIM", "TRY_CAST", "TRY_CONVERT", "UPPER", "YEAR",
         };
 
+        /// <summary>Systémové datové typy SQL Serveru.</summary>
+        public static readonly IReadOnlyList<string> DataTypes = new[]
+        {
+            "BIGINT", "BINARY", "BIT", "CHAR", "DATE", "DATETIME", "DATETIME2", "DATETIMEOFFSET", "DECIMAL", "FLOAT",
+            "GEOGRAPHY", "GEOMETRY", "HIERARCHYID", "IMAGE", "INT", "MONEY", "NCHAR", "NTEXT", "NUMERIC", "NVARCHAR",
+            "REAL", "ROWVERSION", "SMALLDATETIME", "SMALLINT", "SMALLMONEY", "SQL_VARIANT", "SYSNAME", "TEXT", "TIME",
+            "TINYINT", "UNIQUEIDENTIFIER", "VARBINARY", "VARCHAR", "XML", "TABLE",
+        };
+
         public static bool IsReserved(string word) => word != null && Reserved.Contains(word);
 
         /// <summary>Slovo, které nemůže být aliasem zdroje tabulky.</summary>

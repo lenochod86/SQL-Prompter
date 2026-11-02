@@ -34,14 +34,17 @@ namespace SqlPrompter.Core.Completion
         public IReadOnlyList<DbObject> MissingColumns { get; }
 
         /// <summary>
-        /// Rozhodne, jestli může rozšíření na dané pozici nabídnout úplný seznam.
-        /// Pokud ne, má se našeptávání neúčastnit, aby zůstalo vestavěné IntelliSense.
+        /// Zjistí, jestli metadata stačí na úplný seznam a co je případně potřeba načíst.
+        /// Seznam se nabízí i tak; chybějící části se doplní při dalším našeptání.
         /// </summary>
         public static Readiness Evaluate(CaretContext context, IDatabaseMetadata metadata)
         {
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
+                case ContextKind.Name:
+                case ContextKind.DataType:
+                case ContextKind.Fallback:
                     return new Readiness(ReadinessState.Ready, null);
 
                 case ContextKind.ObjectName:

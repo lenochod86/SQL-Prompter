@@ -54,24 +54,32 @@ VisualStudio.Extensibility se nepoužívá: podporu v SSMS žádný dokument nep
 
 ## Průběh našeptání
 
-1. Na vlákně UI (`InitializeCompletion`) se vyřízne dávka mezi řádky `GO`, rozdělí se na tokeny a určí se kontext, třeba „sloupec aliasu `u`“. Rozhodnutí o účasti musí padnout tady, protože naše účast vestavěné IntelliSense potlačí.
-2. Ve stejném kroku se ověří, jestli metadata v cache stačí na úplný seznam. Když ne, spustí se jejich načtení na pozadí a rozšíření se našeptání neúčastní, takže nabídne vestavěné IntelliSense.
-3. Na pozadí (`GetCompletionContextAsync`) se z kontextu a snímku metadat sestaví a seřadí návrhy.
+1. Na vlákně UI (`InitializeCompletion`) se vyřízne dávka mezi řádky `GO`, rozdělí se na tokeny a určí se kontext, třeba „sloupec aliasu `u`“.
+2. Ve stejném kroku se zjistí, co z metadat chybí, a jeho načtení se spustí na pozadí.
+3. Na pozadí (`GetCompletionContextAsync`) se z kontextu a aktuálního snímku sestaví a seřadí návrhy.
 
-Na databázi se v tomto průběhu nikdy nečeká. Když sloupce ještě nejsou načtené, doplní se při dalším našeptání. Objekty ze skriptu (CTE, dočasné tabulky, proměnné) jsou etapa 3; do té doby jejich kontext obsluhuje vestavěné IntelliSense.
+Na databázi se v tomto průběhu nikdy nečeká. Metadata se začnou načítat už při aktivaci okna dotazu a se seznamem objektů se načtou i sloupce uživatelských objektů, takže bývají připravená dřív, než je uživatel potřebuje. Co chybí (sloupce systémových pohledů, první načtení), doplní se při dalším našeptání. Objekty ze skriptu (CTE, dočasné tabulky, proměnné) jsou etapa 3.
 
 ## Rozhodnutí
 
 - **Dva parsery.** Během psaní je SQL skoro vždy nedokončené, proto našeptávání používá vlastní tolerantní lexer a lehkou analýzu klauzulí. ScriptDOM od Microsoftu slouží k úplné analýze platných příkazů a pozdější diagnostice. Licenci ScriptDOM je potřeba ověřit před prvním použitím.
 - **Bez `Microsoft.SqlServer.Management.SqlParser` jako základu.** [Není open source][sqlparser] a podmínky jeho licence nejsou ověřené.
-- **Metadata jako neměnné snímky.** Každá databáze má vlastní snímek a sloupce se načítají až při potřebě. Obnova proběhne podle `sys.objects.modify_date`, po DDL v okně a ručním příkazem.
+- **Metadata jako neměnné snímky.** Každá databáze má vlastní snímek. Sloupce uživatelských objektů se načtou spolu s objekty, sloupce systémových pohledů až při potřebě. Obnova proběhne podle `sys.objects.modify_date`, po DDL v okně a ručním příkazem.
 - **Zabezpečení.** Hesla se nikam neukládají. Metadata na disk jen volitelně, protože i názvy objektů můžou být citlivé. Žádná telemetrie.
 - **Cílové výkonnostní limity (návrh).** Do 50 ms pro seznam z cache a žádné čekání na síť ve vlákně UI.
-- **Účast jen s úplným seznamem.** Naše účast vestavěné IntelliSense potlačí (prototyp, otázka 2). Rozšíření se proto účastní jen tam, kde zná kontext i všechny zdroje v aktuálním bloku a má načtené jejich sloupce. Jinak vrací `DoesNotParticipateInCompletion`, např. u proměnných, dočasných tabulek, CTE, odvozených tabulek ve výrazu, třídílných názvů, `VALUES`, `EXEC` nebo typů za `AS`.
+- **Jen náš seznam.** Naše účast potlačí vestavěný seznam (prototyp, otázka 2). Uživatel chce vidět jen návrhy SQL Prompteru (rozhodnuto 2026-11-02), proto se rozšíření účastní všude mimo řetězce, komentáře a čísla. Vestavěné IntelliSense zůstává zapnuté kvůli podtrhávání chyb a popiskům.
+  - Kde se píše nový nebo neznámý název (alias za `AS`, `@proměnná`, `#tabulka`, neznámý kvalifikátor, třídílný název), je seznam prázdný.
+  - Za `CAST(x AS` a `DECLARE @x` se nabízí datové typy.
+  - Na místech, kterým rozšíření nerozumí (`EXEC`, `VALUES`, `SET @x =` …), se nabízí klíčová slova, funkce a typy bez pevného výběru.
+  - S CTE nebo dočasnou tabulkou se nabídnou sloupce známých zdrojů, aliasy a funkce.
+  - Návrhy mají filtr „SQL Prompter“, podle kterého je seznam poznat.
+  - Neověřeno: jestli prázdný seznam vestavěný seznam opravdu potlačí.
 - **SqlClient z procesu SSMS.** Vlastní připojení vytváří `Microsoft.Data.SqlClient.SqlConnection` z kopie, kterou má SSMS načtenou (ověřeno prototypem, verze 6.0.0.0). VSIX žádný SqlClient nepřibaluje a Metadata pracuje jen s `DbConnection`. Balík SqlClient 6 navíc netstandard2.0 nepodporuje.
 - **Systémové objekty.** Metadata se čtou ze `sys.all_objects` a `sys.all_columns`, takže `sys.objects` nebo `INFORMATION_SCHEMA.TABLES` fungují stejně jako ve vestavěném IntelliSense. Bez schématu se systémové objekty nenabízejí.
 - **Vkládání.** Návrh se vkládá jen klávesou Tab nebo Enter, aby psaní aliasů nepřepsal první návrh. Tam, kde uživatel nejspíš píše vlastní název (za zdrojem tabulky nebo za hodnotou), je výběr jen naznačený (`SoftSelection`). Klíčová slova se vkládají malými písmeny, když je tak uživatel začal psát.
-- **Obnova metadat v MVP.** Nejvýš jednou za 30 s se při našeptání ověří otisk `sys.objects` (počet a nejnovější `modify_date`) a po změně se snímek načte znovu. K tomu slouží ruční příkaz Nástroje → SQL Prompter → Obnovit metadata. Obnova po DDL v okně zatím chybí.
+- **Obnova metadat v MVP.** Nejvýš jednou za 30 s se při našeptání ověří otisk `sys.objects` (počet a nejnovější `modify_date`) a po změně se snímek načte znovu. K tomu slouží ruční příkaz SQL Prompter → Obnovit metadata.
+- **Vlastní menu.** SQL Prompter má samostatné menu v hlavní liště (skupina `IDG_VS_MM_TOOLSADDINS`). Příkazy jsou ve skupinách, další funkce do nich přibudou.
+- **Sestavení VSIX.** Projekt před každým sestavením maže mezivýsledek manifestu v `obj`, jinak by přírůstkové sestavení nepřebalilo VSIX po změně verze. Obnova po DDL v okně zatím chybí.
 
 ## Prototyp
 
@@ -128,7 +136,7 @@ Kód je v `src/` a testy v `tests/`. Sestavení: `dotnet build SqlPrompter.slnx 
 
 Co MVP umí:
 
-- Klíčová slova na začátku příkazu, za zdrojem tabulky (`WHERE`, `JOIN` …) a ve výrazech.
+- Klíčová slova na začátku příkazu, za zdrojem tabulky (`WHERE`, `JOIN` …) a ve výrazech, datové typy za `CAST(x AS` a `DECLARE @x`.
 - Tabulky, pohledy a tabulkové funkce za `FROM`, `JOIN`, `APPLY`, `UPDATE`, `INSERT INTO`, `DELETE FROM`, `MERGE`, `USING` a `TRUNCATE`/`DROP`/`ALTER TABLE`, i se schématem (`sales.|`). Bez schématu se vkládají jako `schema.tabulka`.
 - Sloupce aliasu nebo tabulky (`u.|`, `dbo.Users.|`) a ve výrazech (`SELECT`, `WHERE`, `ON`, `GROUP BY`, `HAVING`, `ORDER BY`, `SET`) sloupce všech zdrojů bloku, aliasy a běžné vestavěné funkce. Sloupec, který je ve více zdrojích, se vkládá s aliasem.
 - Bloky dotazu: poddotaz ve výrazu vidí zdroje vnějšího dotazu, odvozená tabulka a CTE ne; `UNION` odděluje bloky. Příkazy se oddělují i bez středníku.

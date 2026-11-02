@@ -8,11 +8,11 @@ using Task = System.Threading.Tasks.Task;
 
 namespace SqlPrompter.Ssms
 {
-    /// <summary>Příkazy v nabídce Nástroje → SQL Prompter. Našeptávání samo běží přes MEF.</summary>
+    /// <summary>Příkazy v menu SQL Prompter v hlavní liště. Našeptávání samo běží přes MEF.</summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // Druhý parametr je verze nabídek. Po každé změně .vsct ho zvyšte, jinak SSMS použije nabídky z mezipaměti.
-    [ProvideMenuResource("Menus.ctmenu", 1)]
+    [ProvideMenuResource("Menus.ctmenu", 2)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {

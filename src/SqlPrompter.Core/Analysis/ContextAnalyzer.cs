@@ -46,14 +46,16 @@ namespace SqlPrompter.Core.Analysis
 
             var tokens = all.Where(t => t.Kind != TokenKind.Comment).ToList();
             var word = tokens.FirstOrDefault(t => t.Start < caret && caret <= t.End);
-            if (word != null && (word.Kind == TokenKind.Variable || word.Kind == TokenKind.Number ||
-                                 (word.Kind == TokenKind.Word && word.Text.StartsWith("#", StringComparison.Ordinal))))
+            if (word != null && word.Kind == TokenKind.Number)
             {
-                // Proměnné a dočasné tabulky nabízí vestavěné IntelliSense.
                 return CaretContext.None;
             }
 
-            if (word != null && word.Kind != TokenKind.Word && word.Kind != TokenKind.QuotedIdentifier)
+            // Proměnná nebo dočasná tabulka: rozšíření je zatím nezná, ale nesmí je nabízet ani vestavěné IntelliSense.
+            var namesUnknownObject = word != null &&
+                (word.Kind == TokenKind.Variable || (word.Kind == TokenKind.Word && word.Text.StartsWith("#", StringComparison.Ordinal)));
+
+            if (word != null && !namesUnknownObject && word.Kind != TokenKind.Word && word.Kind != TokenKind.QuotedIdentifier)
             {
                 // Kurzor hned za operátorem, tečkou nebo závorkou: žádné rozepsané slovo.
                 word = null;
@@ -70,12 +72,7 @@ namespace SqlPrompter.Core.Analysis
                 nameStart -= 2;
             }
 
-            if (nameStart >= 1 && tokens[nameStart - 1].Kind == TokenKind.Dot)
-            {
-                // db..tabulka, @t.sloupec a podobně
-                return CaretContext.None;
-            }
-
+            var unknownQualifier = nameStart >= 1 && tokens[nameStart - 1].Kind == TokenKind.Dot; // db..t, @t.sloupec
             var replaceStart = word?.Start ?? caret;
             var replaceLength = word != null ? word.End - word.Start : 0;
             var typed = word != null ? text.Substring(word.Start, caret - word.Start) : string.Empty;
@@ -107,12 +104,17 @@ namespace SqlPrompter.Core.Analysis
                 Qualifier = qualifier,
             };
 
+            if (namesUnknownObject || unknownQualifier)
+            {
+                return Make(ContextKind.Name);
+            }
+
             var anchorIndex = nameStart - 1;
             if (anchorIndex < statementStart || tokens[anchorIndex].Kind == TokenKind.Semicolon)
             {
                 if (qualifier.Count > 0)
                 {
-                    return CaretContext.None;
+                    return Make(ContextKind.Name);
                 }
 
                 var start = Make(ContextKind.Keyword);
@@ -134,7 +136,8 @@ namespace SqlPrompter.Core.Analysis
             {
                 if (qualifier.Count > 1)
                 {
-                    return CaretContext.None;
+                    // Jiná databáze nebo server: objekty z ní rozšíření nezná.
+                    return Make(ContextKind.Name);
                 }
 
                 var objectName = Make(ContextKind.ObjectName);
@@ -142,10 +145,17 @@ namespace SqlPrompter.Core.Analysis
                 return objectName;
             }
 
+            if (qualifier.Count == 0 &&
+                ((anchor.IsWord("AS") && IsCastArgument(structure, anchorIndex)) ||
+                 (anchor.Kind == TokenKind.Variable && tokens[statementStart].IsWord("DECLARE"))))
+            {
+                return Make(ContextKind.DataType);
+            }
+
             if (anchor.IsWord("AS"))
             {
-                // Pojmenování aliasu nebo typ v CAST(x AS …).
-                return CaretContext.None;
+                // Pojmenování aliasu.
+                return Make(ContextKind.Name);
             }
 
             var sources = CollectSources(structure, scopes);
@@ -173,7 +183,15 @@ namespace SqlPrompter.Core.Analysis
             // 3. Výraz.
             if (!IsExpressionClause(clauseState.Clause))
             {
-                return CaretContext.None;
+                if (qualifier.Count > 0)
+                {
+                    return Make(ContextKind.Name);
+                }
+
+                // EXEC, VALUES, SET @x = … a další místa, kterým rozšíření zatím nerozumí.
+                var fallback = Make(ContextKind.Fallback);
+                fallback.SoftSelection = true;
+                return fallback;
             }
 
             var expression = Make(ContextKind.Expression);
@@ -184,7 +202,8 @@ namespace SqlPrompter.Core.Analysis
                 var target = FindQualifiedSource(sources, qualifier);
                 if (target == null)
                 {
-                    return CaretContext.None;
+                    // Kvalifikátor nezná ani jako alias: schéma u funkce, CTE ve vnějším příkazu …
+                    return Make(ContextKind.Name);
                 }
 
                 expression.QualifiedSource = target;
@@ -192,6 +211,31 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return expression;
+        }
+
+        /// <summary>AS uvnitř CAST(…) nebo TRY_CAST(…), kde následuje datový typ.</summary>
+        private static bool IsCastArgument(Structure s, int asIndex)
+        {
+            var depth = 0;
+            for (var i = asIndex - 1; i >= s.StatementStart; i--)
+            {
+                var kind = s.Tokens[i].Kind;
+                if (kind == TokenKind.CloseParen)
+                {
+                    depth++;
+                }
+                else if (kind == TokenKind.OpenParen)
+                {
+                    if (depth == 0)
+                    {
+                        return i > s.StatementStart && (s.Tokens[i - 1].IsWord("CAST") || s.Tokens[i - 1].IsWord("TRY_CAST"));
+                    }
+
+                    depth--;
+                }
+            }
+
+            return false;
         }
 
         private static bool Contains(Token token, int caret)
