@@ -38,7 +38,7 @@ Odinstalace: `VSIXInstaller.exe /uninstall:SqlPrompter.0d66644a-dd92-4b87-ae9d-5
 
 Pokud SSMS po odebrání rozšíření hlásí, že se balíček (např. `PrototypePackage`) nenačetl, drží ještě starou registraci. Při zavřeném SSMS pomůže `SSMS.exe /updateconfiguration` ze složky `Common7\IDE`.
 
-V hlavní liště je menu **SQL Prompter** s příkazy **Obnovit metadata** a **Otevřít log**. Log je v `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` a obsahuje jen načítání metadat a chyby, žádná hesla ani obsah skriptů.
+Menu **SQL Prompter** s příkazy **Obnovit metadata** a **Otevřít log** je ve výchozím stavu pod **Extensions**. Do hlavní lišty ho přesunete v **Extensions → Customize Menu…** zrušením zaškrtnutí u SQL Prompter. Log je v `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` a obsahuje jen načítání metadat a chyby, žádná hesla ani obsah skriptů.
 
 ## Jak se chová
 

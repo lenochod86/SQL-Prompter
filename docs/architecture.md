@@ -78,7 +78,7 @@ Na databázi se v tomto průběhu nikdy nečeká. Metadata se začnou načítat 
 - **Systémové objekty.** Metadata se čtou ze `sys.all_objects` a `sys.all_columns`, takže `sys.objects` nebo `INFORMATION_SCHEMA.TABLES` fungují stejně jako ve vestavěném IntelliSense. Bez schématu se systémové objekty nenabízejí.
 - **Vkládání.** Návrh se vkládá jen klávesou Tab nebo Enter, aby psaní aliasů nepřepsal první návrh. Tam, kde uživatel nejspíš píše vlastní název (za zdrojem tabulky nebo za hodnotou), je výběr jen naznačený (`SoftSelection`). Klíčová slova se vkládají malými písmeny, když je tak uživatel začal psát.
 - **Obnova metadat v MVP.** Nejvýš jednou za 30 s se při našeptání ověří otisk `sys.objects` (počet a nejnovější `modify_date`) a po změně se snímek načte znovu. K tomu slouží ruční příkaz SQL Prompter → Obnovit metadata.
-- **Vlastní menu.** SQL Prompter má samostatné menu v hlavní liště (skupina `IDG_VS_MM_TOOLSADDINS`). Příkazy jsou ve skupinách, další funkce do nich přibudou.
+- **Vlastní menu.** SQL Prompter má samostatné menu (rodič `IDG_VS_MM_TOOLSADDINS`). Příkazy jsou ve skupinách, další funkce do nich přibudou. SSMS stejně jako VS od verze 2019 přesouvá menu rozšíření pod **Extensions** a rozšíření to nemůže změnit. Do hlavní lišty je vrátí uživatel v **Extensions → Customize Menu…** (ověřeno v SSMS 22.11: menu pod Tools zmizelo a v hlavní liště se samo neobjevilo).
 - **Sestavení VSIX.** Projekt před každým sestavením maže mezivýsledek manifestu v `obj`, jinak by přírůstkové sestavení nepřebalilo VSIX po změně verze. Obnova po DDL v okně zatím chybí.
 
 ## Prototyp
