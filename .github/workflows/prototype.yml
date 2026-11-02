@@ -1,0 +1,29 @@
+name: Prototyp VSIX
+
+on:
+  push:
+    paths:
+      - 'prototype/**'
+      - '.github/workflows/prototype.yml'
+  pull_request:
+    paths:
+      - 'prototype/**'
+      - '.github/workflows/prototype.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Sestavení VSIX
+        run: msbuild prototype/SqlPrompter.Prototype/SqlPrompter.Prototype.csproj /restore /p:Configuration=Release /p:DeployExtension=false /v:minimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SqlPrompter.Prototype
+          path: prototype/SqlPrompter.Prototype/bin/Release/*.vsix
+          if-no-files-found: error

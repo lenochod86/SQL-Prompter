@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidPrototypePackage">
+    <Menus>
+      <Menu guid="guidPrototypeCmdSet" id="PrototypeMenu" priority="0x0100" type="Menu">
+        <Parent guid="guidPrototypeCmdSet" id="ToolsMenuGroup" />
+        <Strings>
+          <ButtonText>SQL Prompter (prototyp)</ButtonText>
+        </Strings>
+      </Menu>
+    </Menus>
+
+    <Groups>
+      <Group guid="guidPrototypeCmdSet" id="ToolsMenuGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
+      <Group guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" priority="0x0100">
+        <Parent guid="guidPrototypeCmdSet" id="PrototypeMenu" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidPrototypeCmdSet" id="cmdidDumpConnection" priority="0x0100" type="Button">
+        <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
+        <Strings>
+          <ButtonText>Vypsat připojení aktivního okna</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidPrototypeCmdSet" id="cmdidTestConnection" priority="0x0101" type="Button">
+        <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
+        <Strings>
+          <ButtonText>Otestovat vlastní připojení (jen čtení)</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidPrototypeCmdSet" id="cmdidOpenLog" priority="0x0102" type="Button">
+        <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
+        <Strings>
+          <ButtonText>Otevřít log prototypu</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidPrototypePackage" value="{3ec85663-3d4b-488d-9bf5-3df6d2104b8a}" />
+    <GuidSymbol name="guidPrototypeCmdSet" value="{86694616-b33b-4f53-b202-d741c0bf3567}">
+      <IDSymbol name="ToolsMenuGroup" value="0x1000" />
+      <IDSymbol name="PrototypeMenu" value="0x1001" />
+      <IDSymbol name="PrototypeMenuGroup" value="0x1002" />
+      <IDSymbol name="cmdidDumpConnection" value="0x0100" />
+      <IDSymbol name="cmdidTestConnection" value="0x0101" />
+      <IDSymbol name="cmdidOpenLog" value="0x0102" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

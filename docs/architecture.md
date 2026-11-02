@@ -2,7 +2,7 @@
 
 Rozšíření s vlastním IntelliSense pro SQL Server Management Studio 22.
 
-**Stav:** návrh. V SSMS 22 zatím nic neběželo. Závěry označené jako hypotéza musí potvrdit prototyp (viz [Prototyp](#prototyp)).
+**Stav:** návrh a nespuštěný prototyp. V SSMS 22 zatím nic neběželo. Závěry označené jako hypotéza musí potvrdit prototyp (viz [Prototyp](#prototyp)).
 
 ## Shrnutí
 
@@ -76,6 +76,17 @@ Bez kladných odpovědí nemá smysl stavět zbytek:
 1. **Načte se MEF rozšíření v SSMS 22 a funguje v SQL editoru?** Názvy typů obsahu nejsou spolehlivě zdokumentované, takže je prototyp za běhu vypíše. Musí také ukázat, že SQL editor opravdu používá `IAsyncCompletionSource`.
 2. **Půjde se vedle vestavěného IntelliSense vyhnout duplicitám?** Možná bude potřeba vestavěné našeptávání vypnout nebo jeho výsledky potlačit.
 3. **Jak získat připojení aktivního okna?** `ScriptFactory.CurrentlyActiveWndConnectionInfo` je [zdokumentované jen pro starší verze][scriptfactory]. Zvlášť je potřeba ověřit přihlášení přes Entra ID a MFA, kde nemusí jít připojení jednoduše znovu vytvořit.
+
+### Stav prototypu
+
+Kód je v [`prototype/`](../prototype/README.md): diagnostické VSIX, které vše zapisuje do `%LOCALAPPDATA%\SqlPrompter\prototype.log`. README obsahuje postup testu a tabulku výsledků. Zatím se nesestavilo ani nespustilo v SSMS 22, žádná ze tří otázek tedy není zodpovězená.
+
+Hypotézy, které prototyp ověřuje navíc:
+
+- `InstallationTarget Id="Microsoft.VisualStudio.Ssms"` s verzemi `[22.0,23.0)` a prerekvizita `Microsoft.VisualStudio.Component.CoreEditor` ve VSIX manifestu.
+- Rozšíření jde zaregistrovat pro typ obsahu `any` a SQL editor poznat za běhu podle názvu typu obsahu.
+- `ScriptFactory` je dosažitelný reflexí, bez odkazu na sestavení SSMS při sestavení.
+- Vlastní připojení může používat `Microsoft.Data.SqlClient`, který už je v procesu SSMS načtený, takže ho VSIX nemusí přibalovat.
 
 ## Etapy
 

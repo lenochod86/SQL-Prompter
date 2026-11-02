@@ -6,7 +6,7 @@ Před návrhem nebo změnou architektury si přečti `docs/architecture.md`.
 
 ## Aktuální stav
 
-Projekt je ve fázi návrhu a kód zatím neexistuje. Další krok je prototyp popsaný v `docs/architecture.md`. Dokud neodpoví na své tři otázky, nestav MVP.
+Projekt je ve fázi prototypu. Diagnostické VSIX v `prototype/` je napsané, ale ještě neběželo v SSMS 22. Další krok je spustit ho podle `prototype/README.md` a zapsat výsledky do `docs/architecture.md`. Dokud prototyp neodpoví na své tři otázky, nestav MVP.
 
 ## Pravidla
 
