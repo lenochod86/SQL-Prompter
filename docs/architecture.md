@@ -62,7 +62,7 @@ Na databázi se v tomto průběhu nikdy nečeká. Metadata se začnou načítat 
 
 ## Rozhodnutí
 
-- **Dva parsery.** Během psaní je SQL skoro vždy nedokončené, proto našeptávání používá vlastní tolerantní lexer a lehkou analýzu klauzulí. ScriptDOM od Microsoftu slouží k úplné analýze platných příkazů a pozdější diagnostice. Licenci ScriptDOM je potřeba ověřit před prvním použitím.
+- **Dva parsery.** Během psaní je SQL skoro vždy nedokončené, proto našeptávání používá vlastní tolerantní lexer a lehkou analýzu klauzulí. ScriptDOM od Microsoftu slouží k úplné analýze platných příkazů a pozdější diagnostice. ScriptDOM je [open source pod licencí MIT](https://github.com/microsoft/sqlscriptdom) a podporuje netstandard2.0 (ověřeno 2026-11-02). Plán dalších etap je v [roadmap.md](roadmap.md).
 - **Bez `Microsoft.SqlServer.Management.SqlParser` jako základu.** [Není open source][sqlparser] a podmínky jeho licence nejsou ověřené.
 - **Metadata jako neměnné snímky.** Každá databáze má vlastní snímek. Sloupce uživatelských objektů se načtou spolu s objekty, sloupce systémových pohledů až při potřebě. Obnova proběhne podle `sys.objects.modify_date`, po DDL v okně a ručním příkazem.
 - **Zabezpečení.** Hesla se nikam neukládají. Metadata na disk jen volitelně, protože i názvy objektů můžou být citlivé. Žádná telemetrie.

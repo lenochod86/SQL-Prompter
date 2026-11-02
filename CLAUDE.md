@@ -2,7 +2,7 @@
 
 Rozšíření s vlastním IntelliSense pro SSMS 22. Komunikuj česky.
 
-Před návrhem nebo změnou architektury si přečti `docs/architecture.md`.
+Před návrhem nebo změnou architektury si přečti `docs/architecture.md`. Plán etap je v `docs/roadmap.md`.
 
 ## Aktuální stav
 
