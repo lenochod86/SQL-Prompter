@@ -16,7 +16,8 @@ namespace SqlPrompter.Prototype
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
-    [ProvideMenuResource("Menus.ctmenu", 1)]
+    // Druhý parametr je verze nabídek. Po každé změně .vsct ho zvyšte, jinak SSMS použije nabídky z mezipaměti.
+    [ProvideMenuResource("Menus.ctmenu", 2)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class PrototypePackage : AsyncPackage
     {

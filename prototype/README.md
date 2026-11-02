@@ -35,6 +35,12 @@ Manifest cílí na `Microsoft.VisualStudio.Ssms` `[22.0,23.0)`. Stejné Id (s `V
 2. Pokud instalace selže na prerekvizitě `Microsoft.VisualStudio.Component.CoreEditor`, odeberte ji z manifestu a zapište to.
 3. Spusťte SSMS a ověřte, že log obsahuje `=== Prototyp SQL Prompter načten ===`.
 
+Novější verze (vyšší `Version` v manifestu) se nainstaluje přes starší. SSMS 22.11 nemá v nabídce správce rozšíření, takže se odinstalovává z příkazové řádky při zavřeném SSMS. `ab48d67c` je `InstallationID` z `Common7\IDE\SSMS.isolation.ini`:
+
+```powershell
+& "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\VSIXInstaller.exe" /instanceIds:ab48d67c /uninstall:SqlPrompter.Prototype.c9efd892-d89f-4178-8e0d-a9b7f925e617
+```
+
 ## Postup testu
 
 Před každým během smažte log, aby se výsledky nemíchaly.
