@@ -89,18 +89,22 @@ Kód je v [`prototype/`](../prototype/README.md): diagnostické VSIX, které vš
 - V SSMS je načtený `Microsoft.Data.SqlClient` 6.0.0.0. DTE hlásí `Version=18.0` a `Edition=SSMS`.
 - Vlastnosti bufferu SQL okna neobsahují nic, co by souviselo s připojením.
 
-**Otázka 2: předběžně bez duplicit, nutný kontrolní test.**
+**Otázka 2: ano, duplicity nevznikají.**
 
-- Při psaní (`CREATE TABLE …`) se zobrazil jen seznam s `hello`. Vestavěné IntelliSense žádný vlastní seznam neukázalo a do asynchronní relace nepřidalo žádné položky.
-- S vypnutým vestavěným IntelliSense `hello` zůstává.
-- Neověřeno je, jestli vestavěný seznam potlačuje naše relace, nebo jestli v testovaných místech nic nenabízel. Prototyp 0.0.2 má v nabídce příkaz pro vypnutí `hello`, takže jde porovnat stejné místo s naším zdrojem a bez něj.
+- Kontrolní test na `SELECT * FROM sys.ob`: s vypnutým `hello` se zobrazí vestavěný seznam SSMS, se zapnutým jen náš seznam. Vestavěné IntelliSense do asynchronní relace nepřidává žádné položky a jeho seznam se vedle našeho neukáže.
+- Kde náš zdroj vrátí `DoesNotParticipateInCompletion`, vestavěné IntelliSense funguje dál. S vypnutým vestavěným IntelliSense náš zdroj funguje taky.
+- Důsledek pro návrh: kde se náš zdroj účastní, nahrazuje vestavěné IntelliSense úplně, takže musí nabídnout vše potřebné. Kde nemá co nabídnout (třeba kontext, který zatím neumí), má vrátit `DoesNotParticipateInCompletion` a nechat prostor vestavěnému IntelliSense. Vestavěné IntelliSense uživatel vypínat nemusí.
+- Neověřeno, jakým mechanismem SSMS vestavěné IntelliSense potlačí. Pro MVP to stačí, protože chování je stabilní a ovladatelné z našeho zdroje.
 
-**Otázka 3: `ScriptFactory` v SSMS 22 funguje, zbývá vlastní připojení a další typy ověření.**
+**Otázka 3: pro přihlášení SQL Serverem ano, Windows a Entra ID zbývají.**
+
+- Vlastní připojení z údajů okna (včetně hesla z paměti SSMS a převzatého `Encrypt`/`TrustServerCertificate`) se otevře za zhruba 100 ms.
+- `AdvancedOptions[DATABASE]` sleduje databázi zvolenou v rozbalovacím seznamu okna, takže stačí číst ho při každém našeptání.
 
 - `ScriptFactory.Instance.CurrentlyActiveWndConnectionInfo` (`SQLEditors.dll` 22.200) je dosažitelný reflexí. `UIConnectionInfo` (`Microsoft.SqlServer.RegSvrEnum` 18.100) obsahuje `ServerName`, `UserName`, `AuthenticationType` (SQL Server = 1), `Password` a `InMemoryPassword` (`SecureString`) a `RenewableToken` (u SQL přihlášení `null`, kandidát pro Entra ID).
 - `AdvancedOptions` obsahuje `DATABASE`, `ENCRYPT_CONNECTION`, `TRUST_SERVER_CERTIFICATE`, `CONNECTION_TIMEOUT`, `PACKET_SIZE` a údaje o serveru. Vlastní připojení musí šifrování převzít, jinak SqlClient 6 (`Encrypt=Mandatory`) selže na certifikátu podepsaném sám sebou.
 - Mezi kandidátními typy je `Microsoft.SqlServer.Management.ServerInformation.IServerConnectionInformation` (`Microsoft.SqlServer.Management.SDK.SqlStudio` 22.200). Může se hodit jako náhrada.
-- Neověřeno: úspěšné vlastní připojení, přihlášení přes Windows a Entra ID s MFA a to, jestli `DATABASE` sleduje změnu databáze v okně.
+- Neověřeno: přihlášení přes Windows a Entra ID s MFA a to, jestli se `DATABASE` změní i po `USE` ve skriptu.
 
 Zjištěno z instalace SSMS 22.11.3:
 

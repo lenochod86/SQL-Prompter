@@ -6,7 +6,7 @@ Před návrhem nebo změnou architektury si přečti `docs/architecture.md`.
 
 ## Aktuální stav
 
-Projekt je ve fázi prototypu. Diagnostické VSIX v `prototype/` je napsané, ale ještě neběželo v SSMS 22. Další krok je spustit ho podle `prototype/README.md` a zapsat výsledky do `docs/architecture.md`. Dokud prototyp neodpoví na své tři otázky, nestav MVP.
+Prototyp v `prototype/` běžel v SSMS 22.11 a na všechny tři otázky odpověděl kladně (výsledky v `docs/architecture.md`). Neověřené zůstává jen připojení přes Windows a Entra ID s MFA. Další krok je MVP.
 
 ## Pravidla
 

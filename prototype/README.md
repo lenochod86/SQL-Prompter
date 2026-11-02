@@ -83,10 +83,10 @@ Vyplňte po běhu v SSMS 22 a přeneste do `docs/architecture.md`.
 | Balíček se načte | ano, na pozadí, příkazy zaregistrované | 22.11.3, 2026-11-02 |
 | Typ obsahu SQL editoru a jeho bázové typy | `"SQL"` → `"code"` → `"text"` → `"any"`, nad ním projekční buffer `"projection"` | 22.11.3, 2026-11-02 |
 | `IAsyncCompletionSource` funguje v SQL editoru | ano: `hello` se po `hel` zobrazí, `IsCompletionSupported=True`, `GetCompletionContextAsync` běží mimo vlákno UI | 22.11.3, 2026-11-02 |
-| Vestavěné IntelliSense: stejná relace / samostatný seznam / starší API | předběžně: při psaní `CREATE TABLE` se zobrazí jen `hello`, vestavěný seznam ne a do naší relace nic nepřidá. Chybí kontrolní test s vypnutým `hello` (příkaz v nabídce, verze 0.0.2) | 22.11.3, 2026-11-02 |
+| Vestavěné IntelliSense: stejná relace / samostatný seznam / starší API | ani jedno: když náš zdroj dodává položky, vestavěný seznam se nezobrazí; když se neúčastní, vestavěný funguje (`sys.ob` s vypnutým a zapnutým `hello`) | 22.11.3, 2026-11-02 |
 | Lze vestavěné IntelliSense vypnout, aniž by zmizelo `hello` | ano | 22.11.3, 2026-11-02 |
 | `ScriptFactory.CurrentlyActiveWndConnectionInfo` existuje | ano, reflexí: `SQLEditors.dll` 22.200, typ `UIConnectionInfo` z `Microsoft.SqlServer.RegSvrEnum` | 22.11.3, 2026-11-02 |
 | Připojení: Windows | neověřeno | |
-| Připojení: SQL Server (heslo dostupné?) | údaje včetně hesla dostupné (`AuthenticationType=1`). Vlastní připojení ve verzi 0.0.1 selhalo na certifikátu, protože nepřevzalo `TRUST_SERVER_CERTIFICATE`; opraveno ve verzi 0.0.2, neověřeno | 22.11.3, 2026-11-02 |
+| Připojení: SQL Server (heslo dostupné?) | ano: údaje včetně hesla dostupné (`AuthenticationType=1`), vlastní připojení s převzatým `Encrypt`/`TrustServerCertificate` OK za 91–114 ms | 22.11.3, 2026-11-02 |
 | Připojení: Entra ID MFA (nutné znovu přihlásit?) | neověřeno | |
-| Změna databáze v okně je vidět | neověřeno | |
+| Změna databáze v okně je vidět | ano, `AdvancedOptions[DATABASE]` sleduje rozbalovací seznam (`test` → `tempdb`) | 22.11.3, 2026-11-02 |
