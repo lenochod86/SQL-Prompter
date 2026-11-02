@@ -237,14 +237,18 @@ namespace SqlPrompter.Ssms
     }
 
     /// <summary>
-    /// Návrh se vkládá jen klávesou Tab nebo Enter. Mezera, čárka ani tečka nic nevkládají,
-    /// aby psaní aliasů a vlastních názvů nepřepsal první návrh.
+    /// Mezera, tečka, čárka, závorky a operátory vloží vybraný návrh a pak se zapíšou samy,
+    /// takže „e.“ vloží alias a otevře jeho sloupce. Bez nich by seznam zůstal otevřený a čekal na volbu.
+    /// Při naznačeném výběru (SoftSelection, např. při psaní aliasu) editor tyto znaky nevkládá jako návrh.
     /// </summary>
     internal sealed class SqlCommitManager : IAsyncCompletionCommitManager
     {
-        public IEnumerable<char> PotentialCommitCharacters => Array.Empty<char>();
+        private static readonly char[] CommitCharacters = { ' ', '.', ',', '(', ')', ';', '=', '<', '>', '+', '-', '*', '/', '%' };
 
-        public bool ShouldCommitCompletion(IAsyncCompletionSession session, SnapshotPoint location, char typedChar, CancellationToken token) => false;
+        public IEnumerable<char> PotentialCommitCharacters => CommitCharacters;
+
+        public bool ShouldCommitCompletion(IAsyncCompletionSession session, SnapshotPoint location, char typedChar, CancellationToken token) =>
+            Array.IndexOf(CommitCharacters, typedChar) >= 0;
 
         public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token) =>
             CommitResult.Unhandled;

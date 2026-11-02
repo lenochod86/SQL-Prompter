@@ -45,7 +45,7 @@ Menu **SQL Prompter** s příkazy **Obnovit metadata** a **Otevřít log** je ve
 - Seznam našeptávání je vždy od SQL Prompteru a poznáte ho podle tlačítka filtru **SQL Prompter** dole. Vestavěné IntelliSense zůstává zapnuté kvůli podtrhávání chyb a popiskům, jeho seznam se ale neukazuje.
 - Kde rozšíření kontext nezná (`EXEC`, `VALUES`, `SET @x =` …), nabídne klíčová slova, funkce a datové typy. U nových názvů (alias za `AS`, `@proměnná`, `#tabulka`) nenabídne nic.
 - Metadata se začnou načítat po aktivaci okna dotazu, včetně sloupců. Těsně po připojení k nové databázi můžou návrhy tabulek a sloupců chvíli chybět.
-- Návrh se vkládá klávesou Tab nebo Enter, mezera ani tečka ho nevkládají.
+- Vybraný návrh vloží Tab, Enter, mezera, tečka, čárka, závorka nebo operátor. Za tabulkou, kde se píše alias, je výběr jen naznačený a vloží ho jen Tab.
 - Seznam tabulek se otevře i po napsání mezery za `FROM`, `JOIN` a podobně.
 
 ## Ruční test v SSMS
