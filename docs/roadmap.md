@@ -26,25 +26,25 @@ Přehled toho, co SQL Prompt (a u JOINů [dbForge SQL Complete][dbforge] a [Apex
 | Objekty jiné databáze (`db.schema.tabulka`), synonyma, `USE` ve skriptu | A | 2 |
 | **Návrh JOINu**: tabulky související cizím klíčem nahoře a celý `JOIN … ON …` jako jedna položka | A | 3 |
 | **Návrh podmínky za `ON`**: podle cizích klíčů, pak podle názvů sloupců (`UserId` ↔ `Users.Id`, stejné názvy) | A | 3 |
-| Sloupce se seznamem v `INSERT INTO t (` a kostra `VALUES` | A | 4 |
-| Procedury v `EXEC` a jejich parametry, skalární a tabulkové funkce s parametry | A | 4 |
-| Nápověda k parametrům při psaní (signature help) | B | 4 |
-| Rozbalení `*` na seznam sloupců (Tab za `*`) | A | 4 |
-| Popisek objektu po najetí myší (sloupce, typy, definice) | B | 4 |
-| `GROUP BY` doplněné ze sloupců v `SELECT`, aliasy v `ORDER BY` | B | 4 |
-| Řazení podle používání (lokální statistika, nic se neodesílá) | B | 4 |
-| Návrhy klíčových slov podle gramatiky místa (`ORDER BY` jen kde dává smysl …) | B | 4 |
+| Sloupce se seznamem v `INSERT INTO t (` a kostra `VALUES` | A | 5 |
+| Procedury v `EXEC` a jejich parametry, skalární a tabulkové funkce s parametry | A | 5 |
+| Nápověda k parametrům při psaní (signature help) | B | 5 |
+| Rozbalení `*` na seznam sloupců (Tab za `*`) | A | 5 |
+| Popisek objektu po najetí myší (sloupce, typy, definice) | B | 5 |
+| `GROUP BY` doplněné ze sloupců v `SELECT`, aliasy v `ORDER BY` | B | 5 |
+| Řazení podle používání (lokální statistika, nic se neodesílá) | B | 5 |
+| Návrhy klíčových slov podle gramatiky místa (`ORDER BY` jen kde dává smysl …) | B | 5 |
 | Kontrola a doplnění středníků | C | 7 |
 
 ### Snippety
 
 | Funkce | Priorita | Etapa |
 |---|---|---|
-| Vestavěná sada snippetů s běžnými zkratkami (`ssf`, `scf`, `ii`, `uu`, `df`, `ct` …) | A | 5 |
-| Zástupné symboly: kurzor, vybraný text, datum, uživatel, databáze, pole pro vyplnění | A | 5 |
-| Vlastní snippety uživatele, soubor ve sdíleném adresáři pro tým | A | 5 |
-| **Import snippetů ze SQL Promptu** | A | 5 |
-| Editor snippetů v nastavení | B | 5 |
+| Vestavěná sada snippetů s běžnými zkratkami (`ssf`, `scf`, `ii`, `uu`, `df`, `ct` …) | A | 4 |
+| Zástupné symboly: kurzor, vybraný text, datum, uživatel, databáze, pole pro vyplnění | A | 4 |
+| Vlastní snippety uživatele, soubor ve sdíleném adresáři pro tým | A | 4 |
+| **Import snippetů ze SQL Promptu** | A | 4 |
+| Editor snippetů v nastavení | B | 4 |
 
 ### Formátování
 
