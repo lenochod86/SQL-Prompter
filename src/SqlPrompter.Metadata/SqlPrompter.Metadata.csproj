@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Metadata z sys.* přes System.Data.Common. Konkrétní SqlConnection dodává hostitel,
+       v SSMS jde o Microsoft.Data.SqlClient, který už je v procesu načtený. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>SqlPrompter.Metadata</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SqlPrompter.Core\SqlPrompter.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SqlPrompter.Tests" />
+  </ItemGroup>
+
+</Project>

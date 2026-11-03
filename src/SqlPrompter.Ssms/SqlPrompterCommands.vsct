@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidSqlPrompterPackage">
+    <Menus>
+      <!-- Samostatné menu v hlavní liště vedle Tools, Extensions a Window. Další příkazy patří do jeho skupin. -->
+      <Menu guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" priority="0x0700" type="Menu">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_MM_TOOLSADDINS" />
+        <Strings>
+          <ButtonText>SQL Prompter</ButtonText>
+          <CommandName>SQL Prompter</CommandName>
+        </Strings>
+      </Menu>
+    </Menus>
+
+    <Groups>
+      <Group guid="guidSqlPrompterCmdSet" id="MetadataGroup" priority="0x0100">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRefreshMetadata" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="MetadataGroup" />
+        <Strings>
+          <ButtonText>Obnovit metadata</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+        <Strings>
+          <ButtonText>Otevřít log</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidSqlPrompterPackage" value="{a3a4db19-c58e-4eac-8a84-ba61357b9b01}" />
+    <GuidSymbol name="guidSqlPrompterCmdSet" value="{15e19ce9-b3c9-47dd-97f9-49fe13869730}">
+      <IDSymbol name="SqlPrompterMenu" value="0x1001" />
+      <IDSymbol name="MetadataGroup" value="0x1010" />
+      <IDSymbol name="DiagnosticsGroup" value="0x1011" />
+      <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
+      <IDSymbol name="cmdidOpenLog" value="0x0101" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

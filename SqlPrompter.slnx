@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SqlPrompter.Core/SqlPrompter.Core.csproj" />
+    <Project Path="src/SqlPrompter.Metadata/SqlPrompter.Metadata.csproj" />
+    <Project Path="src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SqlPrompter.Tests/SqlPrompter.Tests.csproj" />
+  </Folder>
+</Solution>

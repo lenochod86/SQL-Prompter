@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <Identity Id="SqlPrompter.Prototype.c9efd892-d89f-4178-8e0d-a9b7f925e617" Version="0.0.2" Language="en-US" Publisher="SQL Prompter" />
+    <DisplayName>SQL Prompter (prototyp)</DisplayName>
+    <Description xml:space="preserve">Diagnosticky prototyp: vypisuje typy obsahu editoru, nabizi staticky navrh "hello" a zkouma pripojeni aktivniho okna. Log: %LOCALAPPDATA%\SqlPrompter\prototype.log</Description>
+  </Metadata>
+  <Installation>
+    <!-- Id "Microsoft.VisualStudio.Ssms" pouzivaji vestavena rozsireni SSMS 22.11 (s Version="[22.0,)").
+         Ze VSIXInstaller nasi VSIX do SSMS opravdu nainstaluje, zatim overeno neni. -->
+    <InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,23.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Ssms" Version="[22.0,23.0)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+    <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%|" />
+  </Assets>
+</PackageManifest>

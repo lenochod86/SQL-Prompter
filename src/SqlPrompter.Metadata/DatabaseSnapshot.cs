@@ -1,0 +1,110 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using SqlPrompter.Core.Model;
+
+namespace SqlPrompter.Metadata
+{
+    /// <summary>Neměnný snímek metadat jedné databáze. Doplnění sloupců vytvoří nový snímek.</summary>
+    public sealed class DatabaseSnapshot : IDatabaseMetadata
+    {
+        private readonly Dictionary<string, DbObject> byName;
+        private readonly HashSet<string> schemaSet;
+        private readonly IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> columns;
+
+        public DatabaseSnapshot(
+            string databaseName,
+            string defaultSchema,
+            IReadOnlyList<string> schemas,
+            IReadOnlyList<DbObject> objects,
+            string version,
+            IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> columns = null)
+        {
+            DatabaseName = databaseName ?? string.Empty;
+            DefaultSchema = string.IsNullOrEmpty(defaultSchema) ? "dbo" : defaultSchema;
+            Schemas = schemas ?? Array.Empty<string>();
+            Objects = objects ?? Array.Empty<DbObject>();
+            Version = version;
+            this.columns = columns ?? new Dictionary<int, IReadOnlyList<DbColumn>>();
+            schemaSet = new HashSet<string>(Schemas, StringComparer.OrdinalIgnoreCase);
+            byName = new Dictionary<string, DbObject>(StringComparer.OrdinalIgnoreCase);
+            foreach (var dbObject in Objects)
+            {
+                byName[Key(dbObject.Schema, dbObject.Name)] = dbObject;
+            }
+        }
+
+        private DatabaseSnapshot(DatabaseSnapshot source, IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> columns)
+        {
+            DatabaseName = source.DatabaseName;
+            DefaultSchema = source.DefaultSchema;
+            Schemas = source.Schemas;
+            Objects = source.Objects;
+            Version = source.Version;
+            byName = source.byName;
+            schemaSet = source.schemaSet;
+            this.columns = columns;
+        }
+
+        public string DatabaseName { get; }
+
+        public string DefaultSchema { get; }
+
+        public IReadOnlyList<string> Schemas { get; }
+
+        public IReadOnlyList<DbObject> Objects { get; }
+
+        /// <summary>Otisk stavu objektů v databázi; když se změní, snímek je zastaralý.</summary>
+        public string Version { get; }
+
+        public int LoadedColumnObjects => columns.Count;
+
+        public DbObject FindObject(string schema, string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(schema))
+            {
+                return byName.TryGetValue(Key(schema, name), out var exact) ? exact : null;
+            }
+
+            if (byName.TryGetValue(Key(DefaultSchema, name), out var inDefault))
+            {
+                return inDefault;
+            }
+
+            return byName.TryGetValue(Key("dbo", name), out var inDbo) ? inDbo : null;
+        }
+
+        public bool HasSchema(string schema) => schema != null && schemaSet.Contains(schema);
+
+        public IReadOnlyList<DbColumn> GetColumns(DbObject dbObject)
+        {
+            return dbObject != null && columns.TryGetValue(dbObject.Id, out var list) ? list : null;
+        }
+
+        public bool HasColumns(int objectId) => columns.ContainsKey(objectId);
+
+        /// <summary>Nový snímek s doplněnými sloupci. Původní se nemění.</summary>
+        public DatabaseSnapshot WithColumns(IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> added)
+        {
+            if (added == null || added.Count == 0)
+            {
+                return this;
+            }
+
+            var merged = columns.ToDictionary(p => p.Key, p => p.Value);
+            foreach (var pair in added)
+            {
+                merged[pair.Key] = pair.Value;
+            }
+
+            return new DatabaseSnapshot(this, merged);
+        }
+
+        private static string Key(string schema, string name) => schema + "\u0001" + name;
+    }
+}
