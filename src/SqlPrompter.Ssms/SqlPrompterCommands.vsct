@@ -5,7 +5,7 @@
 
   <Commands package="guidSqlPrompterPackage">
     <Menus>
-      <!-- Samostatné menu v hlavní liště vedle Tools, Extensions a Window. Další příkazy patří do jeho skupin. -->
+      <!-- Own menu next to Tools, Extensions and Window (SSMS moves it under Extensions by default). New commands go into its groups. -->
       <Menu guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" priority="0x0700" type="Menu">
         <Parent guid="guidSHLMainMenu" id="IDG_VS_MM_TOOLSADDINS" />
         <Strings>
@@ -28,13 +28,13 @@
       <Button guid="guidSqlPrompterCmdSet" id="cmdidRefreshMetadata" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="MetadataGroup" />
         <Strings>
-          <ButtonText>Obnovit metadata</ButtonText>
+          <ButtonText>Refresh Metadata</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
-          <ButtonText>Otevřít log</ButtonText>
+          <ButtonText>Open Log</ButtonText>
         </Strings>
       </Button>
     </Buttons>

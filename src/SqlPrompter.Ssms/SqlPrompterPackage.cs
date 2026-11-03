@@ -8,11 +8,11 @@ using Task = System.Threading.Tasks.Task;
 
 namespace SqlPrompter.Ssms
 {
-    /// <summary>Příkazy v menu SQL Prompter v hlavní liště. Našeptávání samo běží přes MEF.</summary>
+    /// <summary>Commands of the SQL Prompter menu. Completion itself runs through MEF.</summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
-    // Druhý parametr je verze nabídek. Po každé změně .vsct ho zvyšte, jinak SSMS použije nabídky z mezipaměti.
-    [ProvideMenuResource("Menus.ctmenu", 2)]
+    // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
+    [ProvideMenuResource("Menus.ctmenu", 3)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {
@@ -23,7 +23,7 @@ namespace SqlPrompter.Ssms
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
-            Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " načten.");
+            Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             if (await GetServiceAsync(typeof(IMenuCommandService)) is OleMenuCommandService commands)
             {
@@ -35,7 +35,7 @@ namespace SqlPrompter.Ssms
         private static void RefreshMetadata()
         {
             MetadataService.Current?.Caches.InvalidateAll();
-            Log.Write("Metadata zahozena, při dalším našeptání se načtou znovu.");
+            Log.Write("Metadata dropped; it is loaded again on the next completion.");
         }
 
         private void OpenLog()
@@ -47,7 +47,7 @@ namespace SqlPrompter.Ssms
             }
             catch (Exception ex)
             {
-                Log.Error("Otevření logu selhalo", ex);
+                Log.Error("Opening the log failed", ex);
             }
         }
     }

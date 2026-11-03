@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Jádro bez závislostí na VS, SSMS a databázi. -->
+  <!-- Core without dependencies on VS, SSMS or a database. -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>

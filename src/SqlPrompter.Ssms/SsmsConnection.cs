@@ -9,9 +9,9 @@ using SqlPrompter.Metadata;
 namespace SqlPrompter.Ssms
 {
     /// <summary>
-    /// Připojení aktivního okna dotazu. Sestavení SSMS nejsou na NuGetu a jejich API je
-    /// nezdokumentované, proto se k ScriptFactory přistupuje reflexí (ověřeno prototypem v SSMS 22.11).
-    /// Typy SSMS za hranici této třídy neodcházejí.
+    /// Connection of the active query window. SSMS assemblies are not on NuGet and their API is
+    /// undocumented, so ScriptFactory is accessed through reflection (verified by the prototype in SSMS 22.11).
+    /// SSMS types never leave this class.
     /// </summary>
     internal static class SsmsConnection
     {
@@ -19,7 +19,7 @@ namespace SqlPrompter.Ssms
         private static readonly ConcurrentDictionary<string, bool> ReportedAuthentication = new ConcurrentDictionary<string, bool>();
         private static Type scriptFactoryType;
 
-        /// <summary>Údaje o připojení aktivního okna, nebo null, pokud okno není připojené.</summary>
+        /// <summary>Connection data of the active window, or null if the window is not connected.</summary>
         public static ConnectionSettings GetActive()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -41,7 +41,7 @@ namespace SqlPrompter.Ssms
                 return null;
             }
 
-            // Hodnoty AuthenticationType ověřené v SSMS 22.11: 1 = SQL Server. 0 = Windows podle starších verzí.
+            // AuthenticationType values verified in SSMS 22.11: 1 = SQL Server. 0 = Windows according to older versions.
             var rawAuthentication = Read("AuthenticationType");
             AuthenticationKind authentication;
             switch (rawAuthentication)
@@ -56,7 +56,7 @@ namespace SqlPrompter.Ssms
                     authentication = AuthenticationKind.Unsupported;
                     if (ReportedAuthentication.TryAdd(rawAuthentication ?? "(null)", true))
                     {
-                        Log.Write("Nepodporovaný typ ověření AuthenticationType=" + rawAuthentication + ", metadata se nenačtou.");
+                        Log.Write("Unsupported authentication type AuthenticationType=" + rawAuthentication + "; metadata will not be loaded.");
                     }
 
                     break;
@@ -75,8 +75,8 @@ namespace SqlPrompter.Ssms
     }
 
     /// <summary>
-    /// Vytváří Microsoft.Data.SqlClient.SqlConnection z kopie, kterou má SSMS načtenou.
-    /// Rozšíření si vlastní SqlClient nepřibaluje, aby v procesu nebyly dvě verze.
+    /// Creates Microsoft.Data.SqlClient.SqlConnection from the copy SSMS has loaded.
+    /// The extension does not ship its own SqlClient so that the process never has two versions.
     /// </summary>
     internal static class SqlClientConnections
     {
@@ -115,7 +115,7 @@ namespace SqlPrompter.Ssms
                 }
                 catch
                 {
-                    // Některá sestavení nejde prohledat.
+                    // Some assemblies cannot be searched.
                 }
             }
 

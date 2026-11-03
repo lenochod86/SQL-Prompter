@@ -5,7 +5,7 @@ namespace SqlPrompter.Core.Sql
 {
     public static class SqlIdentifier
     {
-        /// <summary>Vrátí identifikátor v hranatých závorkách, pokud je bez nich nelze napsat.</summary>
+        /// <summary>Returns the identifier in square brackets if it cannot be written without them.</summary>
         public static string Quote(string name, bool force = false)
         {
             if (!force && !NeedsQuoting(name))

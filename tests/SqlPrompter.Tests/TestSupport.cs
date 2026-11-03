@@ -8,7 +8,7 @@ namespace SqlPrompter.Tests
 {
     internal static class TestSupport
     {
-        /// <summary>Rozebere SQL, ve kterém „|“ označuje pozici kurzoru.</summary>
+        /// <summary>Analyzes SQL in which "|" marks the caret position.</summary>
         public static CaretContext Analyze(string sqlWithCaret)
         {
             var caret = sqlWithCaret.IndexOf('|');
@@ -16,7 +16,7 @@ namespace SqlPrompter.Tests
             return ContextAnalyzer.Analyze(sql, caret);
         }
 
-        /// <summary>Malá databáze: dbo.Users, dbo.Orders, sales.Customers, pohled dbo.ActiveUsers, sys.objects.</summary>
+        /// <summary>Small database: dbo.Users, dbo.Orders, sales.Customers, view dbo.ActiveUsers, sys.objects.</summary>
         public static DatabaseSnapshot SampleDatabase(bool withColumns = true)
         {
             var objects = new[]

@@ -5,9 +5,9 @@ using SqlPrompter.Core.Lexing;
 namespace SqlPrompter.Core.Analysis
 {
     /// <summary>
-    /// Najde začátky příkazů v tokenech bez komentářů. T-SQL nevyžaduje středníky,
-    /// proto se příkaz začíná i klíčovým slovem na nejvyšší úrovni závorek,
-    /// pokud nejde o pokračování předchozího příkazu (INSERT … SELECT, UPDATE … SET, CASE … END …).
+    /// Finds statement starts in tokens without comments. T-SQL does not require semicolons,
+    /// so a keyword at the top parenthesis level also starts a statement
+    /// unless it continues the previous one (INSERT … SELECT, UPDATE … SET, CASE … END …).
     /// </summary>
     internal static class StatementSplitter
     {
@@ -24,13 +24,13 @@ namespace SqlPrompter.Core.Analysis
             "SELECT", "INSERT", "UPDATE", "DELETE", "MERGE",
         };
 
-        /// <summary>Objekty, jejichž tělo za AS je samostatný příkaz nebo blok příkazů.</summary>
+        /// <summary>Objects whose body after AS is a separate statement or block of statements.</summary>
         private static readonly HashSet<string> ObjectsWithBody = new HashSet<string>(StringComparer.Ordinal)
         {
             "PROC", "PROCEDURE", "FUNCTION", "TRIGGER", "VIEW",
         };
 
-        /// <summary>Vrátí indexy prvních tokenů příkazů, vzestupně. Pro prázdný vstup prázdný seznam.</summary>
+        /// <summary>Returns the indexes of the first tokens of statements in ascending order; an empty list for empty input.</summary>
         public static List<int> Split(IReadOnlyList<Token> tokens)
         {
             var bounds = new List<int>();
@@ -98,7 +98,7 @@ namespace SqlPrompter.Core.Analysis
 
                         if (state.Head == "WITH" && !state.CteMainSeen && Dml.Contains(word))
                         {
-                            // Hlavní příkaz za CTE určuje, jak se chová zbytek (UPDATE … SET).
+                            // The main statement after a CTE decides how the rest behaves (UPDATE … SET).
                             state.CteMainSeen = true;
                             state.Head = word;
                         }
@@ -177,7 +177,7 @@ namespace SqlPrompter.Core.Analysis
                         return false;
                     }
 
-                    // CTE: WITH name AS ( … nebo WITH name (sloupce) AS ( …; jinak jde o WITH (NOLOCK), WITH TIES apod.
+                    // CTE: WITH name AS ( … or WITH name (columns) AS ( …; otherwise WITH (NOLOCK), WITH TIES etc.
                     var next = tokens[i + 1];
                     var afterNext = tokens[i + 2];
                     return next.IsIdentifier && (afterNext.IsWord("AS") || afterNext.Kind == TokenKind.OpenParen);
@@ -231,7 +231,7 @@ namespace SqlPrompter.Core.Analysis
 
         private sealed class State
         {
-            /// <summary>První slovo příkazu, u CTE hlavní příkaz za definicemi.</summary>
+            /// <summary>First word of the statement; for a CTE the main statement after the definitions.</summary>
             public string Head;
 
             public string ObjectType;

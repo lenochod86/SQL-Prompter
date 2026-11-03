@@ -1,6 +1,6 @@
 <Project>
-  <!-- Tenká vrstva v procesu SSMS 22. Sestavuje se na Windows: dotnet build -c Release.
-       Cíle VSSDK se importují explicitně až za Sdk.targets, VSToolsPath nastavuje balík Microsoft.VSSDK.BuildTools. -->
+  <!-- Thin layer in the SSMS 22 process. Built on Windows: dotnet build -c Release.
+       The VSSDK targets are imported explicitly after Sdk.targets; the Microsoft.VSSDK.BuildTools package sets VSToolsPath. -->
   <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
 
   <PropertyGroup>
@@ -16,7 +16,7 @@
     <IncludeDebugSymbolsInLocalVSIXDeployment>true</IncludeDebugSymbolsInLocalVSIXDeployment>
     <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
     <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
-    <!-- V SSMS se testuje instalací .vsix, ne nasazením do experimentální instance VS. -->
+    <!-- Tested in SSMS by installing the .vsix, not by deploying to a VS experimental instance. -->
     <DeployExtension>false</DeployExtension>
   </PropertyGroup>
 
@@ -41,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Ověřeno prototypem: SDK 17.14 se v SSMS 22 naváže na sestavení editoru 18.0. -->
+    <!-- Verified by the prototype: SDK 17.14 binds to the 18.0 editor assemblies in SSMS 22. -->
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -52,7 +52,7 @@
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="Exists('$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets')" />
 
-  <!-- Přírůstkové sestavení jinak nepřebalí VSIX po změně source.extension.vsixmanifest (např. verze). -->
+  <!-- Otherwise an incremental build does not repackage the VSIX after source.extension.vsixmanifest changes (e.g. the version). -->
   <Target Name="RefreshIntermediateVsixManifest" BeforeTargets="DetokenizeVsixManifestFile" Condition="'$(IntermediateVsixManifest)' != ''">
     <Delete Files="$(IntermediateVsixManifest)" />
   </Target>

@@ -7,8 +7,8 @@ using SqlPrompter.Core.Sql;
 namespace SqlPrompter.Core.Analysis
 {
     /// <summary>
-    /// Určí, co se na pozici kurzoru píše. Pracuje s nedokončeným SQL a v nejasných
-    /// případech vrací ContextKind.None, aby zůstalo vestavěné IntelliSense.
+    /// Determines what is being typed at the caret. Works with incomplete SQL; positions it does not
+    /// understand are reported as Name or Fallback so that only our list is shown.
     /// </summary>
     public static class ContextAnalyzer
     {
@@ -51,19 +51,19 @@ namespace SqlPrompter.Core.Analysis
                 return CaretContext.None;
             }
 
-            // Proměnná nebo dočasná tabulka: rozšíření je zatím nezná, ale nesmí je nabízet ani vestavěné IntelliSense.
+            // Variable or temporary table: not known to the extension yet, but the built-in list must not show either.
             var namesUnknownObject = word != null &&
                 (word.Kind == TokenKind.Variable || (word.Kind == TokenKind.Word && word.Text.StartsWith("#", StringComparison.Ordinal)));
 
             if (word != null && !namesUnknownObject && word.Kind != TokenKind.Word && word.Kind != TokenKind.QuotedIdentifier)
             {
-                // Kurzor hned za operátorem, tečkou nebo závorkou: žádné rozepsané slovo.
+                // Caret right after an operator, dot or parenthesis: no word being typed.
                 word = null;
             }
 
             var caretIndex = word != null ? tokens.IndexOf(word) : CountBefore(tokens, caret);
 
-            // Kvalifikátor: a.b.| → [a, b]
+            // Qualifier: a.b.| -> [a, b]
             var qualifier = new List<string>();
             var nameStart = caretIndex;
             while (nameStart >= 2 && tokens[nameStart - 1].Kind == TokenKind.Dot && tokens[nameStart - 2].IsNamePart)
@@ -72,7 +72,7 @@ namespace SqlPrompter.Core.Analysis
                 nameStart -= 2;
             }
 
-            var unknownQualifier = nameStart >= 1 && tokens[nameStart - 1].Kind == TokenKind.Dot; // db..t, @t.sloupec
+            var unknownQualifier = nameStart >= 1 && tokens[nameStart - 1].Kind == TokenKind.Dot; // db..t, @t.column
             var replaceStart = word?.Start ?? caret;
             var replaceLength = word != null ? word.End - word.Start : 0;
             var typed = word != null ? text.Substring(word.Start, caret - word.Start) : string.Empty;
@@ -129,14 +129,14 @@ namespace SqlPrompter.Core.Analysis
             var clauseState = ScanClause(structure, block.Start, nameStart);
             var anchorAtBlockLevel = structure.Depth[anchorIndex] == block.Depth;
 
-            // 1. Název objektu za FROM, JOIN, UPDATE, INTO …
+            // 1. Object name after FROM, JOIN, UPDATE, INTO …
             var objectKeywords = ObjectNameAnchor(tokens, anchorIndex, statementStart);
             var commaInFrom = anchor.Kind == TokenKind.Comma && anchorAtBlockLevel && clauseState.InFrom && clauseState.Clause == Clause.From;
             if (objectKeywords != null || commaInFrom)
             {
                 if (qualifier.Count > 1)
                 {
-                    // Jiná databáze nebo server: objekty z ní rozšíření nezná.
+                    // Another database or server: the extension does not know its objects.
                     return Make(ContextKind.Name);
                 }
 
@@ -154,14 +154,14 @@ namespace SqlPrompter.Core.Analysis
 
             if (anchor.IsWord("AS"))
             {
-                // Pojmenování aliasu.
+                // Naming an alias.
                 return Make(ContextKind.Name);
             }
 
             var sources = CollectSources(structure, scopes);
             var operandBefore = IsOperand(anchor);
 
-            // 2. Za zdrojem tabulky ve FROM: alias nebo další klauzule.
+            // 2. After a table source in FROM: an alias or the next clause.
             if (clauseState.Clause == Clause.From && anchorAtBlockLevel && qualifier.Count == 0)
             {
                 if (operandBefore || anchor.Kind == TokenKind.CloseParen)
@@ -180,7 +180,7 @@ namespace SqlPrompter.Core.Analysis
                 }
             }
 
-            // 3. Výraz.
+            // 3. Expression.
             if (!IsExpressionClause(clauseState.Clause))
             {
                 if (qualifier.Count > 0)
@@ -188,7 +188,7 @@ namespace SqlPrompter.Core.Analysis
                     return Make(ContextKind.Name);
                 }
 
-                // EXEC, VALUES, SET @x = … a další místa, kterým rozšíření zatím nerozumí.
+                // EXEC, VALUES, SET @x = … and other positions the extension does not understand yet.
                 var fallback = Make(ContextKind.Fallback);
                 fallback.SoftSelection = true;
                 return fallback;
@@ -202,7 +202,7 @@ namespace SqlPrompter.Core.Analysis
                 var target = FindQualifiedSource(sources, qualifier);
                 if (target == null)
                 {
-                    // Kvalifikátor nezná ani jako alias: schéma u funkce, CTE ve vnějším příkazu …
+                    // Qualifier unknown even as an alias: schema of a function, CTE of an outer statement …
                     return Make(ContextKind.Name);
                 }
 
@@ -213,7 +213,7 @@ namespace SqlPrompter.Core.Analysis
             return expression;
         }
 
-        /// <summary>AS uvnitř CAST(…) nebo TRY_CAST(…), kde následuje datový typ.</summary>
+        /// <summary>AS inside CAST(…) or TRY_CAST(…), followed by a data type.</summary>
         private static bool IsCastArgument(Structure s, int asIndex)
         {
             var depth = 0;
@@ -259,7 +259,7 @@ namespace SqlPrompter.Core.Analysis
             return count;
         }
 
-        /// <summary>Hodnota nebo identifikátor, za kterým může následovat alias nebo operátor.</summary>
+        /// <summary>A value or identifier that may be followed by an alias or an operator.</summary>
         private static bool IsOperand(Token token)
         {
             switch (token.Kind)
@@ -295,8 +295,8 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>
-        /// Pokud za tokenem následuje název tabulky, vrátí klíčová slova, která tu dávají smysl
-        /// (u DELETE třeba FROM). Jinak null.
+        /// If a table name follows the token, returns the keywords that make sense there
+        /// (e.g. FROM after DELETE). Otherwise null.
         /// </summary>
         private static IReadOnlyList<string> ObjectNameAnchor(List<Token> tokens, int anchorIndex, int statementStart)
         {
@@ -311,7 +311,7 @@ namespace SqlPrompter.Core.Analysis
                 case "USING":
                     return Array.Empty<string>();
                 case "UPDATE":
-                    // Ne ON UPDATE CASCADE, FOR UPDATE, AFTER INSERT, UPDATE …
+                    // Not ON UPDATE CASCADE, FOR UPDATE, AFTER INSERT, UPDATE …
                     var isDml = prev == null || (prev.Kind != TokenKind.Comma && prevWord != "ON" && prevWord != "FOR" &&
                                                  prevWord != "AFTER" && prevWord != "OF");
                     return isDml ? Array.Empty<string>() : null;
@@ -355,7 +355,7 @@ namespace SqlPrompter.Core.Analysis
             public bool InFrom;
         }
 
-        /// <summary>Projde blok od začátku po kurzor; vnořené závorky přeskočí, kromě těch, ve kterých je kurzor.</summary>
+        /// <summary>Scans the block from its start to the caret; skips nested parentheses except those containing the caret.</summary>
         private static ClauseState ScanClause(Structure s, int from, int to)
         {
             var state = new ClauseState();
@@ -541,13 +541,13 @@ namespace SqlPrompter.Core.Analysis
                 }
             }
 
-            // UPDATE u SET … FROM dbo.Users u: „u“ za UPDATE je odkaz na alias, ne další zdroj.
+            // UPDATE u SET … FROM dbo.Users u: the "u" after UPDATE refers to the alias, it is not another source.
             sources.RemoveAll(src => src.Kind == TableSourceKind.Object && src.Alias == null && src.NameParts.Count == 1 &&
                 sources.Any(other => other != src && string.Equals(other.Alias, src.ObjectName, StringComparison.OrdinalIgnoreCase)));
             return sources;
         }
 
-        /// <summary>Přečte jeden zdroj tabulky od indexu start a vrátí index za ním.</summary>
+        /// <summary>Reads one table source starting at index start and returns the index after it.</summary>
         private static int ParseReference(Structure s, int start, int to, int depth, int level, List<TableSource> sources)
         {
             var tokens = s.Tokens;
@@ -601,7 +601,7 @@ namespace SqlPrompter.Core.Analysis
 
                 if (i < to && tokens[i].Kind == TokenKind.OpenParen)
                 {
-                    // Tabulková funkce: dbo.fn(…)
+                    // Table-valued function: dbo.fn(…)
                     var close = s.Match[i];
                     i = close >= 0 && close < to ? close + 1 : to;
                 }
@@ -636,18 +636,18 @@ namespace SqlPrompter.Core.Analysis
             return i;
         }
 
-        /// <summary>Oblast tokenů, ve které se hledají zdroje: dotazový blok na jedné úrovni závorek.</summary>
+        /// <summary>Token range searched for sources: a query block at one parenthesis level.</summary>
         private sealed class Scope
         {
             public int Start;
             public int End;
             public int Depth;
 
-            /// <summary>Z bloku jsou vidět zdroje nadřazeného dotazu (poddotaz ve výrazu nebo v APPLY).</summary>
+            /// <summary>The block sees the sources of the enclosing query (subquery in an expression or in APPLY).</summary>
             public bool SeesOuter;
         }
 
-        /// <summary>Závorky a hloubky tokenů jednoho příkazu.</summary>
+        /// <summary>Parentheses and token depths of one statement.</summary>
         private sealed class Structure
         {
             public Structure(List<Token> tokens, int start, int end)
@@ -682,10 +682,10 @@ namespace SqlPrompter.Core.Analysis
 
             public int[] Depth { get; }
 
-            /// <summary>Pro „(“ index odpovídající „)“, jinak -1.</summary>
+            /// <summary>For "(" the index of the matching ")", otherwise -1.</summary>
             public int[] Match { get; }
 
-            /// <summary>Bloky od nejvnitřnějšího, ve kterých leží pozice.</summary>
+            /// <summary>Blocks containing the position, innermost first.</summary>
             public IReadOnlyList<Scope> ScopesAt(int position)
             {
                 var open = new List<int>();
@@ -720,7 +720,7 @@ namespace SqlPrompter.Core.Analysis
 
             private static bool IsQueryStart(Token token) => token.IsWord("SELECT") || token.IsWord("WITH");
 
-            /// <summary>Odvozená tabulka ve FROM a tělo CTE nevidí zdroje vnějšího dotazu, poddotaz ve výrazu ano.</summary>
+            /// <summary>A derived table in FROM and a CTE body do not see the outer query's sources; a subquery in an expression does.</summary>
             private bool SeesOuter(int paren)
             {
                 if (paren <= StatementStart)
@@ -761,7 +761,7 @@ namespace SqlPrompter.Core.Analysis
                 return false;
             }
 
-            /// <summary>V oblasti [start, end) najde blok mezi UNION/EXCEPT/INTERSECT, který obsahuje pozici.</summary>
+            /// <summary>Finds the block between UNION/EXCEPT/INTERSECT in [start, end) that contains the position.</summary>
             private Scope BlockAt(int start, int end, int depth, int position)
             {
                 var blockStart = start;

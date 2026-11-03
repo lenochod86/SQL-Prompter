@@ -3,13 +3,13 @@ using Microsoft.VisualStudio.Text;
 
 namespace SqlPrompter.Ssms
 {
-    /// <summary>Vyřízne dávku s kurzorem: řádky mezi oddělovači GO.</summary>
+    /// <summary>Extracts the batch containing the caret: the lines between GO separators.</summary>
     internal static class SqlBatch
     {
-        /// <summary>Delší dávka se nerozebírá, aby vlákno UI nečekalo.</summary>
+        /// <summary>Longer batches are not analyzed so that the UI thread does not wait.</summary>
         private const int MaxLength = 500000;
 
-        /// <summary>Kolik řádků se nejvýš prohledá oběma směry.</summary>
+        /// <summary>Maximum number of lines searched in each direction.</summary>
         private const int MaxLines = 20000;
 
         private static readonly Regex Go = new Regex(@"^\s*GO(\s+\d+)?\s*(--.*)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);

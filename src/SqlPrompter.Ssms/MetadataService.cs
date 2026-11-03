@@ -6,7 +6,7 @@ using SqlPrompter.Metadata;
 
 namespace SqlPrompter.Ssms
 {
-    /// <summary>Sdílená cache metadat pro všechna okna SSMS.</summary>
+    /// <summary>Metadata cache shared by all SSMS windows.</summary>
     [Export(typeof(MetadataService))]
     [PartCreationPolicy(CreationPolicy.Shared)]
     internal sealed class MetadataService
@@ -18,14 +18,14 @@ namespace SqlPrompter.Ssms
             Current = this;
         }
 
-        /// <summary>Instance pro příkazy balíčku; null, dokud MEF službu nevytvoří.</summary>
+        /// <summary>Instance for the package commands; null until MEF creates the service.</summary>
         public static MetadataService Current { get; private set; }
 
         public MetadataCacheManager Caches { get; } = new MetadataCacheManager(Log.Write);
 
         /// <summary>
-        /// Cache pro připojení aktivního okna; pokud ještě nemá snímek, spustí jeho načtení na pozadí.
-        /// Null, když okno není připojené nebo typ ověření nepodporujeme.
+        /// Cache for the active window's connection; starts loading its snapshot in the background if there is none yet.
+        /// Null when the window is not connected or the authentication type is not supported.
         /// </summary>
         public DatabaseMetadataCache CacheForActiveWindow(out IMetadataLoader loader)
         {
@@ -52,8 +52,8 @@ namespace SqlPrompter.Ssms
     }
 
     /// <summary>
-    /// Po aktivaci SQL okna začne načítat metadata jeho databáze, aby byla připravená
-    /// dřív, než uživatel poprvé vyvolá našeptávání.
+    /// When a SQL window is activated, starts loading the metadata of its database so that it is ready
+    /// before the user first invokes completion.
     /// </summary>
     [Export(typeof(IWpfTextViewCreationListener))]
     [ContentType(SqlContentType.Name)]
@@ -74,7 +74,7 @@ namespace SqlPrompter.Ssms
                 }
                 catch (System.Exception ex)
                 {
-                    Log.Error("Předběžné načtení metadat selhalo", ex);
+                    Log.Error("Preloading metadata failed", ex);
                 }
             };
         }
