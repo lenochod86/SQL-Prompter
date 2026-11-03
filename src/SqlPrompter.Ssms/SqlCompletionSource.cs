@@ -18,6 +18,7 @@ using Microsoft.VisualStudio.Utilities;
 using SqlPrompter.Core.Analysis;
 using SqlPrompter.Core.Completion;
 using SqlPrompter.Core.Model;
+using SqlPrompter.Metadata;
 
 namespace SqlPrompter.Ssms
 {
@@ -63,6 +64,8 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Alias] = Icon(KnownMonikers.LocalVariable, "Alias"),
             [SuggestionKind.Function] = Icon(KnownMonikers.ScalarFunction, "Function"),
             [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Data type"),
+            [SuggestionKind.ScriptTable] = Icon(KnownMonikers.Table, "Table defined in the script"),
+            [SuggestionKind.Variable] = Icon(KnownMonikers.LocalVariable, "Variable"),
         };
 
         private readonly MetadataService service;
@@ -103,7 +106,10 @@ namespace SqlPrompter.Ssms
 
             try
             {
-                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata).Select(ToItem).ToImmutableArray();
+                // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
+                var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
+                RequestScriptColumns(prepared, script);
+                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script).Select(ToItem).ToImmutableArray();
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 return Task.FromResult(new CompletionContext(items, null, hint));
             }
@@ -142,8 +148,8 @@ namespace SqlPrompter.Ssms
                 return CompletionStartData.DoesNotParticipateInCompletion;
             }
 
-            var metadata = PrepareMetadata(context);
-            pending = new Prepared(snapshot, context, metadata);
+            var metadata = PrepareMetadata(context, out var cache, out var loader);
+            pending = new Prepared(snapshot, context, metadata, batch, triggerLocation.Position - batchStart, cache, loader);
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
@@ -153,10 +159,10 @@ namespace SqlPrompter.Ssms
         /// Returns metadata from the cache and starts loading missing parts in the background. It never waits for the database:
         /// the list is built from what is available and completed on the next completion.
         /// </summary>
-        private IDatabaseMetadata PrepareMetadata(CaretContext context)
+        private IDatabaseMetadata PrepareMetadata(CaretContext context, out DatabaseMetadataCache cache, out IMetadataLoader loader)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var cache = service.CacheForActiveWindow(out var loader);
+            cache = service.CacheForActiveWindow(out loader);
             var metadata = cache?.Current;
             if (cache == null || metadata == null)
             {
@@ -171,6 +177,24 @@ namespace SqlPrompter.Ssms
             }
 
             return metadata;
+        }
+
+        /// <summary>
+        /// A CTE, derived table or temporary table with SELECT * needs the columns of the tables behind it.
+        /// Loading starts in the background and the list is completed on the next completion.
+        /// </summary>
+        private static void RequestScriptColumns(Prepared prepared, ScriptModel script)
+        {
+            if (prepared.Cache == null || prepared.Metadata == null || prepared.Loader == null)
+            {
+                return;
+            }
+
+            var readiness = Readiness.Evaluate(prepared.Context, prepared.Metadata, script);
+            if (readiness.State == ReadinessState.NeedsColumns)
+            {
+                _ = prepared.Cache.RequestColumns(readiness.MissingColumns, prepared.Loader);
+            }
         }
 
         private static bool IsTrigger(CompletionTrigger trigger)
@@ -212,12 +236,31 @@ namespace SqlPrompter.Ssms
 
         private sealed class Prepared
         {
-            public Prepared(ITextSnapshot snapshot, CaretContext context, IDatabaseMetadata metadata)
+            public Prepared(
+                ITextSnapshot snapshot,
+                CaretContext context,
+                IDatabaseMetadata metadata,
+                string batch,
+                int caretInBatch,
+                DatabaseMetadataCache cache,
+                IMetadataLoader loader)
             {
                 Snapshot = snapshot;
                 Context = context;
                 Metadata = metadata;
+                Batch = batch;
+                CaretInBatch = caretInBatch;
+                Cache = cache;
+                Loader = loader;
             }
+
+            public string Batch { get; }
+
+            public int CaretInBatch { get; }
+
+            public DatabaseMetadataCache Cache { get; }
+
+            public IMetadataLoader Loader { get; }
 
             public ITextSnapshot Snapshot { get; }
 

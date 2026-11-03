@@ -66,7 +66,8 @@ namespace SqlPrompter.Core.Analysis
             // Qualifier: a.b.| -> [a, b]
             var qualifier = new List<string>();
             var nameStart = caretIndex;
-            while (nameStart >= 2 && tokens[nameStart - 1].Kind == TokenKind.Dot && tokens[nameStart - 2].IsNamePart)
+            while (nameStart >= 2 && tokens[nameStart - 1].Kind == TokenKind.Dot &&
+                   (tokens[nameStart - 2].IsNamePart || tokens[nameStart - 2].Kind == TokenKind.Variable))
             {
                 qualifier.Insert(0, tokens[nameStart - 2].IdentifierValue);
                 nameStart -= 2;
@@ -104,7 +105,7 @@ namespace SqlPrompter.Core.Analysis
                 Qualifier = qualifier,
             };
 
-            if (namesUnknownObject || unknownQualifier)
+            if (unknownQualifier)
             {
                 return Make(ContextKind.Name);
             }
@@ -112,7 +113,7 @@ namespace SqlPrompter.Core.Analysis
             var anchorIndex = nameStart - 1;
             if (anchorIndex < statementStart || tokens[anchorIndex].Kind == TokenKind.Semicolon)
             {
-                if (qualifier.Count > 0)
+                if (qualifier.Count > 0 || namesUnknownObject)
                 {
                     return Make(ContextKind.Name);
                 }
@@ -143,6 +144,13 @@ namespace SqlPrompter.Core.Analysis
                 var objectName = Make(ContextKind.ObjectName);
                 objectName.PreferredKeywords = qualifier.Count == 0 ? objectKeywords ?? Array.Empty<string>() : Array.Empty<string>();
                 return objectName;
+            }
+
+            if (namesUnknownObject)
+            {
+                // A variable being declared and a #table outside a table position are names of the user's own.
+                var declaring = tokens[statementStart].IsWord("DECLARE") && (anchor.IsWord("DECLARE") || anchor.Kind == TokenKind.Comma);
+                return word.Kind == TokenKind.Variable && !declaring ? Make(ContextKind.Variable) : Make(ContextKind.Name);
             }
 
             if (qualifier.Count == 0 &&
@@ -260,7 +268,7 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>A value or identifier that may be followed by an alias or an operator.</summary>
-        private static bool IsOperand(Token token)
+        internal static bool IsOperand(Token token)
         {
             switch (token.Kind)
             {
@@ -451,7 +459,7 @@ namespace SqlPrompter.Core.Analysis
             return result;
         }
 
-        private static List<TableSource> ParseSources(Structure s, int from, int to, int depth, int level)
+        internal static List<TableSource> ParseSources(Structure s, int from, int to, int depth, int level)
         {
             var sources = new List<TableSource>();
             var tokens = s.Tokens;
@@ -559,6 +567,8 @@ namespace SqlPrompter.Core.Analysis
 
             TableSourceKind kind;
             var parts = new List<string>();
+            var bodyStart = -1;
+            var bodyEnd = -1;
             var first = tokens[i];
             if (first.Kind == TokenKind.OpenParen)
             {
@@ -569,6 +579,8 @@ namespace SqlPrompter.Core.Analysis
                 }
 
                 kind = TableSourceKind.Derived;
+                bodyStart = first.End;
+                bodyEnd = tokens[close].Start;
                 i = close + 1;
             }
             else if (first.Kind == TokenKind.Variable)
@@ -626,18 +638,29 @@ namespace SqlPrompter.Core.Analysis
                 i++;
             }
 
+            List<string> columnNames = null;
             if (i < to && kind == TableSourceKind.Derived && tokens[i].Kind == TokenKind.OpenParen && s.Match[i] > 0)
             {
                 // (SELECT …) AS d (a, b)
+                var close = Math.Min(to, s.Match[i]);
+                columnNames = new List<string>();
+                for (var k = i + 1; k < close; k++)
+                {
+                    if (tokens[k].IsNamePart)
+                    {
+                        columnNames.Add(tokens[k].IdentifierValue);
+                    }
+                }
+
                 i = Math.Min(to, s.Match[i] + 1);
             }
 
-            sources.Add(new TableSource(kind, parts, alias, level));
+            sources.Add(new TableSource(kind, parts, alias, level, bodyStart, bodyEnd, columnNames));
             return i;
         }
 
         /// <summary>Token range searched for sources: a query block at one parenthesis level.</summary>
-        private sealed class Scope
+        internal sealed class Scope
         {
             public int Start;
             public int End;
@@ -648,15 +671,21 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>Parentheses and token depths of one statement.</summary>
-        private sealed class Structure
+        internal sealed class Structure
         {
             public Structure(List<Token> tokens, int start, int end)
+                : this(tokens, start, end, new int[tokens.Count], Enumerable.Repeat(-1, tokens.Count).ToArray())
+            {
+            }
+
+            /// <summary>Fills arrays shared by several structures over disjoint ranges of the same tokens.</summary>
+            public Structure(List<Token> tokens, int start, int end, int[] depth, int[] match)
             {
                 Tokens = tokens;
                 StatementStart = start;
                 StatementEnd = end;
-                Depth = new int[tokens.Count];
-                Match = Enumerable.Repeat(-1, tokens.Count).ToArray();
+                Depth = depth;
+                Match = match;
                 var stack = new Stack<int>();
                 for (var i = start; i < end; i++)
                 {

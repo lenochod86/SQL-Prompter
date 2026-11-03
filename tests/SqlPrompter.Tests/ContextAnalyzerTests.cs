@@ -300,13 +300,65 @@ namespace SqlPrompter.Tests
         [Theory]
         [InlineData("SELECT * FROM dbo.Users AS |")]
         [InlineData("SELECT Name AS | FROM dbo.Users")]
-        [InlineData("SELECT @|")]
-        [InlineData("SELECT @va|")]
-        [InlineData("SELECT * FROM #t|")]
+        [InlineData("SELECT * FROM dbo.Users WHERE #t|")]
+        [InlineData("SELECT * INTO #t|")]
+        [InlineData("DECLARE @|")]
+        [InlineData("DECLARE @a int, @|")]
+        [InlineData("@|")]
         [InlineData("SELECT @t.|")]
         public void NewOrUnknownNameOffersEmptyList(string sql)
         {
             Assert.Equal(ContextKind.Name, Analyze(sql).Kind);
+        }
+
+        [Theory]
+        [InlineData("SELECT @|")]
+        [InlineData("SELECT @va|")]
+        [InlineData("SELECT * FROM dbo.Users WHERE Id = @|")]
+        [InlineData("SET @x = @|")]
+        [InlineData("EXEC dbo.p @a = @|")]
+        [InlineData("SELECT * FROM dbo.Users WHERE Id IN (SELECT @|")]
+        public void VariablePositions(string sql)
+        {
+            var context = Analyze(sql);
+
+            Assert.Equal(ContextKind.Variable, context.Kind);
+            Assert.StartsWith("@", context.TypedPrefix);
+        }
+
+        [Theory]
+        [InlineData("SELECT * FROM #t|")]
+        [InlineData("SELECT * FROM dbo.Users u JOIN #|")]
+        [InlineData("SELECT * FROM @t|")]
+        [InlineData("INSERT INTO #|")]
+        public void TempTableAndTableVariableNamesAreObjectNames(string sql)
+        {
+            Assert.Equal(ContextKind.ObjectName, Analyze(sql).Kind);
+        }
+
+        [Fact]
+        public void TableVariableColumnsAreQualifiedSource()
+        {
+            var context = Analyze("DECLARE @t TABLE (a int)\nSELECT t.| FROM @t t");
+
+            Assert.Equal(ContextKind.Expression, context.Kind);
+            Assert.Equal(TableSourceKind.Variable, context.QualifiedSource.Kind);
+
+            var unaliased = Analyze("DECLARE @t TABLE (a int)\nSELECT @t.| FROM @t");
+            Assert.Equal(ContextKind.Expression, unaliased.Kind);
+            Assert.Equal("@t", unaliased.QualifiedSource.ReferenceName);
+        }
+
+        [Fact]
+        public void DerivedTableRemembersItsBodyAndColumnNames()
+        {
+            var sql = "SELECT d.| FROM (SELECT 1 AS x) AS d (p, q)";
+            var context = Analyze(sql);
+            var source = context.QualifiedSource;
+
+            Assert.Equal(TableSourceKind.Derived, source.Kind);
+            Assert.Equal("SELECT 1 AS x", sql.Replace("|", string.Empty).Substring(source.BodyStart, source.BodyEnd - source.BodyStart));
+            Assert.Equal(new[] { "p", "q" }, source.ColumnNames);
         }
 
         [Theory]

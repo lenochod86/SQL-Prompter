@@ -18,6 +18,12 @@ namespace SqlPrompter.Core.Completion
         Alias,
         Function,
         DataType,
+
+        /// <summary>CTE, temporary table or table variable defined in the script.</summary>
+        ScriptTable,
+
+        /// <summary>Variable or parameter defined in the script.</summary>
+        Variable,
     }
 
     public sealed class Suggestion
@@ -58,16 +64,20 @@ namespace SqlPrompter.Core.Completion
 
     public static class SuggestionBuilder
     {
-        public static IReadOnlyList<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata)
+        /// <param name="script">Definitions in the script (CTEs, temporary tables, variables); optional.</param>
+        public static IReadOnlyList<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata, ScriptModel script = null)
         {
+            script = script ?? ScriptModel.Empty;
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
                     return KeywordSuggestions(context, 0).ToList();
                 case ContextKind.ObjectName:
-                    return ObjectSuggestions(context, metadata).ToList();
+                    return ObjectSuggestions(context, metadata, script).ToList();
                 case ContextKind.Expression:
-                    return ExpressionSuggestions(context, metadata).ToList();
+                    return ExpressionSuggestions(context, metadata, script).ToList();
+                case ContextKind.Variable:
+                    return VariableSuggestions(context, script, 0).ToList();
                 case ContextKind.DataType:
                     return DataTypeSuggestions(context, 0).ToList();
                 case ContextKind.Fallback:
@@ -109,8 +119,37 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        private static IEnumerable<Suggestion> ObjectSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        private static IEnumerable<Suggestion> VariableSuggestions(CaretContext context, ScriptModel script, int group)
         {
+            foreach (var variable in script.Variables)
+            {
+                var description = (variable.IsParameter ? "parameter " : "variable ") + variable.Name +
+                    (variable.TypeName.Length > 0 ? " " + variable.TypeName : string.Empty);
+                yield return new Suggestion(SuggestionKind.Variable, variable.Name, variable.Name, variable.Name,
+                    variable.TypeName.Length > 0 ? variable.TypeName : null, description, group);
+            }
+        }
+
+        private static IEnumerable<Suggestion> ScriptTableSuggestions(CaretContext context, ScriptModel script)
+        {
+            var quote = context.QuoteIdentifiers;
+            foreach (var table in script.Tables.GroupBy(t => t.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()))
+            {
+                var insert = table.Kind == ScriptTableKind.Cte ? SqlIdentifier.Quote(table.Name, quote) : table.Name;
+                yield return new Suggestion(SuggestionKind.ScriptTable, table.Name, insert, table.Name, null, table.Description, 0);
+            }
+        }
+
+        private static IEnumerable<Suggestion> ObjectSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
+        {
+            if (context.Qualifier.Count == 0)
+            {
+                foreach (var suggestion in ScriptTableSuggestions(context, script))
+                {
+                    yield return suggestion;
+                }
+            }
+
             if (metadata == null)
             {
                 yield break;
@@ -169,30 +208,61 @@ namespace SqlPrompter.Core.Completion
             return new Suggestion(kind, dbObject.Name, insertText, dbObject.Name, suffix, description + " " + dbObject, 0);
         }
 
-        private static IEnumerable<Suggestion> ExpressionSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        /// <summary>Columns of one table source and how to describe their owner.</summary>
+        private sealed class SourceColumns
+        {
+            public SourceColumns(TableSource source, IReadOnlyList<DbColumn> columns, string owner)
+            {
+                Source = source;
+                Columns = columns;
+                Owner = owner;
+            }
+
+            public TableSource Source { get; }
+
+            public IReadOnlyList<DbColumn> Columns { get; }
+
+            public string Owner { get; }
+        }
+
+        /// <summary>Columns of a source defined in the script or found in the database; null if they are not known (yet).</summary>
+        private static SourceColumns ResolveColumns(TableSource source, IDatabaseMetadata metadata, ScriptModel script)
+        {
+            var scripted = script.Resolve(source, metadata);
+            if (scripted != null)
+            {
+                var owner = source.Kind == TableSourceKind.Derived ? "derived table" : string.Join(".", source.NameParts);
+                return new SourceColumns(source, scripted.Columns, owner);
+            }
+
+            var dbObject = Readiness.Resolve(source, metadata);
+            var columns = dbObject != null ? metadata.GetColumns(dbObject) : null;
+            return columns == null ? null : new SourceColumns(source, columns, dbObject.ToString());
+        }
+
+        private static IEnumerable<Suggestion> ExpressionSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
         {
             var quote = context.QuoteIdentifiers;
             if (context.QualifiedSource != null)
             {
-                var dbObject = Readiness.Resolve(context.QualifiedSource, metadata);
-                var columns = dbObject != null ? metadata.GetColumns(dbObject) : null;
-                foreach (var column in columns ?? Array.Empty<DbColumn>())
+                var qualified = ResolveColumns(context.QualifiedSource, metadata, script);
+                foreach (var column in qualified?.Columns ?? Array.Empty<DbColumn>())
                 {
-                    yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, quote), null, dbObject, 0);
+                    yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, quote), null, qualified.Owner, 0);
                 }
 
                 yield break;
             }
 
             var resolved = context.Sources
-                .Select(s => new { Source = s, Object = Readiness.Resolve(s, metadata) })
-                .Where(x => x.Object != null && metadata.GetColumns(x.Object) != null)
+                .Select(s => ResolveColumns(s, metadata, script))
+                .Where(x => x != null)
                 .ToList();
 
             // A column whose name exists in several sources of the same block is inserted with its alias.
             var ambiguous = new HashSet<string>(
                 resolved.Where(x => x.Source.ScopeLevel == 0)
-                    .SelectMany(x => metadata.GetColumns(x.Object).Select(c => c.Name).Distinct(StringComparer.OrdinalIgnoreCase))
+                    .SelectMany(x => x.Columns.Select(c => c.Name).Distinct(StringComparer.OrdinalIgnoreCase))
                     .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
                     .Where(g => g.Count() > 1)
                     .Select(g => g.Key),
@@ -202,12 +272,12 @@ namespace SqlPrompter.Core.Completion
             {
                 var reference = x.Source.ReferenceName;
                 var inner = x.Source.ScopeLevel == 0;
-                foreach (var column in metadata.GetColumns(x.Object))
+                foreach (var column in x.Columns)
                 {
                     var name = SqlIdentifier.Quote(column.Name, quote);
                     var qualify = !inner || ambiguous.Contains(column.Name);
                     var insert = qualify ? SqlIdentifier.Quote(reference, quote) + "." + name : name;
-                    yield return ColumnSuggestion(column, insert, reference, x.Object, inner ? 0 : 2);
+                    yield return ColumnSuggestion(column, insert, reference, x.Owner, inner ? 0 : 2);
                 }
             }
 
@@ -217,6 +287,11 @@ namespace SqlPrompter.Core.Completion
                 var target = source.Kind == TableSourceKind.Derived ? "derived table" : string.Join(".", source.NameParts);
                 yield return new Suggestion(SuggestionKind.Alias, source.ReferenceName, SqlIdentifier.Quote(source.ReferenceName, quote),
                     source.ReferenceName, source.Alias != null ? target : null, (source.Alias != null ? "alias " : "source ") + target, 1);
+            }
+
+            foreach (var variable in VariableSuggestions(context, script, 2))
+            {
+                yield return variable;
             }
 
             foreach (var function in FunctionSuggestions(context, 3))
@@ -230,10 +305,10 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        private static Suggestion ColumnSuggestion(DbColumn column, string insertText, string suffix, DbObject owner, int group)
+        private static Suggestion ColumnSuggestion(DbColumn column, string insertText, string suffix, string owner, int group)
         {
-            var description = column.Name + " " + column.TypeName + (column.IsNullable ? " null" : " not null") + " (" + owner + ")";
-            return new Suggestion(SuggestionKind.Column, column.Name, insertText, column.Name, suffix, description, group);
+            var type = column.TypeName.Length > 0 ? " " + column.TypeName + (column.IsNullable ? " null" : " not null") : string.Empty;
+            return new Suggestion(SuggestionKind.Column, column.Name, insertText, column.Name, suffix, column.Name + type + " (" + owner + ")", group);
         }
     }
 }

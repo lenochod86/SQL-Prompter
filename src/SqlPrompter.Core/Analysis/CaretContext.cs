@@ -28,6 +28,9 @@ namespace SqlPrompter.Core.Analysis
 
         /// <summary>Expression: columns, aliases, functions and keywords.</summary>
         Expression,
+
+        /// <summary>A variable or parameter (@name) is being typed.</summary>
+        Variable,
     }
 
     public enum TableSourceKind
@@ -49,12 +52,36 @@ namespace SqlPrompter.Core.Analysis
     public sealed class TableSource
     {
         public TableSource(TableSourceKind kind, IReadOnlyList<string> nameParts, string alias, int scopeLevel)
+            : this(kind, nameParts, alias, scopeLevel, -1, -1, null)
+        {
+        }
+
+        public TableSource(
+            TableSourceKind kind,
+            IReadOnlyList<string> nameParts,
+            string alias,
+            int scopeLevel,
+            int bodyStart,
+            int bodyEnd,
+            IReadOnlyList<string> columnNames)
         {
             Kind = kind;
             NameParts = nameParts ?? Array.Empty<string>();
             Alias = alias;
             ScopeLevel = scopeLevel;
+            BodyStart = bodyStart;
+            BodyEnd = bodyEnd;
+            ColumnNames = columnNames;
         }
+
+        /// <summary>Derived table: start of the text between the parentheses, otherwise -1.</summary>
+        public int BodyStart { get; }
+
+        /// <summary>Derived table: end of the text between the parentheses, otherwise -1.</summary>
+        public int BodyEnd { get; }
+
+        /// <summary>Explicit column names of a derived table, (SELECT …) AS d (a, b); otherwise null.</summary>
+        public IReadOnlyList<string> ColumnNames { get; }
 
         public TableSourceKind Kind { get; }
 
