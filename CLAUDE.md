@@ -24,6 +24,8 @@ MVP 0.2.x runs in SSMS 22.11. What is done and what comes next is in `docs/roadm
 
 1. Run `git status` and `git fetch`, and check the current branch. Never overwrite or delete uncommitted changes; ask first.
 2. Read `docs/roadmap.md` and the open issues.
+   - Work through issues in ascending order of their number, unless the user says otherwise.
+   - If an issue has sub-issues, finish all of them before sending the pull request, unless the user agrees on something else.
 3. When continuing work on an issue, switch to its branch and bring it up to date with `main` (see below).
 
 ## Git and GitHub
