@@ -35,7 +35,8 @@ Repository: `lenochod86/SQL-Prompter`, main branch `main`.
 1. **Issue.** Every separate piece of work (a roadmap item or group of items, a bug, a research task) has a GitHub issue. Create it before writing code if it does not exist yet.
    - Title: short and descriptive, without the phase number (e.g. "Configurable commit keys for suggestions").
    - Body: goal, scope, acceptance criteria and a link to the item in `docs/roadmap.md`.
-   - Labels: the kind (`feature`, `bug`, `research`, `docs`; create them if missing) and the phase (`phase-0`, `phase-1`, …).
+   - Labels: the kind (`enhancement`, `bug`, `documentation`, `research`) and the phase (`phase-0`, `phase-1`, …). Create a label if it is missing.
+   - Use `gh` (on Windows `C:\Program Files\GitHub CLI\gh.exe` if it is not on PATH) or the GitHub tools of the environment.
 2. **Branch** from the current `main`, named `<issue-number>-<short-description>`, lowercase with hyphens, e.g. `12-commit-keys`. One issue per branch.
 3. **Commits** are small and self-contained.
    - Imperative subject line of at most 72 characters.
