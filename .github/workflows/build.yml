@@ -1,13 +1,16 @@
 name: Build
 
+# Branches are built through their pull request (or manually); pushes build only main.
 on:
   push:
+    branches: [main]
     paths:
       - 'src/**'
       - 'tests/**'
       - 'SqlPrompter.slnx'
       - 'nuget.config'
       - '.github/workflows/build.yml'
+      - '.github/scripts/**'
   pull_request:
     paths:
       - 'src/**'
@@ -15,10 +18,16 @@ on:
       - 'SqlPrompter.slnx'
       - 'nuget.config'
       - '.github/workflows/build.yml'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# A new push to a pull request cancels its running build; builds of main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -29,7 +38,18 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Core and metadata tests
-        run: dotnet test tests/SqlPrompter.Tests/SqlPrompter.Tests.csproj -v:minimal
+        run: dotnet test tests/SqlPrompter.Tests/SqlPrompter.Tests.csproj -v:minimal -warnaserror
+
+  versions:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check VSIX and menu versions
+        shell: pwsh
+        run: ./.github/scripts/Check-Versions.ps1 -Base origin/${{ github.base_ref }}
 
   vsix:
     runs-on: windows-latest
@@ -39,9 +59,27 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Build VSIX
-        run: dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release -v:minimal
+        run: dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release -v:minimal -warnaserror
+      - name: Read version inside the VSIX
+        id: vsix
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $vsix = Get-Item src/SqlPrompter.Ssms/bin/Release/net48/*.vsix
+          $zip = [IO.Compression.ZipFile]::OpenRead($vsix.FullName)
+          try {
+            $entry = $zip.Entries | Where-Object FullName -eq 'extension.vsixmanifest'
+            $reader = New-Object IO.StreamReader($entry.Open())
+            $version = ([xml]$reader.ReadToEnd()).PackageManifest.Metadata.Identity.Version
+            $reader.Dispose()
+          }
+          finally {
+            $zip.Dispose()
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "VSIX **$($vsix.Name)**, version **$version**, commit ``$env:GITHUB_SHA``" >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v7
         with:
-          name: SqlPrompter
+          name: SqlPrompter-${{ steps.vsix.outputs.version }}
           path: src/SqlPrompter.Ssms/bin/Release/net48/*.vsix
           if-no-files-found: error

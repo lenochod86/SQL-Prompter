@@ -54,6 +54,7 @@ Repository: `lenochod86/SQL-Prompter`, main branch `main`.
 ### Rules
 
 - Never commit or push directly to `main` unless the user explicitly says so.
+- Exception: changes only to CI (`.github/`), tool configuration (`.claude/`, `.gitignore`, `nuget.config` …) or the instructions in `CLAUDE.md` need no issue or pull request. Commit them straight to `main` (tests pass, CI stays green) and push. Product code, tests and `docs/` still go through the issue workflow.
 - Never force push to `main`. On your own branch use only `git push --force-with-lease`, and only when necessary (e.g. after a rebase).
 - Before handing a branch over for review, rebase it on `origin/main`. Resolve conflicts yourself and describe them.
 - Do not rewrite history that someone may already have pulled unless it is necessary.
@@ -81,11 +82,12 @@ Repository: `lenochod86/SQL-Prompter`, main branch `main`.
 - If `dotnet` is not on PATH, install the .NET SDK into the scratchpad with `dotnet-install.ps1` (no admin rights needed) and set `DOTNET_ROOT`.
 - For every VSIX handed to the user, bump the version in `source.extension.vsixmanifest` (otherwise it will not install over the old one) and check the version inside the `.vsix`.
 - After changing `.vsct`, bump the version in `ProvideMenuResource`.
+- CI enforces both bumps in pull requests (`.github/scripts/Check-Versions.ps1`): any change under `src/` needs a higher VSIX version than `main`. CI also builds with warnings as errors.
 
 ## Environments
 
 - **Locally on Windows:** the VSIX can be built and installed into SSMS 22. The user runs installation, uninstallation and SSMS configuration changes; give them the exact command. A SQL Server test instance runs in Docker on `localhost,1433`; use the `test-database` skill (`.claude/skills/test-database/`) to create test databases and data yourself.
-- **In the cloud:** neither SSMS nor the VSIX build is available. Work on Core, Metadata and tests; CI builds the VSIX (`.github/workflows/build.yml`).
+- **In the cloud:** neither SSMS nor the VSIX build is available. Work on Core, Metadata and tests; CI builds the VSIX for pull requests and `main` (`.github/workflows/build.yml`); branch pushes without a pull request are not built, so open a draft pull request or run the workflow manually.
 - **From mobile:** the user may not have SSMS at hand. Ask for SSMS results as a screenshot or the log (`%LOCALAPPDATA%\SqlPrompter\sqlprompter.log`).
 
 ## How to work

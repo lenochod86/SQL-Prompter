@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: Update
+
+  - package-ecosystem: nuget
+    directories:
+      - /src/*
+      - /tests/*
+      - /prototype/*
+    schedule:
+      interval: weekly
+    groups:
+      nuget:
+        patterns: ['*']
+    ignore:
+      # The VS SDK is pinned to the version SSMS 22 binds to (see docs/architecture.md); update it deliberately.
+      - dependency-name: Microsoft.VisualStudio.*
+      - dependency-name: Microsoft.VSSDK.*
+    commit-message:
+      prefix: Update
