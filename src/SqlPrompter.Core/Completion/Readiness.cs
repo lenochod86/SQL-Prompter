@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SqlPrompter.Core.Analysis;
 using SqlPrompter.Core.Model;
 
@@ -37,7 +38,7 @@ namespace SqlPrompter.Core.Completion
         /// Determines whether the metadata is enough for a complete list and what needs to be loaded.
         /// The list is offered anyway; missing parts are added on the next completion.
         /// </summary>
-        public static Readiness Evaluate(CaretContext context, IDatabaseMetadata metadata)
+        public static Readiness Evaluate(CaretContext context, IDatabaseMetadata metadata, ScriptModel script = null)
         {
             switch (context.Kind)
             {
@@ -45,6 +46,7 @@ namespace SqlPrompter.Core.Completion
                 case ContextKind.Name:
                 case ContextKind.DataType:
                 case ContextKind.Fallback:
+                case ContextKind.Variable:
                     return new Readiness(ReadinessState.Ready, null);
 
                 case ContextKind.ObjectName:
@@ -58,7 +60,7 @@ namespace SqlPrompter.Core.Completion
                         : new Readiness(ReadinessState.Ready, null);
 
                 case ContextKind.Expression:
-                    return EvaluateExpression(context, metadata);
+                    return EvaluateExpression(context, metadata, script ?? ScriptModel.Empty);
 
                 default:
                     return new Readiness(ReadinessState.Unsupported, null);
@@ -81,7 +83,7 @@ namespace SqlPrompter.Core.Completion
             return metadata.FindObject(string.IsNullOrEmpty(source.Schema) ? null : source.Schema, source.ObjectName);
         }
 
-        private static Readiness EvaluateExpression(CaretContext context, IDatabaseMetadata metadata)
+        private static Readiness EvaluateExpression(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
         {
             var needed = new List<TableSource>();
             if (context.QualifiedSource != null)
@@ -106,6 +108,14 @@ namespace SqlPrompter.Core.Completion
             var missing = new List<DbObject>();
             foreach (var source in needed)
             {
+                var scripted = script.Resolve(source, metadata);
+                if (scripted != null)
+                {
+                    // CTE, temporary table, table variable or derived table; SELECT * in it needs the columns of database objects.
+                    missing.AddRange(scripted.MissingColumns.Where(m => !missing.Contains(m)));
+                    continue;
+                }
+
                 var dbObject = Resolve(source, metadata);
                 if (dbObject == null)
                 {

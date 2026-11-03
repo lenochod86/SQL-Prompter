@@ -58,7 +58,7 @@ VisualStudio.Extensibility is not used: no document confirms support in SSMS, an
 2. In the same step, missing metadata is identified and loaded in the background.
 3. In the background (`GetCompletionContextAsync`) suggestions are built and ranked from the context and the current snapshot.
 
-This flow never waits for the database. Metadata starts loading when a query window is activated, and the columns of user objects are loaded together with the objects, so they are usually ready before the user needs them. Whatever is missing (columns of system views, the very first load) is added on the next completion. Objects defined in the script (CTEs, temporary tables, variables) are phase 1 of the roadmap.
+This flow never waits for the database. Metadata starts loading when a query window is activated, and the columns of user objects are loaded together with the objects, so they are usually ready before the user needs them. Whatever is missing (columns of system views, the very first load) is added on the next completion. Objects defined in the script (CTEs, temporary tables, table variables, variables, parameters) come from the script model, see below.
 
 ## Decisions
 
@@ -68,12 +68,18 @@ This flow never waits for the database. Metadata starts loading when a query win
 - **Security.** Passwords are never stored. Metadata goes to disk only optionally, because even object names may be sensitive. No telemetry.
 - **Target performance (draft).** Under 50 ms for a list from the cache and no waiting for the network on the UI thread.
 - **Only our list.** Our participation suppresses the built-in list (prototype, question 2). The user wants to see only SQL Prompter's suggestions (decided 2026-11-02), so the extension participates everywhere except in strings, comments and numbers. The built-in IntelliSense stays enabled for error underlining and quick info.
-  - Where a new or unknown name is typed (alias after `AS`, `@variable`, `#table`, unknown qualifier, three-part name), the list is empty.
+  - Where a new or unknown name is typed (alias after `AS`, a variable being declared, `#table` outside a table position, unknown qualifier, three-part name), the list is empty.
+  - After `@`, the variables and parameters defined in the script are offered (`ContextKind.Variable`).
   - After `CAST(x AS` and `DECLARE @x`, data types are offered.
   - At positions the extension does not understand (`EXEC`, `VALUES`, `SET @x =` …), keywords, functions and types are offered without a firm selection.
-  - With a CTE or a temporary table, the columns of known sources, aliases and functions are offered.
+  - With a CTE, derived table, temporary table or table variable, the columns of known sources, aliases and functions are offered.
   - Suggestions carry the "SQL Prompter" filter, which makes the list recognizable.
   - Not verified yet: whether an empty list really suppresses the built-in one.
+- **Script model** (`ScriptModel` in Core, implemented in #15, not verified in SSMS yet). Definitions in the batch before the caret, built from text only and in the background (`GetCompletionContextAsync`), so the UI thread is not slowed down:
+  - CTEs of the statement at the caret, `#tables` from `CREATE TABLE` and `SELECT … INTO`, `@tables` from `DECLARE @t TABLE`, variables from `DECLARE`, and the parameters of `CREATE/ALTER PROCEDURE/FUNCTION`;
+  - columns of a CTE, `SELECT … INTO` table or derived table come from the first `SELECT` of its query (alias, `AS`, `alias = expr`, last part of `a.b`, `x.*` and `*`); `SELECT *` is expanded from the metadata snapshot and the objects whose columns are not loaded yet are requested in the background (`ScriptColumns.MissingColumns`);
+  - items without a name (`SELECT 1`) are skipped, and only the first block of a `UNION` names the columns;
+  - the model is never trusted for what it cannot see: a source it cannot resolve stays unknown, as before.
 - **SqlClient from the SSMS process.** Our own connection creates `Microsoft.Data.SqlClient.SqlConnection` from the copy SSMS has loaded (verified by the prototype, version 6.0.0.0). The VSIX ships no SqlClient and Metadata works with `DbConnection` only. The SqlClient 6 package does not support netstandard2.0 anyway.
 - **System objects.** Metadata is read from `sys.all_objects` and `sys.all_columns`, so `sys.objects` or `INFORMATION_SCHEMA.TABLES` work as in the built-in IntelliSense. System objects are not offered without a schema.
 - **Commit keys.** As in the user's SQL Prompt settings: Tab, Enter and Space insert the suggestion; a dot, comma, parenthesis, semicolon, `]` or operator does not (`CommitKeys` in Core, configurable once settings exist, #9). Every character that ends a word must still end the session: when only Tab and Enter were commit characters, the list stayed open after a space or a dot (verified in SSMS 22.11). The commit manager therefore reports non-inserting characters as a handled commit without inserting anything, so the list closes, the character is typed and a dot opens the next list (verified in SSMS 22.11). Where the user probably types a name of their own (after a table source or an operand), the selection is soft (`SoftSelection`) and typed characters do not commit. Keywords are inserted in lower case when the user started typing in lower case.

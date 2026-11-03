@@ -178,5 +178,145 @@ namespace SqlPrompter.Tests
             Assert.Equal(ReadinessState.NeedsMetadata, Readiness.Evaluate(Analyze("SELECT * FROM |"), null).State);
             Assert.Equal(ReadinessState.Ready, Readiness.Evaluate(Analyze("SEL|"), null).State);
         }
+
+        private static System.Collections.Generic.IReadOnlyList<Suggestion> BuildWithScript(string sqlWithCaret, bool withColumns = true)
+        {
+            var caret = sqlWithCaret.IndexOf('|');
+            var sql = sqlWithCaret.Remove(caret, 1);
+            return SuggestionBuilder.Build(ContextAnalyzer.Analyze(sql, caret), SampleDatabase(withColumns), ScriptModel.Build(sql, caret));
+        }
+
+        [Fact]
+        public void CteColumnsAreSuggested()
+        {
+            var items = BuildWithScript("WITH c AS (SELECT Id, Name AS Title FROM dbo.Users) SELECT | FROM c");
+
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == "Title");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == "Id");
+        }
+
+        [Fact]
+        public void CteColumnsAfterItsAlias()
+        {
+            var items = BuildWithScript("WITH c AS (SELECT Id, Name FROM dbo.Users) SELECT x.| FROM c x JOIN dbo.Orders o ON o.UserId = x.Id");
+
+            Assert.Equal(new[] { "Id", "Name" }, items.Select(i => i.InsertText).ToArray());
+        }
+
+        [Fact]
+        public void ColumnsOfCteAndTableInTheSameQueryAreQualifiedWhenAmbiguous()
+        {
+            var items = BuildWithScript("WITH c AS (SELECT Id FROM dbo.Users) SELECT | FROM c JOIN dbo.Orders o ON o.UserId = c.Id");
+
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == "c.Id");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == "o.Id");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == "Total");
+        }
+
+        [Fact]
+        public void TempTableColumnsHaveTypes()
+        {
+            var items = BuildWithScript("CREATE TABLE #t (Id int NOT NULL, Name nvarchar(20))\nSELECT t.| FROM #t t");
+
+            var id = items.Single(i => i.DisplayText == "Id");
+            Assert.Contains("int not null", id.Description);
+            Assert.Contains("nvarchar(20) null", items.Single(i => i.DisplayText == "Name").Description);
+        }
+
+        [Fact]
+        public void DerivedTableColumns()
+        {
+            var items = BuildWithScript("SELECT | FROM (SELECT Id AS UserId, Name FROM dbo.Users) d");
+
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == "UserId");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Alias && i.InsertText == "d");
+        }
+
+        [Fact]
+        public void ScriptTablesAreOfferedAfterFrom()
+        {
+            var items = BuildWithScript("DECLARE @t TABLE (a int)\nCREATE TABLE #tmp (b int);\nWITH c AS (SELECT 1 AS x) SELECT * FROM |");
+
+            Assert.Contains(items, i => i.Kind == SuggestionKind.ScriptTable && i.InsertText == "c");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.ScriptTable && i.InsertText == "#tmp");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.ScriptTable && i.InsertText == "@t");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Table && i.InsertText == "dbo.Users");
+        }
+
+        [Fact]
+        public void ScriptTablesAreOfferedWithoutMetadata()
+        {
+            var sql = "CREATE TABLE #tmp (b int)\nSELECT * FROM ";
+            var items = SuggestionBuilder.Build(ContextAnalyzer.Analyze(sql, sql.Length), null, ScriptModel.Build(sql, sql.Length));
+
+            Assert.Equal("#tmp", Assert.Single(items).InsertText);
+        }
+
+        [Fact]
+        public void ScriptTablesAreNotOfferedAfterSchema()
+        {
+            var items = BuildWithScript("CREATE TABLE #tmp (b int)\nSELECT * FROM dbo.|");
+
+            Assert.DoesNotContain(items, i => i.Kind == SuggestionKind.ScriptTable);
+        }
+
+        [Fact]
+        public void VariablesAreOfferedAfterAt()
+        {
+            var items = BuildWithScript("DECLARE @count int, @name varchar(10)\nSELECT * FROM dbo.Users WHERE Name = @|");
+
+            Assert.Equal(new[] { "@count", "@name" }, items.Select(i => i.InsertText).OrderBy(t => t).ToArray());
+            Assert.All(items, i => Assert.Equal(SuggestionKind.Variable, i.Kind));
+            Assert.Equal("varchar(10)", items.Single(i => i.DisplayText == "@name").Suffix);
+        }
+
+        [Fact]
+        public void ParametersAreVariables()
+        {
+            var items = BuildWithScript("CREATE PROCEDURE dbo.p @id int AS\nSELECT * FROM dbo.Users WHERE Id = @|");
+
+            var id = Assert.Single(items);
+            Assert.Equal("@id", id.InsertText);
+            Assert.StartsWith("parameter", id.Description);
+        }
+
+        [Fact]
+        public void VariablesAlsoAppearInExpressions()
+        {
+            var items = BuildWithScript("DECLARE @x int\nSELECT * FROM dbo.Users WHERE |");
+
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Variable && i.InsertText == "@x");
+        }
+
+        [Fact]
+        public void VariableListIsEmptyWithoutDeclarations()
+        {
+            Assert.Empty(BuildWithScript("SELECT @|"));
+        }
+
+        [Fact]
+        public void ReadinessRequestsColumnsBehindStarInCte()
+        {
+            var sql = "WITH c AS (SELECT * FROM dbo.Users) SELECT  FROM c";
+            var caret = sql.IndexOf("  FROM", System.StringComparison.Ordinal) + 1;
+            var context = ContextAnalyzer.Analyze(sql, caret);
+            var snapshot = SampleDatabase(withColumns: false);
+
+            var readiness = Readiness.Evaluate(context, snapshot, ScriptModel.Build(sql, caret));
+
+            Assert.Equal(ReadinessState.NeedsColumns, readiness.State);
+            Assert.Equal("Users", Assert.Single(readiness.MissingColumns).Name);
+        }
+
+        [Fact]
+        public void ReadinessIsReadyForScriptSources()
+        {
+            var sql = "CREATE TABLE #t (a int)\nSELECT  FROM #t";
+            var caret = sql.IndexOf("  FROM", System.StringComparison.Ordinal) + 1;
+
+            var readiness = Readiness.Evaluate(ContextAnalyzer.Analyze(sql, caret), SampleDatabase(), ScriptModel.Build(sql, caret));
+
+            Assert.Equal(ReadinessState.Ready, readiness.State);
+        }
     }
 }

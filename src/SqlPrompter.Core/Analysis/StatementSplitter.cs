@@ -206,7 +206,9 @@ namespace SqlPrompter.Core.Analysis
                 case "CREATE":
                 case "ALTER":
                 case "DROP":
-                    return head != "CREATE" && head != "ALTER" && prevWord != "OR";
+                    // CREATE TABLE (…) directly followed by DROP/CREATE/ALTER without a semicolon.
+                    return (head != "CREATE" && head != "ALTER" && prevWord != "OR") ||
+                           (head == "CREATE" && state.ObjectType == "TABLE" && prev.Kind == TokenKind.CloseParen);
 
                 case "IF":
                     return head != "DROP" && head != "ALTER" && head != "CREATE";
