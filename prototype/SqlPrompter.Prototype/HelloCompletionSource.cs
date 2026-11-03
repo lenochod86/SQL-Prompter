@@ -12,8 +12,8 @@ using Microsoft.VisualStudio.Utilities;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Otázka 1: pokud SQL editor používá IAsyncCompletionSource, zavolá GetOrCreate
-    /// a v seznamu našeptávání se objeví statické položky "hello".
+    /// Question 1: if the SQL editor uses IAsyncCompletionSource, it calls GetOrCreate
+    /// and the static items "hello" appear in the completion list.
     /// </summary>
     [Export(typeof(IAsyncCompletionSourceProvider))]
     [Name("SqlPrompter.Prototype.Hello")]
@@ -26,7 +26,7 @@ namespace SqlPrompter.Prototype
             {
                 Log.Write(
                     "q1",
-                    "IAsyncCompletionSourceProvider.GetOrCreate pro typObsahu=" +
+                    "IAsyncCompletionSourceProvider.GetOrCreate for contentType=" +
                     SqlContentTypes.Describe(textView.TextBuffer.ContentType));
                 return new HelloCompletionSource();
             });
@@ -35,9 +35,9 @@ namespace SqlPrompter.Prototype
 
     internal sealed class HelloCompletionSource : IAsyncCompletionSource
     {
-        public const string Description = "Statický návrh z prototypu SQL Prompter.";
+        public const string Description = "Static suggestion from the SQL Prompter prototype.";
 
-        /// <summary>Otázka 2: vypnutím lze porovnat chování vestavěného IntelliSense s naším zdrojem a bez něj.</summary>
+        /// <summary>Question 2: turning it off compares the built-in IntelliSense with and without our source.</summary>
         public static volatile bool Enabled = true;
 
         public CompletionStartData InitializeCompletion(CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
@@ -50,7 +50,7 @@ namespace SqlPrompter.Prototype
             Log.Write(
                 "q1",
                 string.Format(
-                    "InitializeCompletion: důvod={0}, znak='{1}', typObsahu=\"{2}\"",
+                    "InitializeCompletion: reason={0}, char='{1}', contentType=\"{2}\"",
                     trigger.Reason,
                     trigger.Character,
                     triggerLocation.Snapshot.ContentType.TypeName));
@@ -71,7 +71,7 @@ namespace SqlPrompter.Prototype
             SnapshotSpan applicableToSpan,
             CancellationToken token)
         {
-            Log.Write("q1", "GetCompletionContextAsync: vracím statické položky hello, vlákno UI=" + ThreadHelper.CheckAccess());
+            Log.Write("q1", "GetCompletionContextAsync: returning static hello items, UI thread=" + ThreadHelper.CheckAccess());
             var items = ImmutableArray.Create(
                 new CompletionItem("hello", this),
                 new CompletionItem("hello_sql_prompter", this));

@@ -11,12 +11,12 @@ using Task = System.Threading.Tasks.Task;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Balíček načtený na pozadí po startu prostředí. Zapíše, v jakém hostiteli běží,
-    /// a přidá příkazy do nabídky Nástroje → SQL Prompter (prototyp).
+    /// Package loaded in the background after the shell starts. Logs which host it runs in
+    /// and adds commands to the Tools -> SQL Prompter (prototype) menu.
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
-    // Druhý parametr je verze nabídek. Po každé změně .vsct ho zvyšte, jinak SSMS použije nabídky z mezipaměti.
+    // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
     [ProvideMenuResource("Menus.ctmenu", 2)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class PrototypePackage : AsyncPackage
@@ -45,21 +45,21 @@ namespace SqlPrompter.Prototype
                 commands.AddCommand(new MenuCommand((s, e) => TestConnection(), new CommandID(CommandSet, TestConnectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
                 commands.AddCommand(new MenuCommand(ToggleHello, new CommandID(CommandSet, ToggleHelloId)) { Checked = HelloCompletionSource.Enabled });
-                Log.Write("host", "Příkazy zaregistrovány.");
+                Log.Write("host", "Commands registered.");
             }
             else
             {
-                Log.Write("host", "IMenuCommandService není k dispozici, příkazy nejsou zaregistrované.");
+                Log.Write("host", "IMenuCommandService is not available; commands are not registered.");
             }
         }
 
         private static void LogHost()
         {
             var process = Process.GetCurrentProcess();
-            Log.Write("host", "=== Prototyp SQL Prompter načten ===");
+            Log.Write("host", "=== SQL Prompter prototype loaded ===");
             Log.Write("host", "Proces: " + process.ProcessName + ", 64bit=" + Environment.Is64BitProcess +
                 ", architektura=" + RuntimeInformation.ProcessArchitecture + ", CLR=" + Environment.Version);
-            Log.Write("host", "Proměnné: " + SqlContentTypes.OverrideVariable + "=" +
+            Log.Write("host", "Variables: " + SqlContentTypes.OverrideVariable + "=" +
                 (Environment.GetEnvironmentVariable(SqlContentTypes.OverrideVariable) ?? "(nenastaveno)") + ", " +
                 LegacyCompletionProbeProvider.EnableVariable + "=" + LegacyCompletionProbeProvider.Enabled);
 
@@ -77,7 +77,7 @@ namespace SqlPrompter.Prototype
                          .Where(a => interesting.Contains(a.GetName().Name, StringComparer.OrdinalIgnoreCase))
                          .OrderBy(a => a.GetName().Name))
             {
-                Log.Write("host", "Sestavení: " + assembly.GetName().Name + " " + assembly.GetName().Version);
+                Log.Write("host", "Assembly: " + assembly.GetName().Name + " " + assembly.GetName().Version);
             }
         }
 
@@ -97,7 +97,7 @@ namespace SqlPrompter.Prototype
         private void DumpConnection()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            // Výsledek se nedrží: údaje včetně hesla mají v paměti žít jen po dobu příkazu.
+            // The result is not kept: data including the password lives in memory only during the command.
             ConnectionProbe.DumpActiveConnection();
         }
 
@@ -107,7 +107,7 @@ namespace SqlPrompter.Prototype
             var snapshot = ConnectionProbe.DumpActiveConnection();
             if (snapshot == null || string.IsNullOrEmpty(snapshot.ServerName))
             {
-                Log.Write("q3", "Test připojení přeskočen: chybí údaje o připojení.");
+                Log.Write("q3", "Connection test skipped: connection data missing.");
                 return;
             }
 
@@ -122,20 +122,20 @@ namespace SqlPrompter.Prototype
                 command.Checked = HelloCompletionSource.Enabled;
             }
 
-            Log.Write("q2", "Návrhy hello " + (HelloCompletionSource.Enabled ? "zapnuty" : "vypnuty") + ".");
+            Log.Write("q2", "Hello suggestions " + (HelloCompletionSource.Enabled ? "enabled" : "disabled") + ".");
         }
 
         private void OpenLog()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            Log.Write("host", "Otevírám log.");
+            Log.Write("host", "Opening the log.");
             try
             {
                 VsShellUtilities.OpenDocument(this, Log.FilePath);
             }
             catch (Exception ex)
             {
-                Log.Error("host", "Otevření logu selhalo", ex);
+                Log.Error("host", "Opening the log failed", ex);
             }
         }
     }
