@@ -45,7 +45,7 @@ The **SQL Prompter** menu with the **Refresh Metadata** and **Open Log** command
 - The completion list always comes from SQL Prompter; you can tell by the **SQL Prompter** filter button at the bottom. The built-in IntelliSense stays enabled for error underlining and quick info, but its list is not shown.
 - Where the extension does not know the context (`EXEC`, `VALUES`, `SET @x =` …), it offers keywords, functions and data types. For new names (alias after `AS`, `@variable`, `#table`) it offers nothing.
 - Metadata, including columns, starts loading when a query window is activated. Right after connecting to a new database, table and column suggestions may be missing for a moment.
-- Tab, Enter, Space, dot, comma, parentheses and operators insert the selected suggestion. After a table source, where an alias is typed, the selection is only soft and only Tab inserts it.
+- Tab, Enter and Space insert the selected suggestion. A dot, comma, parenthesis, semicolon, `]` or operator only closes the list and is typed, so `e.` keeps `e` and opens its columns. After a table source, where an alias is typed, the selection is only soft and only Tab inserts it.
 - The table list also opens after typing a space after `FROM`, `JOIN` and similar keywords.
 
 ## Manual test in SSMS
