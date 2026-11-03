@@ -54,6 +54,7 @@ Repository: `lenochod86/SQL-Prompter`, main branch `main`.
 ### Rules
 
 - Never commit or push directly to `main` unless the user explicitly says so.
+- Exception: changes only to CI (`.github/`), tool configuration (`.claude/`, `.gitignore`, `nuget.config` …) or the instructions in `CLAUDE.md` need no issue or pull request. Commit them straight to `main` (tests pass, CI stays green) and push. Product code, tests and `docs/` still go through the issue workflow.
 - Never force push to `main`. On your own branch use only `git push --force-with-lease`, and only when necessary (e.g. after a rebase).
 - Before handing a branch over for review, rebase it on `origin/main`. Resolve conflicts yourself and describe them.
 - Do not rewrite history that someone may already have pulled unless it is necessary.
