@@ -98,7 +98,7 @@ Každá fáze končí verzí VSIX, kterou uživatel ručně otestuje. Velikosti 
 
 - **Úložiště ve stejném formátu JSON jako SQL Prompt** (`prefix`, `description`, `body`, `placeholders`). Stávající složku se snippety jde načíst přímo nebo zkopírovat. Import i ze záložního XML.
 - **Návrhy snippetů v seznamu** s vlastní ikonou a filtrem a rozbalení zkratky Tabem.
-- **Zástupné symboly** podle tabulky výše. Způsob vyplňování vlastních polí, tedy dialog, nebo pole v textu přepínaná Tabem, je zatím otevřený (viz Rozhodnutí).
+- **Zástupné symboly** podle tabulky výše. Vlastní pole se vyplňují přímo v textu: jsou zvýrazněná, Tab přechází mezi nimi, opakované pole se přepisuje všude naráz a Enter nebo Esc vyplňování ukončí a kurzor skončí na `$CURSOR$`.
 - **Snippety nad výběrem:** `$SELECTEDTEXT$` (např. obalení výběru `ISNULL(…)`), vyvolané z nabídky akcí nad výběrem.
 - **Správa snippetů:** seznam, úpravy, nový snippet z výběru.
 
@@ -164,7 +164,7 @@ Uživatel ho chce, ale není to priorita, proto je na konci.
 Uživatel 2026-11-03:
 
 1. **Vkládání návrhů** jako v exportovaném nastavení: Enter, mezera a Tab vkládají; tečka, čárka, závorky, středník a `]` ne. Klávesy jsou nastavitelné.
-2. **Vlastní pole ve snippetech:** zatím otevřené. Na výběr je dialog (jako SQL Prompt) a pole v textu přepínaná Tabem (jako Visual Studio).
+2. **Vlastní pole ve snippetech:** přímo v textu jako ve Visual Studiu. Snippet se vloží s výchozími hodnotami a pole jsou zvýrazněná. Tab přechází na další pole a stejné pole se přepisuje na všech místech naráz. Dialog jako v SQL Promptu nebude.
 3. **Barvení:** záložka, a pokud to půjde, i rámeček okna (a stavový řádek).
 4. **F12:** procedury, pohledy, funkce a triggery jako `CREATE OR ALTER`, tabulky jako `CREATE TABLE`.
 5. **`SELECT` bez `FROM`:** po výběru sloupce doplnit `FROM` s jeho tabulkou.
