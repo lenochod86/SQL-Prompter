@@ -237,20 +237,33 @@ namespace SqlPrompter.Ssms
     }
 
     /// <summary>
-    /// Space, dot, comma, parentheses and operators insert the selected suggestion and are then typed themselves,
-    /// so "e." inserts the alias and opens its columns. Without them the list would stay open waiting for a choice.
-    /// With soft selection (SoftSelection, e.g. while typing an alias) the editor does not commit on these characters.
+    /// Every character that ends a word ends the completion session, so the list never stays open waiting
+    /// for a choice. Characters enabled in <see cref="CommitKeys"/> insert the selected suggestion first;
+    /// the others are reported as a handled commit without inserting anything, which closes the list and
+    /// lets the character be typed (a dot then opens the next list, e.g. alias columns after "e.").
+    /// With soft selection (e.g. while typing an alias) the editor does not commit on typed characters.
     /// </summary>
     internal sealed class SqlCommitManager : IAsyncCompletionCommitManager
     {
-        private static readonly char[] CommitCharacters = { ' ', '.', ',', '(', ')', ';', '=', '<', '>', '+', '-', '*', '/', '%' };
+        private static readonly CommitResult CloseWithoutInserting = new CommitResult(isHandled: true, CommitBehavior.None);
 
-        public IEnumerable<char> PotentialCommitCharacters => CommitCharacters;
+        // Replaced by the user's settings once the settings infrastructure exists (#9).
+        private readonly CommitKeys keys = CommitKeys.Default;
+
+        public IEnumerable<char> PotentialCommitCharacters => keys.PotentialCharacters;
 
         public bool ShouldCommitCompletion(IAsyncCompletionSession session, SnapshotPoint location, char typedChar, CancellationToken token) =>
-            Array.IndexOf(CommitCharacters, typedChar) >= 0;
+            keys.PotentialCharacters.Contains(typedChar);
 
-        public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token) =>
-            CommitResult.Unhandled;
+        public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token)
+        {
+            // Enter and Tab arrive as '\n' and '\t'; they always insert.
+            if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || keys.Commits(typedChar))
+            {
+                return CommitResult.Unhandled;
+            }
+
+            return CloseWithoutInserting;
+        }
     }
 }
