@@ -62,7 +62,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] SQL login authentication
 - [x] SQL Prompter menu (Refresh Metadata, Open Log), movable to the main menu bar
 - [x] Test database skill for Claude Code (#3)
-- [ ] Repository text in English (#5)
+- [x] Repository text in English (#5)
 
 ### Phase 0: MVP polish (S)
 
@@ -72,6 +72,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [ ] Verify performance on a large database (#7)
 - [ ] Verify Windows authentication (#7)
 - [x] Refresh metadata after DDL executed in the window (`CREATE`, `ALTER`, `DROP`) (#8)
+- [ ] CI checks: VSIX and menu version bumps, one build per push, warnings as errors, Dependabot (#17)
 
 ### Phase 1: Script knowledge and aliases (M)
 
