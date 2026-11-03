@@ -98,12 +98,13 @@ namespace SqlPrompter.Metadata
         }
 
         /// <summary>At most once per VersionCheckInterval checks whether the objects changed and refreshes the snapshot if so.</summary>
-        public Task CheckForChanges(IMetadataLoader loader)
+        /// <param name="force">Check even if the last check was less than VersionCheckInterval ago (e.g. right after DDL ran).</param>
+        public Task CheckForChanges(IMetadataLoader loader, bool force = false)
         {
             lock (gate)
             {
                 var now = clock();
-                if (snapshot == null || (loading != null && !loading.IsCompleted) || now - lastVersionCheck < VersionCheckInterval)
+                if (snapshot == null || (loading != null && !loading.IsCompleted) || (!force && now - lastVersionCheck < VersionCheckInterval))
                 {
                     return Task.CompletedTask;
                 }

@@ -21,6 +21,9 @@ namespace SqlPrompter.Ssms
         public const int RefreshMetadataId = 0x0100;
         public const int OpenLogId = 0x0101;
 
+        /// <summary>Kept so that its DTE events stay subscribed.</summary>
+        private SchemaChangeWatcher schemaChangeWatcher;
+
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
@@ -29,6 +32,18 @@ namespace SqlPrompter.Ssms
             {
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
+            }
+
+            try
+            {
+                if (await GetServiceAsync(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)
+                {
+                    schemaChangeWatcher = SchemaChangeWatcher.Start(dte);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Starting the schema change watcher failed", ex);
             }
         }
 

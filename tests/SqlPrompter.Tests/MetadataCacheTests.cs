@@ -98,6 +98,23 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public async Task ForcedCheckIgnoresInterval()
+        {
+            var now = new DateTime(2026, 1, 1);
+            var loader = new FakeLoader();
+            var cache = new DatabaseMetadataCache(clock: () => now);
+            await cache.EnsureLoaded(loader);
+
+            loader.Version = "v2";
+            await cache.CheckForChanges(loader, force: true);
+
+            Assert.Equal(1, loader.VersionChecks);
+            Assert.Equal("v2", cache.Current.Version);
+            await cache.CheckForChanges(loader);
+            Assert.Equal(1, loader.VersionChecks);
+        }
+
+        [Fact]
         public async Task InvalidateDropsSnapshotAndIgnoresStaleLoad()
         {
             var loader = new FakeLoader { Gate = new TaskCompletionSource<bool>() };

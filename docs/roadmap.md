@@ -66,12 +66,12 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 ### Phase 0: MVP polish (S)
 
-- [ ] Commit keys like SQL Prompt: Enter, Space and Tab commit; dot, comma, parentheses, semicolon and `]` do not commit, they close the list and are typed (a dot then opens the columns) (#6)
-- [ ] Configurable commit keys (#6, needs #9)
+- [x] Commit keys like SQL Prompt: Enter, Space and Tab commit; dot, comma, parentheses, semicolon and `]` do not commit, they close the list and are typed (a dot then opens the columns) (#6)
+- [ ] Configurable commit keys (#9)
 - [ ] Verify in SSMS: empty list for variables, SQL Prompter filter, soft selection while typing an alias (#7)
 - [ ] Verify performance on a large database (#7)
 - [ ] Verify Windows authentication (#7)
-- [ ] Refresh metadata after DDL executed in the window (`CREATE`, `ALTER`, `DROP`) (#8)
+- [x] Refresh metadata after DDL executed in the window (`CREATE`, `ALTER`, `DROP`) (#8)
 
 ### Phase 1: Script knowledge and aliases (M)
 

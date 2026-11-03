@@ -47,6 +47,7 @@ The **SQL Prompter** menu with the **Refresh Metadata** and **Open Log** command
 - Metadata, including columns, starts loading when a query window is activated. Right after connecting to a new database, table and column suggestions may be missing for a moment.
 - Tab, Enter and Space insert the selected suggestion. A dot, comma, parenthesis, semicolon, `]` or operator only closes the list and is typed, so `e.` keeps `e` and opens its columns. After a table source, where an alias is typed, the selection is only soft and only Tab inserts it.
 - The table list also opens after typing a space after `FROM`, `JOIN` and similar keywords.
+- After running a script that creates, alters or drops objects (or uses `sp_rename` or `SELECT … INTO`), the metadata of the window's database is refreshed within a few seconds. Otherwise changes are noticed at most 30 s later.
 
 ## Manual test in SSMS
 
@@ -63,6 +64,8 @@ Connect a window to a database with a few tables and try:
 | `DECLARE @x int; SELECT @` | No list (the extension does not know variables yet) |
 | `SELECT CAST(1 AS ` | Data types |
 | `EXEC ` and Ctrl+Space | Keywords and functions without a firm selection |
+| Run `CREATE TABLE dbo.NewTable (Id int)`, wait a few seconds, then `SELECT * FROM New` | `dbo.NewTable` |
+| Run `ALTER TABLE dbo.NewTable ADD Name int`, then `SELECT * FROM dbo.NewTable n WHERE n.` | `Name` among the columns |
 | Window signed in with Entra ID | Keywords and functions, no tables or columns |
 
 ## License
