@@ -65,7 +65,7 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        /// <summary>Najde objekt v metadatech pro zdroj tabulky, nebo null.</summary>
+        /// <summary>Finds the object in the metadata for a table source, or null.</summary>
         public static DbObject Resolve(TableSource source, IDatabaseMetadata metadata)
         {
             if (source.Kind != TableSourceKind.Object || metadata == null || source.NameParts.Count > 3)

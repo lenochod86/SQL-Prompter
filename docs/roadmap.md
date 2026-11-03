@@ -1,197 +1,201 @@
-# SQL Prompter: plán
+# SQL Prompter: roadmap
 
-Cíl je nahradit SQL Prompt od Redgate v každodenní práci v SSMS 22. Architektura a ověřená fakta o SSMS jsou v [architecture.md](architecture.md), tento dokument řeší, co a v jakém pořadí stavět.
+The goal is to replace Redgate SQL Prompt in everyday work in SSMS 22. The architecture and verified facts about SSMS are in [architecture.md](architecture.md); this document covers what to build and in which order. Each item links to its GitHub issue once one exists.
 
-**Stav:** odsouhlasené pořadí a rozhodnutí (2026-11-03), viz [Rozhodnutí](#rozhodnutí) na konci.
+**Status:** order and decisions agreed on 2026-11-03, see [Decisions](#decisions) at the end.
 
-## Priority uživatele
+## User priorities
 
-1. **IntelliSense**, které nabídne všechno a dá se na něj spolehnout, včetně návrhu JOINů a automatických aliasů.
-2. **Snippety**, včetně převzetí stávajících snippetů ze SQL Promptu.
-3. **Barvení záložek dotazů** podle serveru a databáze.
-4. **F12**: otevření kódu procedury, pohledu, funkce nebo triggeru v novém okně dotazu.
-5. **Zkratky:** F12, Ctrl+Mezerník, Shift+F5 (spuštění příkazu pod kurzorem). Další přibudou.
+1. **IntelliSense** that offers everything and can be relied on, including JOIN suggestions and automatic aliases.
+2. **Snippets**, including the user's existing SQL Prompt snippets.
+3. **Query tab coloring** by server and database.
+4. **F12**: open the code of a procedure, view, function or trigger in a new query window.
+5. **Shortcuts:** F12, Ctrl+Space, Shift+F5 (run the statement at the caret). More will follow.
 
-Uživatel používá skoro všechny funkce SQL Promptu. Nejvíc IntelliSense, barvu záložky, F12, snippety a aliasy. Formátování chce taky, ale až nakonec.
+The user uses almost all SQL Prompt features, most of all IntelliSense, tab colors, F12, snippets and aliases. Formatting is wanted too, but last.
 
-Prostředí:
-- databáze mají přes sto tabulek a hodně procedur, pohledů a triggerů;
-- přihlašuje se přes Windows a SQL login, Entra ID se nepoužívá;
-- zatím pro jednoho uživatele, později open source pod licencí MIT.
+Environment:
+- databases have over a hundred tables and many procedures, views and triggers;
+- sign-in with Windows authentication and SQL logins; Entra ID is not used;
+- a single user for now, later open source under the MIT license.
 
-## Podklady
+## Source material
 
-Uživatel dodal export ze SQL Promptu 10.14:
-- nastavení (`Prompt.settings`, ZIP s XML);
-- 127 snippetů ve formátu JSON a jejich zálohu v XML;
-- vlastní styl formátování ve dvou formátech;
-- snímky obrazovky voleb a funkcí.
+The user provided an export from SQL Prompt 10.14:
+- settings (`Prompt.settings`, a ZIP with XML files);
+- 127 snippets in JSON and their XML backup;
+- a custom formatting style in two formats;
+- screenshots of options and features.
 
-Podklady leží mimo repozitář a do něj se nekopírují, protože obsahují názvy serverů, databází a interní snippety. Testy importu proto používají vlastní ukázková data se stejnou strukturou.
+The material stays outside the repository and is never copied into it, because it contains server and database names and internal snippets. Import tests therefore use our own sample data with the same structure.
 
-Binární soubory SQL Promptu se neanalyzují ani nepoužívají. Jde o proprietární software a k náhradě stačí exporty a popis chování.
+SQL Prompt binaries are neither analyzed nor used. It is proprietary software; exports and behavior descriptions are enough.
 
-Z exportu vyplývá, co uživatel používá:
+What the export shows the user relies on:
 
-| Oblast | Nastavení v SQL Promptu | Dopad na plán |
+| Area | SQL Prompt setting | Phase |
 |---|---|---|
-| Vkládání návrhu | Enter, mezera a Tab vkládají; tečka, čárka, závorky a středník ne | Fáze 0 |
-| Kvalifikace | Objekty se schématem, sloupce s aliasem | Fáze 1 |
-| Aliasy | Automatické aliasy s `AS`, 10 vlastních aliasů (název tabulky → alias), bez ignorovaných předpon | Fáze 1 |
-| Sloupce | Po `SELECT` všechny sloupce databáze, sloupce v pořadí z tabulky | Fáze 1 |
-| JOINy | Podle cizích klíčů, shody názvů sloupců a jednotlivých sloupců vícesloupcových klíčů; prohození pořadí sloupců v podmínce | Fáze 2 |
-| Snippety | Zástupné symboly `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(formát)$`, `$USER$`, `$DBNAME$` a vlastní pole s výchozí hodnotou; dialog pro jejich vyplnění | Fáze 3 |
-| Barvy | 8 prostředí (název a barva) a 17 pravidel server/databáze → prostředí, barva i ve stavovém řádku | Fáze 4 |
-| Vložený kód | Úplný `INSERT` bez `VALUES`, parametry procedur s výchozími hodnotami a `DECLARE` pro OUTPUT, závorky u funkcí, `ALTER` při úpravě objektu | Fáze 5, 6 |
-| Ostatní | Historie dotazů a obnova záložek, analýza kódu, varování před spuštěním, zvýraznění stejných objektů, automatické uzavírání `'` a `[` | Fáze 7 |
-| Formátování | Vlastní styl (tabulátory, čárky na začátku řádku, zarovnání aliasů, velká písmena …) a akce: `N` u řetězců, středníky, odstranění zbytečných závorek, přidání `AS` | Fáze 8 |
+| Commit keys | Enter, Space and Tab commit; dot, comma, parentheses and semicolon do not | 0 |
+| Qualification | Objects with schema, columns with alias | 1 |
+| Aliases | Automatic aliases with `AS`, 10 custom aliases (table name → alias), no ignored prefixes | 1 |
+| Columns | All database columns after `SELECT`, columns in table order | 1 |
+| JOINs | By foreign keys, matching column names and individual columns of multi-column keys; swapped column order in the condition | 2 |
+| Snippets | Placeholders `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$` and custom fields with default values | 3 |
+| Colors | 8 environments (name and color) and 17 server/database → environment rules, color also in the status bar | 4 |
+| Inserted code | Full `INSERT` without `VALUES`, procedure parameters with default values and `DECLARE` for OUTPUT, parentheses for functions, `ALTER` when editing an object | 5, 6 |
+| Other | Query history and tab restore, code analysis, execution warnings, highlighting matching objects, auto-closing `'` and `[` | 7 |
+| Formatting | Custom style (tabs, leading commas, aligned aliases, upper case …) and actions: `N` prefix for strings, semicolons, removing unnecessary brackets, adding `AS` | 8 |
 
-## Fáze
+## Phases
 
-Každá fáze končí verzí VSIX, kterou uživatel ručně otestuje. Velikosti jsou orientační: **S** dny, **M** týden až dva, **L** několik týdnů. Hotové body mají `[x]`, nehotové `[ ]`.
+Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** days, **M** one or two weeks, **L** several weeks. Done items are `[x]`, open items `[ ]`.
 
-### Hotovo: prototyp a MVP
+### Done: prototype and MVP
 
-- [x] Prototyp: MEF a `IAsyncCompletionSource` v SQL editoru SSMS 22, potlačení vestavěného seznamu, připojení přes `ScriptFactory`
-- [x] Sestavení VSIX bez Visual Studia (`dotnet build`), CI pro testy a VSIX
-- [x] Tolerantní lexer, dělení na příkazy bez středníků, bloky dotazu, zdroje tabulek a aliasy
-- [x] Klíčová slova, schémata, tabulky, pohledy, tabulkové funkce, sloupce, aliasy, vestavěné funkce, datové typy
-- [x] Sloupce aliasu (`e.`), sloupce všech zdrojů ve výrazu, sloupce vnějšího dotazu v poddotazu
-- [x] Jen seznam SQL Prompteru (vestavěný se neukazuje), filtr „SQL Prompter“ v seznamu
-- [x] Metadata na pozadí při aktivaci okna, sloupce uživatelských objektů s objekty, kontrola změn každých 30 s
-- [x] Přihlášení SQL loginem
-- [x] Menu SQL Prompter (Obnovit metadata, Otevřít log), přesunutelné do hlavní lišty
+- [x] Prototype: MEF and `IAsyncCompletionSource` in the SSMS 22 SQL editor, suppressing the built-in list, connection through `ScriptFactory`
+- [x] VSIX builds without Visual Studio (`dotnet build`), CI for tests and VSIX
+- [x] Tolerant lexer, statement splitting without semicolons, query blocks, table sources and aliases
+- [x] Keywords, schemas, tables, views, table-valued functions, columns, aliases, built-in functions, data types
+- [x] Alias columns (`e.`), columns of all sources in an expression, outer query columns in a subquery
+- [x] Only the SQL Prompter list (the built-in one is not shown), "SQL Prompter" filter in the list
+- [x] Metadata loaded in the background when a window is activated, user object columns with the objects, change check every 30 s
+- [x] SQL login authentication
+- [x] SQL Prompter menu (Refresh Metadata, Open Log), movable to the main menu bar
+- [x] Test database skill for Claude Code (#3)
+- [ ] Repository text in English (#5)
 
-### Fáze 0: Doladění MVP (S)
+### Phase 0: MVP polish (S)
 
-- [ ] Vkládání jako v SQL Promptu: Enter, mezera a Tab návrh vloží; tečka, čárka, závorky, středník a `]` ho nevloží, jen zavřou seznam a zapíšou se (tečka pak otevře sloupce)
-- [ ] Nastavitelné klávesy pro vkládání
-- [ ] Ověřit v SSMS: prázdný seznam u proměnných, filtr SQL Prompter, naznačený výběr při psaní aliasu
-- [ ] Ověřit výkon na velké databázi
-- [ ] Ověřit přihlášení přes Windows
-- [ ] Obnova metadat po DDL spuštěném v okně (`CREATE`, `ALTER`, `DROP`)
+- [ ] Commit keys like SQL Prompt: Enter, Space and Tab commit; dot, comma, parentheses, semicolon and `]` do not commit, they close the list and are typed (a dot then opens the columns) (#6)
+- [ ] Configurable commit keys (#6, needs #9)
+- [ ] Verify in SSMS: empty list for variables, SQL Prompter filter, soft selection while typing an alias (#7)
+- [ ] Verify performance on a large database (#7)
+- [ ] Verify Windows authentication (#7)
+- [ ] Refresh metadata after DDL executed in the window (`CREATE`, `ALTER`, `DROP`) (#8)
 
-### Fáze 1: Znalost skriptu a aliasy (M)
+### Phase 1: Script knowledge and aliases (M)
 
-- [ ] **Základ nastavení:** stránky v Tools → Options → SQL Prompter, soubor JSON, export a import. Každá další funkce přidává svoje volby.
-- [ ] **Import nastavení ze SQL Promptu** (`.settings`): aliasy, kvalifikace, vkládání. Další části přibudou s dalšími fázemi.
-- [ ] **Model skriptu**, tedy definice ve skriptu počítané na pozadí:
-  - [ ] sloupce CTE a odvozených tabulek
-  - [ ] `#tabulky` z `CREATE TABLE` a `SELECT … INTO`
-  - [ ] `@tabulky`
-  - [ ] proměnné a parametry s typy, včetně parametrů upravované procedury
-- [ ] **Automatické aliasy** při vložení tabulky:
-  - [ ] z velkých písmen názvu (`OrderItems` → `oi`) a s ohledem na kolize v dotazu
-  - [ ] vlastní aliasy
-  - [ ] ignorované předpony
-  - [ ] volba `AS`
-- [ ] **Kvalifikace:** objekty se schématem, sloupce s aliasem (`a.Sloupec`)
-- [ ] Po `SELECT` bez `FROM` sloupce všech tabulek databáze; po výběru sloupce se doplní `FROM` s jeho tabulkou a aliasem
-- [ ] Třídílné názvy a sledování `USE`
-- [ ] Synonyma
-- [ ] **Linked servery, načítané líně**, aby úvodní načtení nezdržovalo ani zákazníka s pěti linked servery plnými tabulek:
-  - [ ] nejdřív jen jejich názvy (`sys.servers`)
-  - [ ] po výběru serveru jeho databáze
-  - [ ] po výběru databáze schémata a objekty
-  - [ ] sloupce až při použití tabulky
+- [ ] **Settings foundation:** pages in Tools → Options → SQL Prompter, JSON file, export and import. Every later feature adds its options (#9).
+- [ ] **SQL Prompt settings import** (`.settings`): aliases, qualification, commit keys. Other parts follow with later phases (#9).
+- [ ] **Script model**, i.e. definitions in the script computed in the background:
+  - [ ] columns of CTEs and derived tables
+  - [ ] `#tables` from `CREATE TABLE` and `SELECT … INTO`
+  - [ ] `@tables`
+  - [ ] variables and parameters with types, including the parameters of the procedure being edited
+- [ ] **Automatic aliases** when inserting a table:
+  - [ ] from the capital letters of the name (`OrderItems` → `oi`), avoiding collisions in the query
+  - [ ] custom aliases
+  - [ ] ignored prefixes
+  - [ ] `AS` option
+- [ ] **Qualification:** objects with schema, columns with alias (`a.Column`)
+- [ ] After `SELECT` without `FROM`, columns of all tables in the database; choosing a column adds `FROM` with its table and alias
+- [ ] Three-part names and tracking `USE`
+- [ ] Synonyms
+- [ ] **Linked servers, loaded lazily**, so that the initial load stays fast even for a customer with five linked servers full of tables:
+  - [ ] only their names first (`sys.servers`)
+  - [ ] the server's databases after choosing a server
+  - [ ] schemas and objects after choosing a database
+  - [ ] columns only when a table is used
 
-### Fáze 2: JOINy (M)
+### Phase 2: JOINs (M)
 
-- [ ] Metadata primárních a cizích klíčů včetně vícesloupcových
-- [ ] Za `JOIN` nahoře tabulky propojené cizím klíčem s tabulkami v dotazu a položka s celou klauzulí `Tabulka AS t ON t.IdX = x.IdX`
-- [ ] Za `ON` úplné podmínky:
-  - [ ] podle cizích klíčů
-  - [ ] podle shody názvů sloupců
-  - [ ] volitelně podle shody typů
-  - [ ] jednotlivé sloupce vícesloupcových klíčů
-- [ ] Volba pořadí sloupců v podmínce (nová tabulka vlevo nebo vpravo)
-- [ ] Testy na schématu podobném skutečnému (konvence `IdTabulka` ↔ `Tabulka.IdTabulka`)
+- [ ] Metadata of primary and foreign keys, including multi-column keys
+- [ ] After `JOIN`, tables linked by a foreign key to the tables in the query first, with an item for the whole clause `Table AS t ON t.IdX = x.IdX`
+- [ ] Complete conditions after `ON`:
+  - [ ] by foreign keys
+  - [ ] by matching column names
+  - [ ] optionally by matching types
+  - [ ] individual columns of multi-column keys
+- [ ] Option for the column order in the condition (new table left or right)
+- [ ] Tests on a schema similar to real ones (convention `IdTable` ↔ `Table.IdTable`)
 
-### Fáze 3: Snippety (M)
+### Phase 3: Snippets (M)
 
-- [ ] **Úložiště ve stejném formátu JSON jako SQL Prompt** (`prefix`, `description`, `body`, `placeholders`). Stávající složku jde načíst přímo nebo zkopírovat.
-- [ ] Import ze záložního XML (`.sqlpromptsnippet`)
-- [ ] Návrhy snippetů v seznamu s vlastní ikonou a filtrem, rozbalení zkratky Tabem
-- [ ] Zástupné symboly: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(formát)$`, `$USER$`, `$DBNAME$`
-- [ ] **Vlastní pole přímo v textu:**
-  - zvýrazněná a přepínaná Tabem;
-  - opakované pole se přepisuje všude naráz;
-  - Enter nebo Esc vyplňování ukončí a kurzor skončí na `$CURSOR$`.
-- [ ] Snippety nad výběrem (`$SELECTEDTEXT$`, např. obalení výběru `ISNULL(…)`) z nabídky akcí nad výběrem
-- [ ] Správa snippetů: seznam, úpravy, nový snippet z výběru
+- [ ] **Storage in the same JSON format as SQL Prompt** (`prefix`, `description`, `body`, `placeholders`). An existing snippet folder can be read directly or copied.
+- [ ] Import from the XML backup (`.sqlpromptsnippet`)
+- [ ] Snippet suggestions in the list with their own icon and filter; expanding a shortcut with Tab
+- [ ] Placeholders: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$`
+- [ ] **Custom fields directly in the text:**
+  - highlighted and navigated with Tab;
+  - a repeated field is updated everywhere at once;
+  - Enter or Esc ends editing and the caret ends at `$CURSOR$`.
+- [ ] Snippets on a selection (`$SELECTEDTEXT$`, e.g. wrapping the selection in `ISNULL(…)`) from a selection actions menu
+- [ ] Snippet management: list, editing, new snippet from a selection
 
-### Fáze 4: Barvení podle serveru a databáze (S až M, nejdřív průzkum)
+### Phase 4: Coloring by server and database (S to M, research first)
 
-- [ ] **Průzkum:** jak v SSMS 22 obarvit záložku dokumentu, rámeček okna a stavový řádek. SSMS umí vlastní barvu připojení jen ve stavovém řádku a ta se nastavuje v dialogu připojení. Pro barvu záložky ani rámečku API ověřené nemáme.
-- [ ] Barva záložky
-- [ ] Barva rámečku okna dotazu, pokud to jde
-- [ ] Barva stavového řádku, pokud to jde
-- [ ] Prostředí (název a barva) a pravidla server + databáze → prostředí, se zástupnými znaky
-- [ ] Import barev ze SQL Promptu
+- [ ] **Research:** how to color the document tab, the window frame and the status bar in SSMS 22. SSMS only has a custom connection color in the status bar, set in the connect dialog. There is no verified API for tab or frame colors.
+- [ ] Tab color
+- [ ] Query window frame color, if possible
+- [ ] Status bar color, if possible
+- [ ] Environments (name and color) and server + database → environment rules with wildcards
+- [ ] Import of SQL Prompt colors
 
-### Fáze 5: Navigace a spouštění (S až M, nejdřív průzkum)
+### Phase 5: Navigation and execution (S to M, research first)
 
-- [ ] **Průzkum:** otevření nového okna s připojením. Kandidát je `ScriptFactory.CreateNewBlankScript` s připojením aktuálního okna, které už umíme číst.
-- [ ] **F12 na objektu pod kurzorem:**
-  - [ ] procedura, pohled, funkce nebo trigger se otevře v novém okně se stejným serverem a databází jako `CREATE OR ALTER`
-  - [ ] tabulka otevře skript `CREATE TABLE`
-- [ ] **Shift+F5: spuštění příkazu pod kurzorem.** Hranice určí stávající dělení na příkazy, příkaz se vybere, spustí přes Query.Execute a výběr se vrátí. Ověřit kolizi zkratky.
-- [ ] Ctrl+F12: zobrazení objektu v Object Exploreru (později)
+- [ ] **Research:** opening a new window with a connection. Candidate: `ScriptFactory.CreateNewBlankScript` with the current window's connection, which we can already read.
+- [ ] **F12 on the object at the caret:**
+  - [ ] a procedure, view, function or trigger opens in a new window on the same server and database as `CREATE OR ALTER`
+  - [ ] a table opens its `CREATE TABLE` script
+- [ ] **Shift+F5: run the statement at the caret.** The existing statement splitting finds its bounds; the statement is selected, run through Query.Execute and the selection restored. Check for a shortcut conflict.
+- [ ] Ctrl+F12: show the object in Object Explorer (later)
 
-### Fáze 6: Rozšířené IntelliSense (L)
+### Phase 6: Extended IntelliSense (L)
 
-- [ ] `INSERT`: úplný příkaz se seznamem sloupců, volitelně s `VALUES` a výchozími hodnotami
-- [ ] `EXEC`: procedury s parametry, výchozími hodnotami a `DECLARE` pro výstupní parametry
-- [ ] Funkce se závorkami a parametry
-- [ ] Rozbalení `*` Tabem na seznam sloupců s aliasy
-- [ ] Panel s definicí objektu vedle seznamu (skript `CREATE`, jako v SQL Promptu)
-- [ ] Nápověda k parametrům
-- [ ] Řazení podle používání (statistika zůstává lokálně, nic se neodesílá)
+- [ ] `INSERT`: full statement with the column list, optionally with `VALUES` and default values
+- [ ] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters
+- [ ] Functions with parentheses and parameters
+- [ ] Expanding `*` with Tab into a column list with aliases
+- [ ] Object definition panel next to the list (`CREATE` script, as in SQL Prompt)
+- [ ] Parameter info
+- [ ] Ranking by usage (statistics stay local, nothing is sent anywhere)
 
-### Fáze 7: Nástroje (M až L)
+### Phase 7: Tools (M to L)
 
-Uživatel používá skoro všechny, pořadí uvnitř fáze se domluví před jejím začátkem.
+The user uses almost all of them; the order within the phase is agreed before it starts.
 
-- [ ] Historie dotazů a obnova záložek po spuštění SSMS
-- [ ] Refaktoring:
-  - [ ] kvalifikace názvů
-  - [ ] rozbalení `*`
-  - [ ] vložení středníků
-  - [ ] odstranění hranatých závorek
-  - [ ] nepoužité proměnné
-  - [ ] přehled skriptu
-- [ ] Varování před spuštěním (`DELETE` nebo `UPDATE` bez `WHERE` …)
-- [ ] Analýza kódu
-- [ ] Akce nad výběrem: přidat čárky, přidat uvozovky a čárky
-- [ ] Zvýraznění stejných objektů ve skriptu
-- [ ] Automatické uzavírání `'` a `[`
-- [ ] Script as INSERT z mřížky výsledků (zatím nevíme, jestli to v SSMS 22 jde)
+- [ ] Query history and restoring tabs when SSMS starts
+- [ ] Refactoring:
+  - [ ] qualify names
+  - [ ] expand `*`
+  - [ ] insert semicolons
+  - [ ] remove square brackets
+  - [ ] unused variables
+  - [ ] script summary
+- [ ] Execution warnings (`DELETE` or `UPDATE` without `WHERE` …)
+- [ ] Code analysis
+- [ ] Selection actions: add commas, add quotes and commas
+- [ ] Highlighting matching objects in the script
+- [ ] Auto-closing `'` and `[`
+- [ ] Script as INSERT from the results grid (not yet known whether SSMS 22 allows it)
 
-### Fáze 8: Formátování (L)
+### Phase 8: Formatting (L)
 
-Uživatel ho chce, ale není to priorita, proto je na konci.
+Wanted, but not a priority, so it comes last.
 
-- [ ] Formátovač nad tokeny se strukturou ze ScriptDOM; zachová komentáře, a když by se lišil význam, úpravu neprovede
-- [ ] Volby podle stylu SQL Promptu a import stylu `.json` (uživatelův styl je hlavní testovací případ)
-- [ ] Akce formátování: `N` u řetězců, středníky, odstranění zbytečných závorek, přidání nebo odebrání `AS`, velikost písmen, volitelně kvalifikace a rozbalení `*`
-- [ ] Formátování dokumentu nebo výběru
-- [ ] Velká písmena během psaní
+- [ ] Formatter over tokens with structure from ScriptDOM; keeps comments and refuses a change that would alter the meaning
+- [ ] Options following the SQL Prompt style and import of a `.json` style (the user's style is the main test case)
+- [ ] Formatting actions: `N` prefix for strings, semicolons, removing unnecessary brackets, adding or removing `AS`, casing, optionally qualification and expanding `*`
+- [ ] Formatting the document or the selection
+- [ ] Upper case while typing
 
-## Rizika
+## Risks
 
-- **Nepodporované API SSMS.** Barvení záložek, F12 do nového okna a spuštění výběru závisí na API, které nemusí existovat nebo se může změnit. Proto se tyto fáze otevírají průzkumem.
-- **Formátování** je nejpracnější a chyba v něm poškodí skript. Ochranou je kontrola tokenů, zlaté testy a formátování jen na příkaz uživatele.
-- **Výkon** u velkých skriptů a databází: model skriptu po dávkách mezi `GO`, metadata cachovaná po databázích.
+- **Unsupported SSMS API.** Tab coloring, F12 into a new window and running a selection depend on APIs that may not exist or may change. Those phases therefore start with research.
+- **Formatting** is the most laborious part and a bug in it damages the script. Protection: token comparison, golden tests and formatting only on the user's command.
+- **Performance** with large scripts and databases: script model per batch between `GO` lines, metadata cached per database.
 
-## Rozhodnutí
+## Decisions
 
-Uživatel 2026-11-03:
+By the user on 2026-11-03:
 
-1. **Vkládání návrhů** jako v exportovaném nastavení: Enter, mezera a Tab vkládají; tečka, čárka, závorky, středník a `]` ne. Klávesy jsou nastavitelné.
-2. **Vlastní pole ve snippetech:** přímo v textu jako ve Visual Studiu. Snippet se vloží s výchozími hodnotami a pole jsou zvýrazněná. Tab přechází na další pole a stejné pole se přepisuje na všech místech naráz. Dialog jako v SQL Promptu nebude.
-3. **Barvení:** záložka, a pokud to půjde, i rámeček okna (a stavový řádek).
-4. **F12:** procedury, pohledy, funkce a triggery jako `CREATE OR ALTER`, tabulky jako `CREATE TABLE`.
-5. **`SELECT` bez `FROM`:** po výběru sloupce doplnit `FROM` s jeho tabulkou.
-6. **Formátování** až na konec.
-7. **Nástroje:** používá skoro všechny, pořadí se domluví před fází 7.
-8. **Linked servery:** ano, ale líně. Nejdřív jen názvy, objekty až po výběru serveru.
+1. **Commit keys** as in the exported settings: Enter, Space and Tab commit; dot, comma, parentheses, semicolon and `]` do not. The keys are configurable.
+2. **Custom snippet fields:** directly in the text as in Visual Studio. The snippet is inserted with default values and the fields are highlighted. Tab moves to the next field and the same field is updated everywhere at once. No dialog as in SQL Prompt.
+3. **Coloring:** the tab and, if possible, the window frame (and the status bar).
+4. **F12:** procedures, views, functions and triggers as `CREATE OR ALTER`, tables as `CREATE TABLE`.
+5. **`SELECT` without `FROM`:** choosing a column adds `FROM` with its table.
+6. **Formatting** last.
+7. **Tools:** almost all are used; the order is agreed before phase 7.
+8. **Linked servers:** yes, but lazily. Names first, objects only after choosing a server.
+9. **Language:** everything in the repository is in English; the conversation with the user stays in Czech.
+10. **Workflow:** an issue, a branch and a squash-merged pull request for every piece of work; GitHub deletes merged branches automatically.

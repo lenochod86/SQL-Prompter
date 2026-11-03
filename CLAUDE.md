@@ -8,7 +8,7 @@ These instructions apply in every environment: locally on Windows, in the cloud 
 
 - **Talk to the user in Czech.**
 - **Everything that goes into the repository is in English:** code, identifiers, comments, UI text (menus, options, suggestion descriptions, messages), log messages, documentation, issues, pull requests, commit messages and labels.
-- Existing Czech text in the repository (code comments, UI strings, `docs/`) is being translated; until that is done, write all new or changed text in English.
+- Test data and SQL keywords in tests may contain other languages only when a test needs them (e.g. non-ASCII identifiers).
 
 ## Documents
 
@@ -47,9 +47,9 @@ Repository: `lenochod86/SQL-Prompter`, main branch `main`.
    - Describe what changed, how to test it in SSMS, and what is verified and what is not.
    - Include `Closes #<number>`.
 6. **Approval.** Merge only after the user explicitly agrees. The user usually tests the VSIX from the branch in SSMS.
-7. **Squash merge** the pull request into `main`.
+7. **Squash merge** the pull request into `main` (the repository allows only squash merges).
    - The commit message is the PR title with the PR number; the body summarizes the change.
-   - Then delete the remote and local branch and switch to the updated `main`.
+   - GitHub deletes the remote branch automatically. Then switch to the updated `main` and delete the local branch.
 
 ### Rules
 

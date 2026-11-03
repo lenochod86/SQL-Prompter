@@ -8,13 +8,13 @@ namespace SqlPrompter.Core.Lexing
         /// <summary>Identifier or keyword, including temporary tables (#t).</summary>
         Word,
 
-        /// <summary>[name] nebo "name".</summary>
+        /// <summary>[name] or "name".</summary>
         QuotedIdentifier,
 
-        /// <summary>@name nebo @@name.</summary>
+        /// <summary>@name or @@name.</summary>
         Variable,
 
-        /// <summary>'text' nebo N'text'.</summary>
+        /// <summary>'text' or N'text'.</summary>
         String,
 
         Number,

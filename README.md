@@ -1,66 +1,70 @@
 # SQL Prompter
 
-Rozšíření s vlastním IntelliSense pro SQL editor v SQL Server Management Studio 22. Návrh a výsledky prototypu jsou v [docs/architecture.md](docs/architecture.md).
+Custom IntelliSense for the SQL editor in SQL Server Management Studio 22. The design and the prototype results are in [docs/architecture.md](docs/architecture.md), the plan in [docs/roadmap.md](docs/roadmap.md).
 
-**Stav:** MVP. Jednotkové testy procházejí, v SSMS 22 zatím neověřené.
+**Status:** MVP. Runs in SSMS 22.11; unit tests pass.
 
-## Struktura
+## Structure
 
-| Složka | Obsah |
+| Folder | Contents |
 |---|---|
-| `src/SqlPrompter.Core` | Lexer, rozbor kontextu na pozici kurzoru a sestavení návrhů (netstandard2.0, bez závislostí) |
-| `src/SqlPrompter.Metadata` | Snímky metadat po databázích, načítání z `sys.*` na pozadí (netstandard2.0) |
-| `src/SqlPrompter.Ssms` | VSIX pro SSMS 22: zdroj našeptávání, připojení okna, příkazy (net48) |
-| `tests/SqlPrompter.Tests` | Testy jádra a metadat (aktuální .NET) |
-| `prototype/` | Diagnostický prototyp, který ověřil základní předpoklady |
+| `src/SqlPrompter.Core` | Lexer, caret context analysis and suggestion building (netstandard2.0, no dependencies) |
+| `src/SqlPrompter.Metadata` | Per-database metadata snapshots loaded from `sys.*` in the background (netstandard2.0) |
+| `src/SqlPrompter.Ssms` | VSIX for SSMS 22: completion source, window connection, commands (net48) |
+| `tests/SqlPrompter.Tests` | Tests of Core and Metadata (current .NET) |
+| `prototype/` | Diagnostic prototype that verified the basic assumptions |
 
-## Sestavení
+## Build
 
-Stačí .NET SDK 8 nebo novější, Visual Studio není potřeba.
+The .NET SDK 8 or later is enough; Visual Studio is not needed.
 
 ```powershell
 dotnet test tests\SqlPrompter.Tests
 dotnet build src\SqlPrompter.Ssms\SqlPrompter.Ssms.csproj -c Release
 ```
 
-VSIX vznikne v `src\SqlPrompter.Ssms\bin\Release\net48\SqlPrompter.Ssms.vsix`. Testy běží i mimo Windows, VSIX se sestavuje jen na Windows.
+The VSIX is created in `src\SqlPrompter.Ssms\bin\Release\net48\SqlPrompter.Ssms.vsix`. The tests run on any OS; the VSIX builds on Windows only.
 
-## Instalace do SSMS 22
+## Installing into SSMS 22
 
-1. Zavřete SSMS.
-2. Pokud je nainstalovaný prototyp, odinstalujte ho, jinak by se v seznamu objevovalo i „hello“:
+1. Close SSMS.
+2. If the prototype is installed, uninstall it, otherwise "hello" would show up in the list as well:
    ```powershell
    & "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\VSIXInstaller.exe" /uninstall:SqlPrompter.Prototype.c9efd892-d89f-4178-8e0d-a9b7f925e617
    ```
-3. Poklepejte na `SqlPrompter.Ssms.vsix`.
+3. Double-click `SqlPrompter.Ssms.vsix`.
 
-Odinstalace: `VSIXInstaller.exe /uninstall:SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6`.
+Uninstall: `VSIXInstaller.exe /uninstall:SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6`.
 
-Pokud SSMS po odebrání rozšíření hlásí, že se balíček (např. `PrototypePackage`) nenačetl, drží ještě starou registraci. Při zavřeném SSMS pomůže `SSMS.exe /updateconfiguration` ze složky `Common7\IDE`.
+If SSMS reports after removing an extension that a package (e.g. `PrototypePackage`) did not load, it still holds the old registration. Run `SSMS.exe /updateconfiguration` from the `Common7\IDE` folder while SSMS is closed.
 
-Menu **SQL Prompter** s příkazy **Obnovit metadata** a **Otevřít log** je ve výchozím stavu pod **Extensions**. Do hlavní lišty ho přesunete v **Extensions → Customize Menu…** zrušením zaškrtnutí u SQL Prompter. Log je v `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` a obsahuje jen načítání metadat a chyby, žádná hesla ani obsah skriptů.
+The **SQL Prompter** menu with the **Refresh Metadata** and **Open Log** commands is under **Extensions** by default. Move it to the main menu bar in **Extensions → Customize Menu…** by clearing SQL Prompter. The log is `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` and contains only metadata loading and errors, never passwords or script contents.
 
-## Jak se chová
+## Behavior
 
-- Seznam našeptávání je vždy od SQL Prompteru a poznáte ho podle tlačítka filtru **SQL Prompter** dole. Vestavěné IntelliSense zůstává zapnuté kvůli podtrhávání chyb a popiskům, jeho seznam se ale neukazuje.
-- Kde rozšíření kontext nezná (`EXEC`, `VALUES`, `SET @x =` …), nabídne klíčová slova, funkce a datové typy. U nových názvů (alias za `AS`, `@proměnná`, `#tabulka`) nenabídne nic.
-- Metadata se začnou načítat po aktivaci okna dotazu, včetně sloupců. Těsně po připojení k nové databázi můžou návrhy tabulek a sloupců chvíli chybět.
-- Vybraný návrh vloží Tab, Enter, mezera, tečka, čárka, závorka nebo operátor. Za tabulkou, kde se píše alias, je výběr jen naznačený a vloží ho jen Tab.
-- Seznam tabulek se otevře i po napsání mezery za `FROM`, `JOIN` a podobně.
+- The completion list always comes from SQL Prompter; you can tell by the **SQL Prompter** filter button at the bottom. The built-in IntelliSense stays enabled for error underlining and quick info, but its list is not shown.
+- Where the extension does not know the context (`EXEC`, `VALUES`, `SET @x =` …), it offers keywords, functions and data types. For new names (alias after `AS`, `@variable`, `#table`) it offers nothing.
+- Metadata, including columns, starts loading when a query window is activated. Right after connecting to a new database, table and column suggestions may be missing for a moment.
+- Tab, Enter, Space, dot, comma, parentheses and operators insert the selected suggestion. After a table source, where an alias is typed, the selection is only soft and only Tab inserts it.
+- The table list also opens after typing a space after `FROM`, `JOIN` and similar keywords.
 
-## Ruční test v SSMS
+## Manual test in SSMS
 
-Připojte okno k databázi s několika tabulkami a vyzkoušejte:
+Connect a window to a database with a few tables and try:
 
-| Napište | Očekávání |
+| Type | Expected |
 |---|---|
-| `sel` | Klíčová slova, `select` malými písmeny |
-| `SELECT * FROM ` | Tabulky a pohledy jako `dbo.Tabulka`, schémata |
-| `SELECT * FROM sys.ob` | `objects` a další systémové pohledy |
-| `SELECT * FROM dbo.T t WHERE t.` | Sloupce tabulky |
-| `SELECT  FROM dbo.A a JOIN dbo.B b ON 1=1` s kurzorem za `SELECT` a Ctrl+Mezerník | Sloupce obou tabulek, společné s aliasem |
-| `SELECT * FROM dbo.T t ` | `WHERE`, `JOIN` … bez pevného výběru: Enter odřádkuje |
-| `DECLARE @x int; SELECT @` | Žádný seznam (proměnné zatím rozšíření nezná) |
-| `SELECT CAST(1 AS ` | Datové typy |
-| `EXEC ` a Ctrl+Mezerník | Klíčová slova a funkce bez pevného výběru |
-| Okno přihlášené přes Entra ID | Klíčová slova a funkce, bez tabulek a sloupců |
+| `sel` | Keywords, `select` in lower case |
+| `SELECT * FROM ` | Tables and views as `dbo.Table`, schemas |
+| `SELECT * FROM sys.ob` | `objects` and other system views |
+| `SELECT * FROM dbo.T t WHERE t.` | Columns of the table |
+| `SELECT  FROM dbo.A a JOIN dbo.B b ON 1=1` with the caret after `SELECT` and Ctrl+Space | Columns of both tables, shared ones with their alias |
+| `SELECT * FROM dbo.T t ` | `WHERE`, `JOIN` … without a firm selection: Enter starts a new line |
+| `DECLARE @x int; SELECT @` | No list (the extension does not know variables yet) |
+| `SELECT CAST(1 AS ` | Data types |
+| `EXEC ` and Ctrl+Space | Keywords and functions without a firm selection |
+| Window signed in with Entra ID | Keywords and functions, no tables or columns |
+
+## License
+
+The project will be released under the MIT license.
