@@ -1,92 +1,92 @@
-# Prototyp SQL Prompter
+# SQL Prompter prototype
 
-Diagnostické VSIX rozšíření, které má v SSMS 22 odpovědět na tři otázky z [`docs/architecture.md`](../docs/architecture.md#prototyp). Kód se nepoužije pro MVP. Měří, nic nestaví.
+A diagnostic VSIX extension that answered the three questions from [`docs/architecture.md`](../docs/architecture.md#prototype) in SSMS 22. Its code is not used by the MVP; it measures, it does not build anything.
 
-**Stav:** VSIX se sestaví (Windows, .NET SDK 10.0.403, bez Visual Studia). V SSMS 22 zatím neběželo, takže nic z toho, co následuje, není ověřené.
+**Status:** done. All three questions are answered (see [Results](#results) and `docs/architecture.md`). The prototype is kept as a reference and a diagnostic tool.
 
-Všechno se zapisuje do `%LOCALAPPDATA%\SqlPrompter\prototype.log`. Řádky jsou označené `[host]`, `[q1]`, `[q2]` a `[q3]` a uvádějí vlákno (`UI` = vlákno UI).
+Everything is logged to `%LOCALAPPDATA%\SqlPrompter\prototype.log`. Lines are tagged `[host]`, `[q1]`, `[q2]` and `[q3]` and show the thread (`UI` = the UI thread).
 
-## Co dělá
+## What it does
 
-| Soubor | Otázka | Co zjišťuje |
+| File | Question | What it finds out |
 |---|---|---|
-| `PrototypePackage.cs` | předpoklad | Načte se balíček? Zapíše proces, architekturu, verzi DTE, verze sestavení editoru a SqlClient a přidá nabídku **Nástroje → SQL Prompter (prototyp)**. |
-| `TextViewDiagnostics.cs` | 1, 2, 3 | Pro každý pohled vypíše typ obsahu včetně bázových typů, buffery v grafu a `IAsyncCompletionBroker.IsCompletionSupported`. U SQL pohledu vypíše klíče vlastností bufferu (možné místo, kde je připojení okna). Sleduje všechny asynchronní relace našeptávání a vypíše počet položek podle zdroje a texty, které nabízí víc zdrojů. |
-| `HelloCompletionSource.cs` | 1 | `IAsyncCompletionSource` pro typ obsahu `any`, který v SQL editoru nabídne `hello` a `hello_sql_prompter`. |
-| `LegacyCompletionProbe.cs` | 1, 2 | Sonda staršího `ICompletionSource`: vypíše cizí sady návrhů a přidá vlastní. Ve výchozím stavu je vypnutá. |
-| `ConnectionProbe.cs` | 3 | Reflexí najde `ScriptFactory.Instance.CurrentlyActiveWndConnectionInfo`, vypíše jeho strukturu (tajemství skrytá) a kandidátní typy `*ConnectionInfo`. Volitelně otevře vlastní připojení přes SqlClient, který už je v procesu SSMS, a spustí `SELECT @@SERVERNAME, DB_NAME(), SUSER_SNAME()`. |
+| `PrototypePackage.cs` | precondition | Does the package load? Logs the process, architecture, DTE version, editor and SqlClient assembly versions and adds the **Tools → SQL Prompter (prototype)** menu. |
+| `TextViewDiagnostics.cs` | 1, 2, 3 | For every view logs the content type including base types, the buffers in the graph and `IAsyncCompletionBroker.IsCompletionSupported`. For a SQL view logs the buffer property keys (a possible place for the window connection). Watches all asynchronous completion sessions and logs the item count per source and texts offered by several sources. |
+| `HelloCompletionSource.cs` | 1 | `IAsyncCompletionSource` for content type `any` that offers `hello` and `hello_sql_prompter` in the SQL editor. |
+| `LegacyCompletionProbe.cs` | 1, 2 | Probe of the legacy `ICompletionSource`: logs the other completion sets and adds its own. Off by default. |
+| `ConnectionProbe.cs` | 3 | Finds `ScriptFactory.Instance.CurrentlyActiveWndConnectionInfo` through reflection, logs its structure (secrets hidden) and candidate `*ConnectionInfo` types. Optionally opens its own connection through the SqlClient already loaded in SSMS and runs `SELECT @@SERVERNAME, DB_NAME(), SUSER_SNAME()`. |
 
-SQL editor se pozná podle typu obsahu, jehož název nebo bázový typ obsahuje `sql`. Když tato heuristika selže, nastavte před spuštěním SSMS proměnnou `SQLPROMPTER_CONTENT_TYPE` na přesný název z logu.
+The SQL editor is recognized by a content type whose name or base type contains `sql`. If that heuristic fails, set the environment variable `SQLPROMPTER_CONTENT_TYPE` to the exact name from the log before starting SSMS.
 
-## Sestavení
+## Build
 
-Projekt je ve formátu SDK, takže Visual Studio ani VS SDK není potřeba. Nástroje pro VSIX dodává balík `Microsoft.VSSDK.BuildTools` a referenční sestavení .NET Frameworku si SDK stáhne samo.
+The project is SDK-style, so neither Visual Studio nor the VS SDK is needed. The `Microsoft.VSSDK.BuildTools` package provides the VSIX tools and the SDK downloads the .NET Framework reference assemblies itself.
 
-- Na Windows s .NET SDK 8 nebo novějším: `dotnet build prototype\SqlPrompter.Prototype\SqlPrompter.Prototype.csproj -c Release`.
-- Nebo stáhněte artefakt z workflow [Prototyp VSIX](../.github/workflows/prototype.yml) na Windows runneru GitHub Actions.
+- On Windows with the .NET SDK 8 or later: `dotnet build prototype\SqlPrompter.Prototype\SqlPrompter.Prototype.csproj -c Release`.
+- Or download the artifact of the [Prototype VSIX](../.github/workflows/prototype.yml) workflow from the GitHub Actions Windows runner.
 
-Výsledek je `prototype\SqlPrompter.Prototype\bin\Release\net48\SqlPrompter.Prototype.vsix`. Soubor [`nuget.config`](../nuget.config) v kořeni repozitáře omezuje zdroje balíčků na nuget.org, aby sestavení nezáviselo na lokální konfiguraci NuGetu.
+The output is `prototype\SqlPrompter.Prototype\bin\Release\net48\SqlPrompter.Prototype.vsix`. [`nuget.config`](../nuget.config) in the repository root limits package sources to nuget.org so that the build does not depend on the local NuGet configuration.
 
-## Instalace do SSMS 22
+## Installing into SSMS 22
 
-Manifest cílí na `Microsoft.VisualStudio.Ssms` `[22.0,23.0)`. Stejné Id (s `Version="[22.0,)"`) používají vestavěná rozšíření SSMS 22.11 v `Common7\IDE\Extensions`. Jestli VSIXInstaller naši VSIX do SSMS nainstaluje, zatím ověřené není.
+The manifest targets `Microsoft.VisualStudio.Ssms` `[22.0,23.0)`, the same Id the built-in SSMS 22.11 extensions in `Common7\IDE\Extensions` use (with `Version="[22.0,)"`). VSIXInstaller installs it into SSMS 22.11 (verified).
 
-1. Zavřete SSMS a poklepejte na `.vsix`. Pokud VSIXInstaller SSMS 22 nenabídne, zapište chybu z jeho logu (odkaz je v okně instalátoru) do `docs/architecture.md`.
-2. Pokud instalace selže na prerekvizitě `Microsoft.VisualStudio.Component.CoreEditor`, odeberte ji z manifestu a zapište to.
-3. Spusťte SSMS a ověřte, že log obsahuje `=== Prototyp SQL Prompter načten ===`.
+1. Close SSMS and double-click the `.vsix`.
+2. Start SSMS and check that the log contains `=== SQL Prompter prototype loaded ===`.
 
-Novější verze (vyšší `Version` v manifestu) se nainstaluje přes starší. SSMS 22.11 nemá v nabídce správce rozšíření, takže se odinstalovává z příkazové řádky při zavřeném SSMS. `ab48d67c` je `InstallationID` z `Common7\IDE\SSMS.isolation.ini`:
+A newer version (higher `Version` in the manifest) installs over an older one. SSMS 22.11 has no extension manager in its menus, so uninstall from the command line while SSMS is closed. `ab48d67c` is the `InstallationID` from `Common7\IDE\SSMS.isolation.ini`:
 
 ```powershell
 & "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\VSIXInstaller.exe" /instanceIds:ab48d67c /uninstall:SqlPrompter.Prototype.c9efd892-d89f-4178-8e0d-a9b7f925e617
 ```
 
-## Postup testu
+The prototype and the MVP must not be installed at the same time, otherwise "hello" shows up in the MVP's list.
 
-Před každým během smažte log, aby se výsledky nemíchaly.
+## Test procedure
 
-### Otázka 1: MEF a `IAsyncCompletionSource`
+Delete the log before every run so that results do not mix.
 
-1. Otevřete nové okno dotazu (připojené i nepřipojené).
-2. V logu najděte `[q1] Nový pohled` a opište název typu obsahu SQL editoru, jeho bázové typy a hodnotu `asyncCompletionSupported`.
-3. Napište `hel` a zkuste také Ctrl+Mezerník.
-4. Kladná odpověď: v seznamu je `hello` a log obsahuje `GetOrCreate`, `InitializeCompletion` a `GetCompletionContextAsync`.
-5. Pokud se v logu objeví jen `Nový pohled` a nic dalšího, editor zřejmě asynchronní API nepoužívá. Pak zopakujte test se sondou staršího API (viz níže).
+### Question 1: MEF and `IAsyncCompletionSource`
 
-### Otázka 2: duplicity s vestavěným IntelliSense
+1. Open a new query window (connected and not connected).
+2. Find `[q1] New view` in the log and note the SQL editor's content type name, its base types and the value of `asyncCompletionSupported`.
+3. Type `hel` and also try Ctrl+Space.
+4. Positive answer: `hello` is in the list and the log contains `GetOrCreate`, `InitializeCompletion` and `GetCompletionContextAsync`.
+5. If the log only shows `New view` and nothing else, the editor apparently does not use the asynchronous API. Repeat the test with the legacy API probe (see below).
 
-1. Se zapnutým vestavěným IntelliSense napište `SELECT * FROM sys.ob`.
-2. Pozorujte, jestli se objeví **jeden** seznam (položky `hello` a vestavěné dohromady), nebo **dva** samostatné seznamy.
-3. V logu `[q2] položky podle zdroje` ukáže, jestli vestavěné IntelliSense dodává položky do stejné asynchronní relace. Pokud tam je jen `HelloCompletionSource`, vestavěné IntelliSense běží mimo moderní API.
-4. Vypněte IntelliSense (**Dotaz → IntelliSense povoleno**, Ctrl+Q, I, nebo *Nástroje → Možnosti → Textový editor → Transact-SQL → IntelliSense*) a zopakujte. Zapište, jestli zmizí jen vestavěný seznam a jestli `hello` zůstane.
-5. Sonda staršího API: zavřete SSMS, nastavte `SQLPROMPTER_LEGACY_PROBE=1` a SSMS spusťte ze stejné konzole. Log `[q2] Starší relace našeptávání` vypíše cizí sady návrhů. Sonda je ve výchozím stavu vypnutá, protože starší zdroj může přepnout editor do staršího režimu a zkreslit otázku 1.
+### Question 2: duplicates with the built-in IntelliSense
 
-### Otázka 3: připojení aktivního okna
+1. With the built-in IntelliSense enabled, type `SELECT * FROM sys.ob`.
+2. Watch whether **one** list appears (`hello` and built-in items together) or **two** separate lists.
+3. The `[q2] items by source` log line shows whether the built-in IntelliSense adds items to the same asynchronous session. If only `HelloCompletionSource` is listed, the built-in IntelliSense runs outside the modern API.
+4. Use **Tools → SQL Prompter (prototype) → Hello Suggestions Enabled** to turn our items off and repeat, to compare the same place with and without our source.
+5. Turn off IntelliSense (**Query → IntelliSense Enabled**, Ctrl+Q, I, or *Tools → Options → Text Editor → Transact-SQL → IntelliSense*) and repeat. Note whether only the built-in list disappears and whether `hello` stays.
+6. Legacy API probe: close SSMS, set `SQLPROMPTER_LEGACY_PROBE=1` and start SSMS from the same console. The `[q2] Legacy completion session` log lines show the other completion sets. The probe is off by default because a legacy source may switch the editor to legacy completion and distort question 1.
 
-Postup zopakujte pro každý typ ověření, který máte k dispozici: Windows, SQL Server a Entra ID s MFA (Interactive). U každého zapište výsledek do tabulky níže.
+### Question 3: connection of the active window
 
-1. Připojte okno dotazu k serveru a databázi.
-2. **Nástroje → SQL Prompter (prototyp) → Vypsat připojení aktivního okna.** Log vypíše, kde je `ScriptFactory`, strukturu `CurrentlyActiveWndConnectionInfo` a shrnutí (server, databáze, typ ověření, jestli je k dispozici heslo). Heslo ani tokeny se nikdy nevypisují.
-3. Pokud `ScriptFactory` neexistuje, použijte výpis `Kandidátní typy` a klíče vlastností bufferu z `[q1]/[q3] Nový pohled` jako vodítko pro náhradu.
-4. **Otestovat vlastní připojení (jen čtení).** Zapište, jestli se připojení otevřelo a za jak dlouho. U Entra ID zapište, jestli se objevilo přihlašovací okno (token se nesdílí s SSMS), nebo připojení proběhlo bez dotazu.
-5. Přepněte databázi v rozbalovacím seznamu SSMS a krok 2 zopakujte. Zapište, jestli se změna projeví v `AdvancedOptions[DATABASE]` nebo jinde.
+Repeat for every authentication type available: Windows, SQL Server and Entra ID with MFA (Interactive). Record each result in the table below.
 
-## Výsledky
+1. Connect a query window to a server and database.
+2. **Tools → SQL Prompter (prototype) → Dump Active Window Connection.** The log shows where `ScriptFactory` is, the structure of `CurrentlyActiveWndConnectionInfo` and a summary (server, database, authentication type, whether a password is available). Passwords and tokens are never logged.
+3. If `ScriptFactory` does not exist, use the `Candidate types` dump and the buffer property keys from `[q1]/[q3] New view` as hints for a replacement.
+4. **Test Own Connection (Read-Only).** Note whether the connection opened and how long it took. For Entra ID note whether a sign-in window appeared (the token is not shared with SSMS) or the connection succeeded without a prompt.
+5. Switch the database in the SSMS drop-down and repeat step 2. Note whether the change shows in `AdvancedOptions[DATABASE]` or elsewhere.
 
-Vyplňte po běhu v SSMS 22 a přeneste do `docs/architecture.md`.
+## Results
 
-| Bod | Výsledek | Verze SSMS, datum |
+| Item | Result | SSMS version, date |
 |---|---|---|
-| VSIX se sestaví bez Visual Studia | ano | 2026-11-02 |
-| Id `InstallationTarget` | `Microsoft.VisualStudio.Ssms` podle vestavěných rozšíření, instalace neověřena | 22.11.3, 2026-11-02 |
-| VSIX se nainstaluje do SSMS 22 | ano | 22.11.3, 2026-11-02 |
-| Balíček se načte | ano, na pozadí, příkazy zaregistrované | 22.11.3, 2026-11-02 |
-| Typ obsahu SQL editoru a jeho bázové typy | `"SQL"` → `"code"` → `"text"` → `"any"`, nad ním projekční buffer `"projection"` | 22.11.3, 2026-11-02 |
-| `IAsyncCompletionSource` funguje v SQL editoru | ano: `hello` se po `hel` zobrazí, `IsCompletionSupported=True`, `GetCompletionContextAsync` běží mimo vlákno UI | 22.11.3, 2026-11-02 |
-| Vestavěné IntelliSense: stejná relace / samostatný seznam / starší API | ani jedno: když náš zdroj dodává položky, vestavěný seznam se nezobrazí; když se neúčastní, vestavěný funguje (`sys.ob` s vypnutým a zapnutým `hello`) | 22.11.3, 2026-11-02 |
-| Lze vestavěné IntelliSense vypnout, aniž by zmizelo `hello` | ano | 22.11.3, 2026-11-02 |
-| `ScriptFactory.CurrentlyActiveWndConnectionInfo` existuje | ano, reflexí: `SQLEditors.dll` 22.200, typ `UIConnectionInfo` z `Microsoft.SqlServer.RegSvrEnum` | 22.11.3, 2026-11-02 |
-| Připojení: Windows | neověřeno | |
-| Připojení: SQL Server (heslo dostupné?) | ano: údaje včetně hesla dostupné (`AuthenticationType=1`), vlastní připojení s převzatým `Encrypt`/`TrustServerCertificate` OK za 91–114 ms | 22.11.3, 2026-11-02 |
-| Připojení: Entra ID MFA (nutné znovu přihlásit?) | neověřeno | |
-| Změna databáze v okně je vidět | ano, `AdvancedOptions[DATABASE]` sleduje rozbalovací seznam (`test` → `tempdb`) | 22.11.3, 2026-11-02 |
+| VSIX builds without Visual Studio | yes | 2026-11-02 |
+| `InstallationTarget` Id | `Microsoft.VisualStudio.Ssms`, as used by the built-in extensions | 22.11.3, 2026-11-02 |
+| VSIX installs into SSMS 22 | yes | 22.11.3, 2026-11-02 |
+| Package loads | yes, in the background, commands registered | 22.11.3, 2026-11-02 |
+| SQL editor content type and base types | `"SQL"` → `"code"` → `"text"` → `"any"`, on a `"projection"` buffer | 22.11.3, 2026-11-02 |
+| `IAsyncCompletionSource` works in the SQL editor | yes: `hello` appears after `hel`, `IsCompletionSupported=True`, `GetCompletionContextAsync` runs off the UI thread | 22.11.3, 2026-11-02 |
+| Built-in IntelliSense: same session / separate list / legacy API | none of them: while our source provides items, the built-in list is not shown; when it does not participate, the built-in one works (`sys.ob` with `hello` off and on) | 22.11.3, 2026-11-02 |
+| Built-in IntelliSense can be turned off without losing `hello` | yes | 22.11.3, 2026-11-02 |
+| `ScriptFactory.CurrentlyActiveWndConnectionInfo` exists | yes, through reflection: `SQLEditors.dll` 22.200, type `UIConnectionInfo` from `Microsoft.SqlServer.RegSvrEnum` | 22.11.3, 2026-11-02 |
+| Connection: Windows | not verified | |
+| Connection: SQL Server (password available?) | yes: data including the password available (`AuthenticationType=1`); own connection with the window's `Encrypt`/`TrustServerCertificate` OK in 91–114 ms | 22.11.3, 2026-11-02 |
+| Connection: Entra ID MFA (sign in again?) | not verified | |
+| Database change in the window is visible | yes, `AdvancedOptions[DATABASE]` follows the drop-down (`test` → `tempdb`) | 22.11.3, 2026-11-02 |

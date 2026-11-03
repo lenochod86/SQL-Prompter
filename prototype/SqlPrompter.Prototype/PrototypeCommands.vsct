@@ -8,7 +8,7 @@
       <Menu guid="guidPrototypeCmdSet" id="PrototypeMenu" priority="0x0100" type="Menu">
         <Parent guid="guidPrototypeCmdSet" id="ToolsMenuGroup" />
         <Strings>
-          <ButtonText>SQL Prompter (prototyp)</ButtonText>
+          <ButtonText>SQL Prompter (prototype)</ButtonText>
         </Strings>
       </Menu>
     </Menus>
@@ -26,25 +26,25 @@
       <Button guid="guidPrototypeCmdSet" id="cmdidDumpConnection" priority="0x0100" type="Button">
         <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
         <Strings>
-          <ButtonText>Vypsat připojení aktivního okna</ButtonText>
+          <ButtonText>Dump Active Window Connection</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidPrototypeCmdSet" id="cmdidTestConnection" priority="0x0101" type="Button">
         <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
         <Strings>
-          <ButtonText>Otestovat vlastní připojení (jen čtení)</ButtonText>
+          <ButtonText>Test Own Connection (Read-Only)</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidPrototypeCmdSet" id="cmdidOpenLog" priority="0x0102" type="Button">
         <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
         <Strings>
-          <ButtonText>Otevřít log prototypu</ButtonText>
+          <ButtonText>Open Prototype Log</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidPrototypeCmdSet" id="cmdidToggleHello" priority="0x0103" type="Button">
         <Parent guid="guidPrototypeCmdSet" id="PrototypeMenuGroup" />
         <Strings>
-          <ButtonText>Návrhy hello zapnuté</ButtonText>
+          <ButtonText>Hello Suggestions Enabled</ButtonText>
         </Strings>
       </Button>
     </Buttons>

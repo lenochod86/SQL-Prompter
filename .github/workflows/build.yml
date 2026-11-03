@@ -1,4 +1,4 @@
-name: Sestavení
+name: Build
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
-      - name: Testy jádra a metadat
+      - name: Core and metadata tests
         run: dotnet test tests/SqlPrompter.Tests/SqlPrompter.Tests.csproj -v:minimal
 
   vsix:
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
-      - name: Sestavení VSIX
+      - name: Build VSIX
         run: dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release -v:minimal
       - uses: actions/upload-artifact@v7
         with:

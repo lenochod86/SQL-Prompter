@@ -20,7 +20,7 @@ namespace SqlPrompter.Core.Model
             IsSystem = isSystem;
         }
 
-        /// <summary>object_id v databázi.</summary>
+        /// <summary>object_id in the database.</summary>
         public int Id { get; }
 
         public string Schema { get; }
@@ -29,7 +29,7 @@ namespace SqlPrompter.Core.Model
 
         public DbObjectKind Kind { get; }
 
-        /// <summary>Systémový objekt (sys.*, INFORMATION_SCHEMA.*).</summary>
+        /// <summary>System object (sys.*, INFORMATION_SCHEMA.*).</summary>
         public bool IsSystem { get; }
 
         public override string ToString() => Schema + "." + Name;
@@ -46,15 +46,15 @@ namespace SqlPrompter.Core.Model
 
         public string Name { get; }
 
-        /// <summary>Typ včetně délky, např. nvarchar(50).</summary>
+        /// <summary>Type including length, e.g. nvarchar(50).</summary>
         public string TypeName { get; }
 
         public bool IsNullable { get; }
     }
 
     /// <summary>
-    /// Neměnný snímek metadat jedné databáze. Implementace nesmí čekat na databázi:
-    /// co není načtené, vrací jako null.
+    /// Immutable metadata snapshot of one database. Implementations must not wait for the database:
+    /// anything not loaded yet is returned as null.
     /// </summary>
     public interface IDatabaseMetadata
     {
@@ -66,12 +66,12 @@ namespace SqlPrompter.Core.Model
 
         IReadOnlyList<DbObject> Objects { get; }
 
-        /// <summary>Najde objekt jako SQL Server: bez schématu ve výchozím schématu a pak v dbo.</summary>
+        /// <summary>Finds an object like SQL Server does: without a schema in the default schema, then in dbo.</summary>
         DbObject FindObject(string schema, string name);
 
         bool HasSchema(string schema);
 
-        /// <summary>Sloupce objektu, nebo null, pokud ještě nejsou načtené.</summary>
+        /// <summary>Columns of the object, or null if they are not loaded yet.</summary>
         IReadOnlyList<DbColumn> GetColumns(DbObject dbObject);
     }
 }

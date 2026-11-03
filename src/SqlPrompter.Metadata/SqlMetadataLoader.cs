@@ -12,17 +12,17 @@ namespace SqlPrompter.Metadata
 {
     public interface IMetadataLoader
     {
-        /// <summary>Načte schémata a objekty (bez sloupců).</summary>
+        /// <summary>Loads schemas, objects and the columns of user objects.</summary>
         Task<DatabaseSnapshot> LoadAsync(CancellationToken cancellationToken);
 
-        /// <summary>Načte sloupce zadaných objektů. Objekt, který už neexistuje, ve výsledku chybí.</summary>
+        /// <summary>Loads the columns of the given objects. An object that no longer exists is missing from the result.</summary>
         Task<IReadOnlyDictionary<int, IReadOnlyList<DbColumn>>> LoadColumnsAsync(IReadOnlyCollection<int> objectIds, CancellationToken cancellationToken);
 
-        /// <summary>Otisk stavu objektů; levný dotaz pro zjištění, jestli je snímek zastaralý.</summary>
+        /// <summary>Fingerprint of the objects; a cheap query to find out whether the snapshot is stale.</summary>
         Task<string> GetVersionAsync(CancellationToken cancellationToken);
     }
 
-    /// <summary>Čte metadata z katalogových pohledů sys.* jen pro čtení.</summary>
+    /// <summary>Reads metadata from the sys.* catalog views, read-only.</summary>
     public sealed class SqlMetadataLoader : IMetadataLoader
     {
         private const string ObjectsQuery = @"
@@ -35,7 +35,7 @@ FROM sys.all_objects AS o
 JOIN sys.schemas AS s ON s.schema_id = o.schema_id
 WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT');
 
--- Sloupce uživatelských objektů hned, systémových až při potřebě.
+-- Columns of user objects right away, of system objects on demand.
 SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable
 FROM sys.columns AS c
 JOIN sys.objects AS o ON o.object_id = c.object_id
@@ -49,7 +49,7 @@ FROM sys.objects;";
 
         private readonly Func<DbConnection> connectionFactory;
 
-        /// <param name="connectionFactory">Vrátí nové, neotevřené připojení k cílové databázi.</param>
+        /// <param name="connectionFactory">Returns a new, unopened connection to the target database.</param>
         public SqlMetadataLoader(Func<DbConnection> connectionFactory)
         {
             this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
@@ -136,7 +136,7 @@ ORDER BY c.object_id, c.column_id;";
             }
         }
 
-        /// <summary>Čte řádky (object_id, název, typ, max_length, precision, scale, is_nullable) seřazené podle objektu.</summary>
+        /// <summary>Reads rows (object_id, name, type, max_length, precision, scale, is_nullable) ordered by object.</summary>
         private static async Task<IReadOnlyDictionary<int, IReadOnlyList<DbColumn>>> ReadColumnsAsync(DbDataReader reader, CancellationToken cancellationToken)
         {
             var lists = new Dictionary<int, List<DbColumn>>();

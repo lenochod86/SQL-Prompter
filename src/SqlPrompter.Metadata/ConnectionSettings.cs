@@ -8,13 +8,13 @@ namespace SqlPrompter.Metadata
         Windows,
         SqlPassword,
 
-        /// <summary>Např. Entra ID; připojení zatím neumíme vytvořit.</summary>
+        /// <summary>E.g. Entra ID; we cannot create such a connection yet.</summary>
         Unsupported,
     }
 
     /// <summary>
-    /// Údaje pro vlastní připojení k databázi okna. Heslo žije jen v paměti
-    /// a nikdy se nezapisuje do logu ani na disk.
+    /// Data for our own connection to the window's database. The password lives only in memory
+    /// and is never written to the log or to disk.
     /// </summary>
     public sealed class ConnectionSettings
     {
@@ -38,7 +38,7 @@ namespace SqlPrompter.Metadata
 
         public string Server { get; }
 
-        /// <summary>Prázdné = výchozí databáze přihlášení.</summary>
+        /// <summary>Empty = default database of the login.</summary>
         public string Database { get; }
 
         public AuthenticationKind Authentication { get; }
@@ -53,14 +53,14 @@ namespace SqlPrompter.Metadata
 
         public bool CanConnect => Authentication != AuthenticationKind.Unsupported;
 
-        /// <summary>Klíč cache metadat. Neobsahuje heslo.</summary>
+        /// <summary>Metadata cache key. Does not contain the password.</summary>
         public string CacheKey => string.Join("|", Server, Database, Authentication, UserName).ToLowerInvariant();
 
         public string BuildConnectionString(string applicationName)
         {
             if (!CanConnect)
             {
-                throw new InvalidOperationException("Typ ověření není podporovaný.");
+                throw new InvalidOperationException("The authentication type is not supported.");
             }
 
             var builder = new DbConnectionStringBuilder
@@ -86,8 +86,8 @@ namespace SqlPrompter.Metadata
                 builder["Persist Security Info"] = false;
             }
 
-            // Šifrování se přebírá z nastavení okna v SSMS, jinak by SqlClient 6 (Encrypt=Mandatory)
-            // odmítl server s certifikátem podepsaným sám sebou.
+            // Encryption is taken over from the window's settings in SSMS; otherwise SqlClient 6 (Encrypt=Mandatory)
+            // would reject a server with a self-signed certificate.
             if (!string.IsNullOrEmpty(Encrypt))
             {
                 builder["Encrypt"] = Encrypt;
@@ -101,6 +101,6 @@ namespace SqlPrompter.Metadata
             return builder.ConnectionString;
         }
 
-        public override string ToString() => Server + "/" + (Database.Length > 0 ? Database : "(výchozí)") + " (" + Authentication + ", " + UserName + ")";
+        public override string ToString() => Server + "/" + (Database.Length > 0 ? Database : "(default)") + " (" + Authentication + ", " + UserName + ")";
     }
 }

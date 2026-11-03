@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace SqlPrompter.Core.Lexing
 {
     /// <summary>
-    /// Tolerantní lexer T-SQL. Nikdy nehází výjimku: nedokončený řetězec, komentář
-    /// nebo [identifikátor] skončí koncem textu a má příznak IsUnterminated.
+    /// Tolerant T-SQL lexer. Never throws: an unterminated string, comment
+    /// or [identifier] ends at the end of the text and has IsUnterminated set.
     /// </summary>
     public static class Lexer
     {
@@ -38,7 +38,7 @@ namespace SqlPrompter.Core.Lexing
                 }
                 else if (c == '/' && Peek(text, i + 1) == '*')
                 {
-                    // T-SQL podporuje vnořené blokové komentáře.
+                    // T-SQL supports nested block comments.
                     i += 2;
                     var depth = 1;
                     while (i < n && depth > 0)
@@ -131,7 +131,7 @@ namespace SqlPrompter.Core.Lexing
 
         private static char Peek(string text, int index) => index < text.Length ? text[index] : '\0';
 
-        /// <summary>Čte do uzavíracího znaku; zdvojený znak je escapovaný. Vrací false, pokud text skončil dřív.</summary>
+        /// <summary>Reads up to the closing character; a doubled character is escaped. Returns false if the text ends first.</summary>
         private static bool ReadDelimited(string text, ref int i, char close)
         {
             while (i < text.Length)

@@ -6,7 +6,7 @@ namespace SqlPrompter.Core.Sql
 {
     public static class Keywords
     {
-        /// <summary>Rezervovaná klíčová slova T-SQL (dokumentace „Reserved Keywords (Transact-SQL)“).</summary>
+        /// <summary>Reserved T-SQL keywords (documentation "Reserved Keywords (Transact-SQL)").</summary>
         private static readonly HashSet<string> Reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "ADD", "ALL", "ALTER", "AND", "ANY", "AS", "ASC", "AUTHORIZATION", "BACKUP", "BEGIN", "BETWEEN", "BREAK",
@@ -30,13 +30,13 @@ namespace SqlPrompter.Core.Sql
             "VALUES", "VARYING", "VIEW", "WAITFOR", "WHEN", "WHERE", "WHILE", "WITH", "WITHIN", "WRITETEXT",
         };
 
-        /// <summary>Slova, která po zdroji tabulky nemůžou být alias, i když nejsou rezervovaná.</summary>
+        /// <summary>Words that cannot be an alias after a table source even though they are not reserved.</summary>
         private static readonly HashSet<string> NotAlias = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "APPLY", "USING", "OUTPUT", "WINDOW", "OFFSET", "ROWS", "GO",
         };
 
-        /// <summary>Klíčová slova nabízená na začátku příkazu.</summary>
+        /// <summary>Keywords offered at the start of a statement.</summary>
         public static readonly IReadOnlyList<string> StatementStart = new[]
         {
             "SELECT", "INSERT INTO", "UPDATE", "DELETE FROM", "WITH", "DECLARE", "SET", "IF", "BEGIN", "END",
@@ -44,7 +44,7 @@ namespace SqlPrompter.Core.Sql
             "BEGIN TRANSACTION", "COMMIT", "ROLLBACK", "GO",
         };
 
-        /// <summary>Klíčová slova nabízená za zdrojem tabulky ve FROM.</summary>
+        /// <summary>Keywords offered after a table source in FROM.</summary>
         public static readonly IReadOnlyList<string> AfterTableSource = new[]
         {
             "WHERE", "JOIN", "INNER JOIN", "LEFT JOIN", "LEFT OUTER JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN",
@@ -52,7 +52,7 @@ namespace SqlPrompter.Core.Sql
             "OPTION",
         };
 
-        /// <summary>Všechna klíčová slova, která rozšíření nabízí.</summary>
+        /// <summary>All keywords the extension offers.</summary>
         public static readonly IReadOnlyList<string> All = StatementStart
             .Concat(AfterTableSource)
             .Concat(new[]
@@ -67,7 +67,7 @@ namespace SqlPrompter.Core.Sql
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        /// <summary>Běžné vestavěné funkce. Bez nich by výrazy nabízely méně než vestavěné IntelliSense.</summary>
+        /// <summary>Common built-in functions. Without them expressions would offer less than the built-in IntelliSense.</summary>
         public static readonly IReadOnlyList<string> BuiltInFunctions = new[]
         {
             "ABS", "AVG", "CAST", "CEILING", "CHARINDEX", "CHOOSE", "COALESCE", "CONCAT", "CONCAT_WS", "CONVERT",
@@ -80,7 +80,7 @@ namespace SqlPrompter.Core.Sql
             "TRANSLATE", "TRIM", "TRY_CAST", "TRY_CONVERT", "UPPER", "YEAR",
         };
 
-        /// <summary>Systémové datové typy SQL Serveru.</summary>
+        /// <summary>SQL Server system data types.</summary>
         public static readonly IReadOnlyList<string> DataTypes = new[]
         {
             "BIGINT", "BINARY", "BIT", "CHAR", "DATE", "DATETIME", "DATETIME2", "DATETIMEOFFSET", "DECIMAL", "FLOAT",
@@ -91,11 +91,11 @@ namespace SqlPrompter.Core.Sql
 
         public static bool IsReserved(string word) => word != null && Reserved.Contains(word);
 
-        /// <summary>Slovo, které nemůže být aliasem zdroje tabulky.</summary>
+        /// <summary>A word that cannot be the alias of a table source.</summary>
         public static bool CannotBeAlias(string word) => IsReserved(word) || NotAlias.Contains(word);
 
         /// <summary>
-        /// Klíčová slova se vkládají velkými písmeny, pokud uživatel nezačal psát malými.
+        /// Keywords are inserted in upper case unless the user started typing in lower case.
         /// </summary>
         public static string ApplyCase(string keyword, string typedPrefix)
         {

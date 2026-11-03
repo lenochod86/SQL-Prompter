@@ -5,47 +5,47 @@ namespace SqlPrompter.Core.Analysis
 {
     public enum ContextKind
     {
-        /// <summary>Žádné našeptávání: řetězec, komentář, číslo.</summary>
+        /// <summary>No completion: string, comment, number.</summary>
         None,
 
         /// <summary>
-        /// Uživatel píše nový nebo neznámý název (alias za AS, proměnná, #tabulka, neznámý kvalifikátor).
-        /// Seznam je prázdný, ale rozšíření se účastní, aby se neukázal vestavěný seznam.
+        /// The user is typing a new or unknown name (alias after AS, variable, #table, unknown qualifier).
+        /// The list is empty, but the extension participates so that the built-in list is not shown.
         /// </summary>
         Name,
 
-        /// <summary>Datový typ: CAST(x AS …), DECLARE @x ….</summary>
+        /// <summary>Data type: CAST(x AS …), DECLARE @x ….</summary>
         DataType,
 
-        /// <summary>Místo, kterému rozšíření zatím nerozumí: klíčová slova, funkce a datové typy.</summary>
+        /// <summary>A position the extension does not understand yet: keywords, functions and data types.</summary>
         Fallback,
 
-        /// <summary>Jen klíčová slova: začátek příkazu nebo místo za zdrojem tabulky.</summary>
+        /// <summary>Keywords only: start of a statement or after a table source.</summary>
         Keyword,
 
-        /// <summary>Název tabulky nebo pohledu (za FROM, JOIN, UPDATE, INTO …).</summary>
+        /// <summary>Name of a table or view (after FROM, JOIN, UPDATE, INTO …).</summary>
         ObjectName,
 
-        /// <summary>Výraz: sloupce, aliasy, funkce a klíčová slova.</summary>
+        /// <summary>Expression: columns, aliases, functions and keywords.</summary>
         Expression,
     }
 
     public enum TableSourceKind
     {
-        /// <summary>Tabulka, pohled nebo tabulková funkce s názvem.</summary>
+        /// <summary>Named table, view or table-valued function.</summary>
         Object,
 
-        /// <summary>Odvozená tabulka (SELECT …) alias.</summary>
+        /// <summary>Derived table (SELECT …) alias.</summary>
         Derived,
 
-        /// <summary>Tabulková proměnná @t.</summary>
+        /// <summary>Table variable @t.</summary>
         Variable,
 
-        /// <summary>Dočasná tabulka #t.</summary>
+        /// <summary>Temporary table #t.</summary>
         TempTable,
     }
 
-    /// <summary>Zdroj řádků ve FROM, JOIN, APPLY, UPDATE nebo MERGE.</summary>
+    /// <summary>Row source in FROM, JOIN, APPLY, UPDATE or MERGE.</summary>
     public sealed class TableSource
     {
         public TableSource(TableSourceKind kind, IReadOnlyList<string> nameParts, string alias, int scopeLevel)
@@ -58,12 +58,12 @@ namespace SqlPrompter.Core.Analysis
 
         public TableSourceKind Kind { get; }
 
-        /// <summary>Části názvu, např. [dbo, Users]. U odvozené tabulky prázdné.</summary>
+        /// <summary>Name parts, e.g. [dbo, Users]. Empty for a derived table.</summary>
         public IReadOnlyList<string> NameParts { get; }
 
         public string Alias { get; }
 
-        /// <summary>0 = blok s kurzorem, 1 = nadřazený dotaz (korelovaný poddotaz) atd.</summary>
+        /// <summary>0 = block containing the caret, 1 = enclosing query (correlated subquery) and so on.</summary>
         public int ScopeLevel { get; }
 
         public string ObjectName => NameParts.Count > 0 ? NameParts[NameParts.Count - 1] : null;
@@ -72,13 +72,13 @@ namespace SqlPrompter.Core.Analysis
 
         public string Database => NameParts.Count > 2 ? NameParts[NameParts.Count - 3] : null;
 
-        /// <summary>Jak se na zdroj odkazuje ve výrazu: alias, jinak název objektu.</summary>
+        /// <summary>How an expression refers to the source: the alias, otherwise the object name.</summary>
         public string ReferenceName => Alias ?? ObjectName;
 
         public override string ToString() => string.Join(".", NameParts) + (Alias != null ? " " + Alias : string.Empty) + " @" + ScopeLevel;
     }
 
-    /// <summary>Výsledek rozboru textu na pozici kurzoru.</summary>
+    /// <summary>Result of analyzing the text at the caret position.</summary>
     public sealed class CaretContext
     {
         public static readonly CaretContext None = new CaretContext(ContextKind.None, 0, 0, string.Empty);
@@ -93,32 +93,32 @@ namespace SqlPrompter.Core.Analysis
 
         public ContextKind Kind { get; }
 
-        /// <summary>Začátek úseku, který návrh nahradí (slovo pod kurzorem).</summary>
+        /// <summary>Start of the span a suggestion replaces (the word at the caret).</summary>
         public int ReplaceStart { get; }
 
         public int ReplaceLength { get; }
 
-        /// <summary>Text slova od jeho začátku po kurzor.</summary>
+        /// <summary>Text of the word from its start to the caret.</summary>
         public string TypedPrefix { get; }
 
-        /// <summary>Uživatel začal psát identifikátor s „[“, vkládá se tedy vždy v závorkách.</summary>
+        /// <summary>The user started the identifier with "[", so it is always inserted in brackets.</summary>
         public bool QuoteIdentifiers { get; internal set; }
 
-        /// <summary>Části názvu před slovem pod kurzorem, např. [dbo] u „dbo.Us|“.</summary>
+        /// <summary>Name parts before the word at the caret, e.g. [dbo] for "dbo.Us|".</summary>
         public IReadOnlyList<string> Qualifier { get; internal set; } = Array.Empty<string>();
 
-        /// <summary>Zdroje tabulek viditelné z pozice kurzoru, nejbližší blok první.</summary>
+        /// <summary>Table sources visible from the caret, nearest block first.</summary>
         public IReadOnlyList<TableSource> Sources { get; internal set; } = Array.Empty<TableSource>();
 
-        /// <summary>U „alias.|“ zdroj, na který kvalifikátor odkazuje.</summary>
+        /// <summary>For "alias.|", the source the qualifier refers to.</summary>
         public TableSource QualifiedSource { get; internal set; }
 
-        /// <summary>Klíčová slova, která mají v tomto místě přednost.</summary>
+        /// <summary>Keywords that take precedence at this position.</summary>
         public IReadOnlyList<string> PreferredKeywords { get; internal set; } = Array.Empty<string>();
 
         /// <summary>
-        /// Uživatel nejspíš píše vlastní název (alias), proto výběr nemá být pevný,
-        /// aby Enter nevložil první návrh.
+        /// The user is probably typing a name of their own (an alias), so the selection must not be firm
+        /// and Enter must not insert the first suggestion.
         /// </summary>
         public bool SoftSelection { get; internal set; }
 

@@ -21,7 +21,7 @@ using SqlPrompter.Core.Model;
 
 namespace SqlPrompter.Ssms
 {
-    /// <summary>Typ obsahu SQL editoru v SSMS 22 (ověřeno prototypem).</summary>
+    /// <summary>Content type of the SQL editor in SSMS 22 (verified by the prototype).</summary>
     internal static class SqlContentType
     {
         public const string Name = "SQL";
@@ -40,29 +40,29 @@ namespace SqlPrompter.Ssms
     }
 
     /// <summary>
-    /// Kde se zdroj účastní, potlačí vestavěný seznam IntelliSense (ověřeno prototypem).
-    /// Účastní se proto všude mimo řetězce a komentáře, aby se ukazovaly jen jeho návrhy;
-    /// vestavěné IntelliSense dál podtrhává chyby a zobrazuje popisky.
+    /// Where this source participates, it suppresses the built-in IntelliSense list (verified by the prototype).
+    /// It therefore participates everywhere except in strings and comments so that only its suggestions are shown;
+    /// the built-in IntelliSense still underlines errors and shows quick info.
     /// </summary>
     internal sealed class SqlCompletionSource : IAsyncCompletionSource
     {
         private const string DescriptionKey = "SqlPrompter.Description";
 
-        /// <summary>Tlačítko dole v seznamu, podle kterého je vidět, že seznam je od SQL Prompteru.</summary>
+        /// <summary>Button at the bottom of the list that shows the list comes from SQL Prompter.</summary>
         private static readonly ImmutableArray<CompletionFilter> Filters = ImmutableArray.Create(
             new CompletionFilter("SQL Prompter", "Q", Icon(KnownMonikers.Database, "SQL Prompter")));
 
         private static readonly IReadOnlyDictionary<SuggestionKind, ImageElement> Icons = new Dictionary<SuggestionKind, ImageElement>
         {
-            [SuggestionKind.Keyword] = Icon(KnownMonikers.IntellisenseKeyword, "Klíčové slovo"),
-            [SuggestionKind.Schema] = Icon(KnownMonikers.Schema, "Schéma"),
-            [SuggestionKind.Table] = Icon(KnownMonikers.Table, "Tabulka"),
-            [SuggestionKind.View] = Icon(KnownMonikers.View, "Pohled"),
-            [SuggestionKind.TableFunction] = Icon(KnownMonikers.TableFunction, "Tabulková funkce"),
-            [SuggestionKind.Column] = Icon(KnownMonikers.Column, "Sloupec"),
+            [SuggestionKind.Keyword] = Icon(KnownMonikers.IntellisenseKeyword, "Keyword"),
+            [SuggestionKind.Schema] = Icon(KnownMonikers.Schema, "Schema"),
+            [SuggestionKind.Table] = Icon(KnownMonikers.Table, "Table"),
+            [SuggestionKind.View] = Icon(KnownMonikers.View, "View"),
+            [SuggestionKind.TableFunction] = Icon(KnownMonikers.TableFunction, "Table-valued function"),
+            [SuggestionKind.Column] = Icon(KnownMonikers.Column, "Column"),
             [SuggestionKind.Alias] = Icon(KnownMonikers.LocalVariable, "Alias"),
-            [SuggestionKind.Function] = Icon(KnownMonikers.ScalarFunction, "Funkce"),
-            [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Datový typ"),
+            [SuggestionKind.Function] = Icon(KnownMonikers.ScalarFunction, "Function"),
+            [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Data type"),
         };
 
         private readonly MetadataService service;
@@ -77,7 +77,7 @@ namespace SqlPrompter.Ssms
         {
             try
             {
-                // Editor volá InitializeCompletion na vlákně UI; ScriptFactory to vyžaduje.
+                // The editor calls InitializeCompletion on the UI thread; ScriptFactory requires it.
                 ThreadHelper.ThrowIfNotOnUIThread();
                 return Initialize(trigger, triggerLocation);
             }
@@ -109,7 +109,7 @@ namespace SqlPrompter.Ssms
             }
             catch (Exception ex)
             {
-                Log.Error("Sestavení návrhů selhalo", ex);
+                Log.Error("Building suggestions failed", ex);
                 return Task.FromResult(CompletionContext.Empty);
             }
         }
@@ -150,8 +150,8 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>
-        /// Vrátí metadata z cache a případně spustí načtení chybějících částí na pozadí. Na databázi se nečeká:
-        /// seznam se sestaví z toho, co je k dispozici, a doplní se při dalším našeptání.
+        /// Returns metadata from the cache and starts loading missing parts in the background. It never waits for the database:
+        /// the list is built from what is available and completed on the next completion.
         /// </summary>
         private IDatabaseMetadata PrepareMetadata(CaretContext context)
         {
@@ -237,9 +237,9 @@ namespace SqlPrompter.Ssms
     }
 
     /// <summary>
-    /// Mezera, tečka, čárka, závorky a operátory vloží vybraný návrh a pak se zapíšou samy,
-    /// takže „e.“ vloží alias a otevře jeho sloupce. Bez nich by seznam zůstal otevřený a čekal na volbu.
-    /// Při naznačeném výběru (SoftSelection, např. při psaní aliasu) editor tyto znaky nevkládá jako návrh.
+    /// Space, dot, comma, parentheses and operators insert the selected suggestion and are then typed themselves,
+    /// so "e." inserts the alias and opens its columns. Without them the list would stay open waiting for a choice.
+    /// With soft selection (SoftSelection, e.g. while typing an alias) the editor does not commit on these characters.
     /// </summary>
     internal sealed class SqlCommitManager : IAsyncCompletionCommitManager
     {

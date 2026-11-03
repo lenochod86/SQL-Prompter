@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Metadata z sys.* přes System.Data.Common. Konkrétní SqlConnection dodává hostitel,
-       v SSMS jde o Microsoft.Data.SqlClient, který už je v procesu načtený. -->
+  <!-- Metadata from sys.* through System.Data.Common. The host supplies the concrete SqlConnection;
+       in SSMS it is the Microsoft.Data.SqlClient already loaded in the process. -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
