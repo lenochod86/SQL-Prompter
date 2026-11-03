@@ -67,20 +67,22 @@ try {
         $command.CommandTimeout = $TimeoutSeconds
         try {
             $reader = $command.ExecuteReader()
-            do {
+            while (-not $reader.IsClosed) {
                 if ($reader.FieldCount -gt 0) {
+                    # DataTable.Load moves the reader to the next result set (and closes it after the last one).
                     $table = [System.Data.DataTable]::new()
                     $table.Load($reader)
                     $table | Select-Object -First $MaxRows -Property ($table.Columns | ForEach-Object ColumnName) | Format-Table -AutoSize | Out-String -Width 4096 | Write-Output
                     if ($table.Rows.Count -gt $MaxRows) { Write-Output "($($table.Rows.Count) rows, first $MaxRows shown)" }
                     else { Write-Output "($($table.Rows.Count) rows)" }
-                    if ($reader.IsClosed) { break }
                 }
-            } while (-not $reader.IsClosed -and $reader.NextResult())
-            if (-not $reader.IsClosed) {
-                if ($reader.RecordsAffected -ge 0) { Write-Output "($($reader.RecordsAffected) rows affected)" }
-                $reader.Close()
+                elseif (-not $reader.NextResult()) {
+                    break
+                }
             }
+
+            if ($reader.RecordsAffected -ge 0) { Write-Output "($($reader.RecordsAffected) rows affected)" }
+            $reader.Close()
         }
         catch {
             $failed = $true
@@ -93,4 +95,4 @@ finally {
     $connection.Dispose()
 }
 
-if ($failed) { exit 1 }
+exit ([int]$failed)
