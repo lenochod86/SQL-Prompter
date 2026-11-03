@@ -1,89 +1,95 @@
 # SQL Prompter
 
-Rozšíření s vlastním IntelliSense pro SSMS 22, náhrada SQL Promptu od Redgate. Komunikuj česky.
+A custom IntelliSense extension for SSMS 22, intended to replace Redgate SQL Prompt. It will be released as open source under the MIT license.
 
-Tyto instrukce platí v každém prostředí: lokálně na Windows, v cloudu i přes mobil. Postupuj všude stejně.
+These instructions apply in every environment: locally on Windows, in the cloud and from mobile. Work the same way everywhere.
 
-## Dokumenty
+## Language
 
-- `docs/architecture.md`: architektura, rozhodnutí a ověřená fakta o SSMS. Přečti před návrhem nebo změnou architektury.
-- `docs/roadmap.md`: fáze s checkboxy a rozhodnutí uživatele. Podle něj vybírej další práci.
-- `README.md`: sestavení, instalace a ruční test v SSMS.
+- **Talk to the user in Czech.**
+- **Everything that goes into the repository is in English:** code, identifiers, comments, UI text (menus, options, suggestion descriptions, messages), log messages, documentation, issues, pull requests, commit messages and labels.
+- Existing Czech text in the repository (code comments, UI strings, `docs/`) is being translated; until that is done, write all new or changed text in English.
 
-## Aktuální stav
+## Documents
 
-MVP 0.2.x běží v SSMS 22.11. Hotové a další body jsou v `docs/roadmap.md`, další na řadě je fáze 0.
+- `docs/architecture.md`: architecture, decisions and verified facts about SSMS. Read it before designing or changing the architecture.
+- `docs/roadmap.md`: phases with checkboxes and the user's decisions. Pick the next work from it.
+- `README.md`: build, installation and manual testing in SSMS.
 
-## Na začátku sezení
+## Current state
 
-1. `git status`, `git fetch` a aktuální větev. Necommitnuté změny nepřepisuj a nemaž, zeptej se.
-2. Přečti `docs/roadmap.md` a otevřená issue.
-3. Když pokračuješ na rozpracovaném issue, přepni se na jeho větev a srovnej ji s `main` (viz níže).
+MVP 0.2.x runs in SSMS 22.11. What is done and what comes next is in `docs/roadmap.md`; phase 0 is next.
 
-## Práce s gitem a GitHubem
+## At the start of a session
 
-Repozitář: `lenochod86/SQL-Prompter`, hlavní větev `main`.
+1. Run `git status` and `git fetch`, and check the current branch. Never overwrite or delete uncommitted changes; ask first.
+2. Read `docs/roadmap.md` and the open issues.
+3. When continuing work on an issue, switch to its branch and bring it up to date with `main` (see below).
 
-### Postup pro každou práci
+## Git and GitHub
 
-1. **Issue.** Každá samostatná práce (bod nebo skupina bodů z roadmapy, chyba, průzkum) má issue na GitHubu. Pokud ještě neexistuje, založ ho dřív, než začneš psát kód. Obsah česky:
-   - název: krátký, bez čísla fáze (např. „Vkládání návrhů podle nastavení“);
-   - popis: cíl, rozsah, kritéria hotovo a odkaz na bod v `docs/roadmap.md`;
-   - štítky podle druhu: `feature`, `bug`, `research`, `docs` (založ, když chybí) a fáze (`fáze-0` …).
-2. **Větev** z aktuálního `main`: `<číslo-issue>-<krátký-popis>`, malými písmeny a s pomlčkami, např. `12-vkladani-navrhu`. Na jedné větvi jen jedno issue.
-3. **Commity** malé a logicky ucelené:
-   - zpráva anglicky, v rozkazovacím způsobu, předmět do 72 znaků;
-   - v těle proč a co, na konci `Refs #<číslo>`;
-   - před každým commitem projdou testy (`dotnet test tests/SqlPrompter.Tests`) a sestavení VSIX, pokud se měnil `src/SqlPrompter.Ssms` a jsi na Windows.
-4. **Průběžně** větev pushuj (`git push -u origin <větev>`), aby šla práce převzít z jiného prostředí.
-5. **Pull request** do `main`, jakmile je práce připravená k posouzení:
-   - česky: co se změnilo, jak to otestovat v SSMS, co ověřené je a co ne;
-   - v popisu `Closes #<číslo>`.
-6. **Schválení.** Merguje se až po výslovném souhlasu uživatele. Uživatel obvykle testuje VSIX z větve v SSMS.
-7. **Squash merge** PR do `main`:
-   - zpráva commitu = název PR a číslo PR, tělo shrne změnu;
-   - potom smaž vzdálenou i lokální větev a přepni se na aktuální `main`.
+Repository: `lenochod86/SQL-Prompter`, main branch `main`.
 
-### Pravidla
+### Workflow for every piece of work
 
-- Do `main` nikdy necommituj ani nepushuj přímo. Výjimkou je, když to uživatel výslovně řekne.
-- Na `main` nikdy nedělej force push. Na vlastní větvi jen `git push --force-with-lease`, a to jen když je to nutné (např. po rebase).
-- Než větev předáš k posouzení, srovnej ji s `main` přes `git rebase origin/main`. Konflikty řeš ty a popiš je.
-- Neměň historii, kterou už někdo mohl stáhnout, pokud to není nutné.
-- Do repozitáře nepatří: hesla, connection stringy, názvy serverů a databází uživatele, jeho snippety, export nastavení ani nic z `E:\Prompter` (soukromé podklady a proprietární soubory SQL Promptu). Testy používají vlastní ukázková data se stejnou strukturou.
-- Binární soubory SQL Promptu neanalyzuj a nepoužívej. Stačí exporty a popis chování.
-- Generované soubory (`bin/`, `obj/`, `.vs/`) zůstávají v `.gitignore`.
-- Když nemáš přístup ke GitHubu (není `gh` ani GitHub nástroje), řekni to uživateli. Issue a PR nevynechávej potichu.
+1. **Issue.** Every separate piece of work (a roadmap item or group of items, a bug, a research task) has a GitHub issue. Create it before writing code if it does not exist yet.
+   - Title: short and descriptive, without the phase number (e.g. "Configurable commit keys for suggestions").
+   - Body: goal, scope, acceptance criteria and a link to the item in `docs/roadmap.md`.
+   - Labels: the kind (`feature`, `bug`, `research`, `docs`; create them if missing) and the phase (`phase-0`, `phase-1`, …).
+2. **Branch** from the current `main`, named `<issue-number>-<short-description>`, lowercase with hyphens, e.g. `12-commit-keys`. One issue per branch.
+3. **Commits** are small and self-contained.
+   - Imperative subject line of at most 72 characters.
+   - The body says why and what, and ends with `Refs #<number>`.
+   - Before every commit the tests pass (`dotnet test tests/SqlPrompter.Tests`). If `src/SqlPrompter.Ssms` changed and you are on Windows, the VSIX builds too.
+4. **Push** the branch regularly (`git push -u origin <branch>`) so the work can be picked up from another environment.
+5. **Pull request** to `main` when the work is ready for review.
+   - Describe what changed, how to test it in SSMS, and what is verified and what is not.
+   - Include `Closes #<number>`.
+6. **Approval.** Merge only after the user explicitly agrees. The user usually tests the VSIX from the branch in SSMS.
+7. **Squash merge** the pull request into `main`.
+   - The commit message is the PR title with the PR number; the body summarizes the change.
+   - Then delete the remote and local branch and switch to the updated `main`.
 
-## Architektura a kód
+### Rules
 
-- Logika patří do `SqlPrompter.Core` a `SqlPrompter.Metadata` (netstandard2.0). Tyto projekty nesmí záviset na VS SDK ani na API SSMS.
-- `SqlPrompter.Ssms` zůstává tenká vrstva. Typy SSMS nepouštěj za její hranici.
-- Na vlákně UI nedělej nic pomalého a při našeptávání nikdy nečekej na databázi.
-- Metadata čti jen pro čtení. Neukládej hesla a nepřidávej telemetrii.
-- API SSMS je nepodporované a nezdokumentované. Předpoklady ověřuj za běhu v SSMS a výsledky zapisuj do `docs/architecture.md`.
-- Uživatel chce vidět jen náš seznam. Náš zdroj se proto účastní všude mimo řetězce a komentáře a tím vestavěný seznam potlačí. Kde nic nevíme, nabídni prázdný seznam (`ContextKind.Name`) nebo klíčová slova (`ContextKind.Fallback`), nikdy `DoesNotParticipateInCompletion`.
-- Nové příkazy patří do menu SQL Prompter (`SqlPrompterCommands.vsct`).
-- Nový kontext v `ContextAnalyzer` pokryj testem s kurzorem vyznačeným `|`. Každá oprava chyby má test, který ji zachytí.
-- Komentáře v kódu česky, identifikátory anglicky, styl podle okolního kódu.
+- Never commit or push directly to `main` unless the user explicitly says so.
+- Never force push to `main`. On your own branch use only `git push --force-with-lease`, and only when necessary (e.g. after a rebase).
+- Before handing a branch over for review, rebase it on `origin/main`. Resolve conflicts yourself and describe them.
+- Do not rewrite history that someone may already have pulled unless it is necessary.
+- Never put into the repository: passwords, connection strings, the user's server or database names, the user's snippets or exported settings, or anything from `E:\Prompter` (private material and proprietary SQL Prompt files). Tests use our own sample data with the same structure.
+- Do not analyze or use SQL Prompt binaries. Exports and behavior descriptions are enough.
+- Generated files (`bin/`, `obj/`, `.vs/`) stay in `.gitignore`.
+- If GitHub is not accessible (no `gh` and no GitHub tools), tell the user. Never silently skip issues or pull requests.
 
-## Sestavení a verze
+## Architecture and code
 
-- Testy: `dotnet test tests/SqlPrompter.Tests` (kdekoli).
-- VSIX: `dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release` (jen Windows). Výsledek je v `src/SqlPrompter.Ssms/bin/Release/net48/SqlPrompter.Ssms.vsix`.
-- Když `dotnet` na PATH chybí, nainstaluj .NET SDK do scratchpadu skriptem `dotnet-install.ps1` (bez administrátora) a nastav `DOTNET_ROOT`.
-- S každým VSIX, který dostane uživatel, zvyš verzi v `source.extension.vsixmanifest` (jinak se přes starou nenainstaluje) a ověř ji uvnitř `.vsix`.
-- Po změně `.vsct` zvyš verzi v `ProvideMenuResource`.
+- Logic belongs in `SqlPrompter.Core` and `SqlPrompter.Metadata` (netstandard2.0). These projects must not depend on the VS SDK or the SSMS API.
+- `SqlPrompter.Ssms` stays a thin layer. Do not let SSMS types cross its boundary.
+- Never do anything slow on the UI thread and never wait for the database while completing.
+- Read metadata only. Never store passwords and do not add telemetry.
+- The SSMS API is unsupported and undocumented. Verify assumptions at runtime in SSMS and record the results in `docs/architecture.md`.
+- The user wants to see only our completion list. Our source therefore participates everywhere except in strings, comments and numbers, which suppresses the built-in list. Where we know nothing, offer an empty list (`ContextKind.Name`) or keywords (`ContextKind.Fallback`), never `DoesNotParticipateInCompletion`.
+- New commands go into the SQL Prompter menu (`SqlPrompterCommands.vsct`).
+- Cover every new context in `ContextAnalyzer` with a test that marks the caret with `|`. Every bug fix has a test that catches the bug.
+- Follow the style of the surrounding code.
 
-## Prostředí
+## Build and versions
 
-- **Lokálně na Windows:** jde sestavit VSIX a nainstalovat ho do SSMS 22. Instalaci, odinstalaci a zásahy do konfigurace SSMS spouští uživatel. Ty mu dej přesný příkaz.
-- **V cloudu:** SSMS ani sestavení VSIX nejsou k dispozici. Pracuj na Core, Metadata a testech. VSIX sestaví CI (`.github/workflows/build.yml`).
-- **Přes mobil:** uživatel nemusí mít po ruce SSMS. Výsledky z SSMS si vyžádej jako snímek obrazovky nebo log (`%LOCALAPPDATA%\SqlPrompter\sqlprompter.log`).
+- Tests: `dotnet test tests/SqlPrompter.Tests` (anywhere).
+- VSIX: `dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release` (Windows only). Output: `src/SqlPrompter.Ssms/bin/Release/net48/SqlPrompter.Ssms.vsix`.
+- If `dotnet` is not on PATH, install the .NET SDK into the scratchpad with `dotnet-install.ps1` (no admin rights needed) and set `DOTNET_ROOT`.
+- For every VSIX handed to the user, bump the version in `source.extension.vsixmanifest` (otherwise it will not install over the old one) and check the version inside the `.vsix`.
+- After changing `.vsct`, bump the version in `ProvideMenuResource`.
 
-## Jak pracovat
+## Environments
 
-- Když něco nevíš nebo jde o rozhodnutí uživatele, zeptej se. Nevymýšlej si chování SSMS, SQL Promptu ani přání uživatele.
-- Co se týká SSMS, neoznačuj za ověřené, dokud to neproběhlo v SSMS 22. Checkbox v `docs/roadmap.md` odškrtni až po ověření, na větvi daného issue.
-- Výsledky hlas přesně: co prošlo, co selhalo (s výstupem) a co se netestovalo.
-- Rozhodnutí uživatele zapisuj do `docs/roadmap.md` (sekce Rozhodnutí), ověřená fakta o SSMS do `docs/architecture.md`.
+- **Locally on Windows:** the VSIX can be built and installed into SSMS 22. The user runs installation, uninstallation and SSMS configuration changes; give them the exact command.
+- **In the cloud:** neither SSMS nor the VSIX build is available. Work on Core, Metadata and tests; CI builds the VSIX (`.github/workflows/build.yml`).
+- **From mobile:** the user may not have SSMS at hand. Ask for SSMS results as a screenshot or the log (`%LOCALAPPDATA%\SqlPrompter\sqlprompter.log`).
+
+## How to work
+
+- If you do not know something, or it is the user's decision, ask. Do not make up SSMS or SQL Prompt behavior or the user's wishes.
+- Do not mark anything about SSMS as verified until it has run in SSMS 22. Tick a checkbox in `docs/roadmap.md` only after verification, on the issue's branch.
+- Report results precisely: what passed, what failed (with output) and what was not tested.
+- Record the user's decisions in `docs/roadmap.md` (Decisions section) and verified SSMS facts in `docs/architecture.md`.
