@@ -7,8 +7,8 @@ using System.Threading;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Log do %LOCALAPPDATA%\SqlPrompter\prototype.log. Zápis na disk běží na vlastním
-    /// vlákně, takže volání z vlákna UI jen vloží řádek do fronty.
+    /// Log in %LOCALAPPDATA%\SqlPrompter\prototype.log. Writing to disk runs on its own
+    /// thread, so a call from the UI thread only queues the line.
     /// </summary>
     internal static class Log
     {
@@ -65,7 +65,7 @@ namespace SqlPrompter.Prototype
                 }
                 catch
                 {
-                    // Prototyp: chybu logu nemá kam nahlásit.
+                    // Prototype: there is nowhere to report a logging failure.
                 }
             }
         }

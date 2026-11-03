@@ -12,17 +12,17 @@ using Microsoft.VisualStudio.Threading;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Otázka 3: jak získat připojení aktivního okna.
-    /// Sestavení SSMS nejsou na NuGetu a jejich API je nezdokumentované, proto se
-    /// k <c>ScriptFactory</c> přistupuje reflexí. Prototyp tak nezávisí na verzi SSMS
-    /// při sestavení a za běhu vypíše, co skutečně existuje.
+    /// Question 3: how to get the connection of the active window.
+    /// SSMS assemblies are not on NuGet and their API is undocumented, so
+    /// <c>ScriptFactory</c> is accessed through reflection. The prototype therefore does not depend on the SSMS version
+    /// at build time and logs at runtime what really exists.
     /// </summary>
     internal static class ConnectionProbe
     {
         private const string Area = "q3";
         private const string ScriptFactoryTypeName = "Microsoft.SqlServer.Management.UI.VSIntegration.Editors.ScriptFactory";
 
-        /// <summary>Údaje o připojení v paměti. Heslo se nikdy nezapisuje do logu ani na disk.</summary>
+        /// <summary>Connection data in memory. The password is never written to the log or to disk.</summary>
         internal sealed class Snapshot
         {
             public string ServerName;
@@ -37,7 +37,7 @@ namespace SqlPrompter.Prototype
         public static Snapshot DumpActiveConnection()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            Log.Write(Area, "=== Výpis připojení aktivního okna ===");
+            Log.Write(Area, "=== Active window connection dump ===");
             try
             {
                 LogCandidateTypes();
@@ -45,7 +45,7 @@ namespace SqlPrompter.Prototype
                 var factoryType = FindLoadedType(ScriptFactoryTypeName);
                 if (factoryType == null)
                 {
-                    Log.Write(Area, "Typ " + ScriptFactoryTypeName + " není v načtených sestaveních. Otevřete okno dotazu a zkuste znovu.");
+                    Log.Write(Area, "Typ " + ScriptFactoryTypeName + " is not in the loaded assemblies. Open a query window and try again.");
                     return null;
                 }
 
@@ -53,14 +53,14 @@ namespace SqlPrompter.Prototype
                 var factory = factoryType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
                 if (factory == null)
                 {
-                    Log.Write(Area, "ScriptFactory.Instance je null nebo neexistuje.");
+                    Log.Write(Area, "ScriptFactory.Instance is null or does not exist.");
                     return null;
                 }
 
                 var activeProperty = factory.GetType().GetProperty("CurrentlyActiveWndConnectionInfo");
                 if (activeProperty == null)
                 {
-                    Log.Write(Area, "Vlastnost CurrentlyActiveWndConnectionInfo neexistuje. Veřejné vlastnosti: " +
+                    Log.Write(Area, "Property CurrentlyActiveWndConnectionInfo does not exist. Public properties: " +
                         string.Join(", ", factory.GetType().GetProperties().Select(p => p.Name)));
                     return null;
                 }
@@ -68,7 +68,7 @@ namespace SqlPrompter.Prototype
                 var active = activeProperty.GetValue(factory);
                 if (active == null)
                 {
-                    Log.Write(Area, "CurrentlyActiveWndConnectionInfo je null: aktivní okno nemá připojení.");
+                    Log.Write(Area, "CurrentlyActiveWndConnectionInfo is null: the active window has no connection.");
                     return null;
                 }
 
@@ -79,15 +79,15 @@ namespace SqlPrompter.Prototype
             }
             catch (Exception ex)
             {
-                Log.Error(Area, "Výpis připojení selhal", ex);
+                Log.Error(Area, "Connection dump failed", ex);
                 return null;
             }
         }
 
         /// <summary>
-        /// Otevře vlastní připojení jen pro čtení a spustí dotaz bez vedlejších účinků.
-        /// Používá SqlClient, který už je v procesu SSMS načtený, aby prototyp nemusel
-        /// přibalovat vlastní kopii. Běží na pozadí.
+        /// Opens our own read-only connection and runs a query without side effects.
+        /// Uses the SqlClient already loaded in the SSMS process so that the prototype does not have to
+        /// ship its own copy. Runs in the background.
         /// </summary>
         public static async Task TestConnectionAsync(Snapshot snapshot, CancellationToken token)
         {
@@ -97,8 +97,8 @@ namespace SqlPrompter.Prototype
             {
                 var connectionType = FindLoadedType("Microsoft.Data.SqlClient.SqlConnection");
                 Log.Write(Area, connectionType != null
-                    ? "Používám Microsoft.Data.SqlClient z procesu SSMS: " + connectionType.Assembly.FullName
-                    : "Microsoft.Data.SqlClient není načtený, používám System.Data.SqlClient (bez Entra Interactive).");
+                    ? "Using Microsoft.Data.SqlClient from the SSMS process: " + connectionType.Assembly.FullName
+                    : "Microsoft.Data.SqlClient is not loaded, using System.Data.SqlClient (without Entra Interactive).");
                 connectionType = connectionType ?? typeof(System.Data.SqlClient.SqlConnection);
 
                 var builder = new DbConnectionStringBuilder
@@ -112,8 +112,8 @@ namespace SqlPrompter.Prototype
                     builder["Initial Catalog"] = snapshot.DatabaseName;
                 }
 
-                // Šifrování přebíráme z nastavení okna v SSMS. Výchozí hodnoty SqlClient 6
-                // (Encrypt=Mandatory) by u serveru s certifikátem podepsaným sám sebou selhaly.
+                // Encryption is taken over from the window's settings in SSMS. The SqlClient 6 defaults
+                // (Encrypt=Mandatory) would fail against a server with a self-signed certificate.
                 if (!string.IsNullOrEmpty(snapshot.Encrypt))
                 {
                     builder["Encrypt"] = snapshot.Encrypt;
@@ -125,7 +125,7 @@ namespace SqlPrompter.Prototype
                 }
 
                 var mode = ChooseAuthentication(snapshot, connectionType, builder);
-                Log.Write(Area, "Režim ověření pro test: " + mode + "; připojovací řetězec bez tajemství: " + Redact(builder));
+                Log.Write(Area, "Authentication mode for the test: " + mode + "; connection string without secrets: " + Redact(builder));
 
                 using (var connection = (DbConnection)Activator.CreateInstance(connectionType))
                 {
@@ -139,7 +139,7 @@ namespace SqlPrompter.Prototype
                             if (await reader.ReadAsync(token))
                             {
                                 Log.Write(Area, string.Format(
-                                    "Test připojení OK za {0} ms: server={1}, databáze={2}, login={3}",
+                                    "Connection test OK in {0} ms: server={1}, database={2}, login={3}",
                                     watch.ElapsedMilliseconds, reader.GetValue(0), reader.GetValue(1), reader.GetValue(2)));
                             }
                         }
@@ -148,14 +148,14 @@ namespace SqlPrompter.Prototype
             }
             catch (Exception ex)
             {
-                Log.Error(Area, "Test připojení selhal po " + watch.ElapsedMilliseconds + " ms", ex);
+                Log.Error(Area, "Connection test failed after " + watch.ElapsedMilliseconds + " ms", ex);
             }
         }
 
         private static string ChooseAuthentication(Snapshot s, Type connectionType, DbConnectionStringBuilder builder)
         {
             var auth = s.AuthenticationType ?? string.Empty;
-            // Starší SSMS: 0 = Windows, 1 = SQL Server. Hodnoty pro Entra ID jsou neznámé, proto se logují.
+            // Older SSMS: 0 = Windows, 1 = SQL Server. Values for Entra ID are unknown, so they are logged.
             if (auth == "0" || auth.IndexOf("Windows", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 builder["Integrated Security"] = true;
@@ -166,7 +166,7 @@ namespace SqlPrompter.Prototype
             {
                 builder["User ID"] = s.UserName;
                 builder["Password"] = s.Password ?? string.Empty;
-                return "SQL Server (heslo z paměti SSMS dostupné: " + !string.IsNullOrEmpty(s.Password) + ")";
+                return "SQL Server (password from SSMS memory available: " + !string.IsNullOrEmpty(s.Password) + ")";
             }
 
             if (connectionType.Assembly.GetName().Name == "Microsoft.Data.SqlClient")
@@ -177,10 +177,10 @@ namespace SqlPrompter.Prototype
                     builder["User ID"] = s.UserName;
                 }
 
-                return "Entra ID Interactive (může zobrazit přihlašovací okno; ověřujeme, zda se token sdílí s SSMS)";
+                return "Entra ID Interactive (may show a sign-in window; checks whether the token is shared with SSMS)";
             }
 
-            return "neznámý typ ověření \"" + auth + "\", zkouším bez dalších parametrů";
+            return "unknown authentication type \"" + auth + "\", trying without further parameters";
         }
 
         private static Snapshot ToSnapshot(object ui)
@@ -204,13 +204,13 @@ namespace SqlPrompter.Prototype
             }
 
             Log.Write(Area, string.Format(
-                "Shrnutí: server={0}, databáze={1}, uživatel={2}, typOvěření={3}, heslo k dispozici={4}, encrypt={5}, trustServerCertificate={6}",
-                snapshot.ServerName, snapshot.DatabaseName ?? "(nezadáno)", snapshot.UserName, snapshot.AuthenticationType,
-                !string.IsNullOrEmpty(snapshot.Password), snapshot.Encrypt ?? "(nezadáno)", snapshot.TrustServerCertificate ?? "(nezadáno)"));
+                "Summary: server={0}, database={1}, user={2}, authenticationType={3}, password available={4}, encrypt={5}, trustServerCertificate={6}",
+                snapshot.ServerName, snapshot.DatabaseName ?? "(not set)", snapshot.UserName, snapshot.AuthenticationType,
+                !string.IsNullOrEmpty(snapshot.Password), snapshot.Encrypt ?? "(not set)", snapshot.TrustServerCertificate ?? "(not set)"));
             return snapshot;
         }
 
-        /// <summary>Pomůže najít náhradu, kdyby ScriptFactory v SSMS 22 neexistoval.</summary>
+        /// <summary>Helps to find a replacement if ScriptFactory did not exist in SSMS 22.</summary>
         private static void LogCandidateTypes()
         {
             var names = AppDomain.CurrentDomain.GetAssemblies()
@@ -233,7 +233,7 @@ namespace SqlPrompter.Prototype
                 .Take(200)
                 .ToList();
 
-            Log.Write(Area, "Kandidátní typy v načtených sestaveních SSMS (" + names.Count + "):");
+            Log.Write(Area, "Candidate types in the loaded SSMS assemblies (" + names.Count + "):");
             foreach (var name in names)
             {
                 Log.Write(Area, "  " + name);
@@ -259,7 +259,7 @@ namespace SqlPrompter.Prototype
                 }
                 catch
                 {
-                    // Některá sestavení nejde prohledat, přeskočíme je.
+                    // Some assemblies cannot be searched; skip them.
                 }
             }
 

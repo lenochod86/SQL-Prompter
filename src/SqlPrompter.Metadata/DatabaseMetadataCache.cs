@@ -9,8 +9,8 @@ using SqlPrompter.Core.Model;
 namespace SqlPrompter.Metadata
 {
     /// <summary>
-    /// Metadata jedné databáze. Všechny metody se vrací hned: načítání běží na pozadí
-    /// a výsledek je vidět v Current při dalším našeptání.
+    /// Metadata of one database. All methods return immediately: loading runs in the background
+    /// and the result is visible in Current on the next completion.
     /// </summary>
     public sealed class DatabaseMetadataCache
     {
@@ -30,16 +30,16 @@ namespace SqlPrompter.Metadata
             this.clock = clock ?? (() => DateTime.UtcNow);
         }
 
-        /// <summary>Po chybě se další pokus o načtení odloží.</summary>
+        /// <summary>After a failure the next load attempt is postponed.</summary>
         public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(30);
 
-        /// <summary>Jak často se nejvýš ověřuje, jestli se objekty v databázi změnily.</summary>
+        /// <summary>How often at most to check whether the objects in the database changed.</summary>
         public TimeSpan VersionCheckInterval { get; set; } = TimeSpan.FromSeconds(30);
 
-        /// <summary>Aktuální snímek, nebo null, dokud se nenačte.</summary>
+        /// <summary>Current snapshot, or null until it is loaded.</summary>
         public DatabaseSnapshot Current => snapshot;
 
-        /// <summary>Spustí načtení objektů, pokud ještě neproběhlo. Vrací úlohu jen kvůli testům.</summary>
+        /// <summary>Starts loading objects if not done yet. Returns the task only for tests.</summary>
         public Task EnsureLoaded(IMetadataLoader loader)
         {
             lock (gate)
@@ -65,7 +65,7 @@ namespace SqlPrompter.Metadata
             }
         }
 
-        /// <summary>Spustí načtení sloupců objektů, které ještě nejsou v snímku ani se nenačítají.</summary>
+        /// <summary>Starts loading columns of objects that are neither in the snapshot nor being loaded.</summary>
         public Task RequestColumns(IEnumerable<DbObject> objects, IMetadataLoader loader)
         {
             List<int> ids;
@@ -97,7 +97,7 @@ namespace SqlPrompter.Metadata
             return Task.Run(() => LoadColumnsAsync(loader, ids, current));
         }
 
-        /// <summary>Nejvýš jednou za VersionCheckInterval ověří, jestli se objekty změnily, a případně snímek obnoví.</summary>
+        /// <summary>At most once per VersionCheckInterval checks whether the objects changed and refreshes the snapshot if so.</summary>
         public Task CheckForChanges(IMetadataLoader loader)
         {
             lock (gate)
@@ -115,7 +115,7 @@ namespace SqlPrompter.Metadata
             }
         }
 
-        /// <summary>Zahodí snímek; další našeptání načte metadata znovu.</summary>
+        /// <summary>Drops the snapshot; the next completion loads the metadata again.</summary>
         public void Invalidate()
         {
             lock (gate)
@@ -146,12 +146,12 @@ namespace SqlPrompter.Metadata
                     lastVersionCheck = clock();
                 }
 
-                log("Metadata databáze " + loaded.DatabaseName + " načtena: " + loaded.Objects.Count + " objektů za " +
+                log("Metadata of database " + loaded.DatabaseName + " loaded: " + loaded.Objects.Count + " objects in " +
                     (int)(clock() - started).TotalMilliseconds + " ms.");
             }
             catch (Exception ex)
             {
-                Fail("Načtení metadat selhalo", ex);
+                Fail("Loading metadata failed", ex);
             }
         }
 
@@ -163,7 +163,7 @@ namespace SqlPrompter.Metadata
                 var complete = new Dictionary<int, IReadOnlyList<DbColumn>>();
                 foreach (var id in ids)
                 {
-                    // Objekt, který mezitím zmizel, dostane prázdný seznam, aby se nenačítal pořád dokola.
+                    // An object that has disappeared meanwhile gets an empty list so that it is not loaded over and over.
                     complete[id] = loaded.TryGetValue(id, out var list) ? list : Array.Empty<DbColumn>();
                 }
 
@@ -177,7 +177,7 @@ namespace SqlPrompter.Metadata
             }
             catch (Exception ex)
             {
-                Fail("Načtení sloupců selhalo", ex);
+                Fail("Loading columns failed", ex);
             }
             finally
             {
@@ -207,16 +207,16 @@ namespace SqlPrompter.Metadata
                 {
                     if (generation == expectedGeneration)
                     {
-                        // Sloupce se po změně objektů načtou znovu podle potřeby.
+                        // After objects change, columns are loaded again on demand.
                         snapshot = loaded;
                     }
                 }
 
-                log("Metadata databáze " + loaded.DatabaseName + " obnovena po změně objektů.");
+                log("Metadata of database " + loaded.DatabaseName + " refreshed after objects changed.");
             }
             catch (Exception ex)
             {
-                Fail("Kontrola změn metadat selhala", ex);
+                Fail("Checking metadata for changes failed", ex);
             }
         }
 
@@ -231,7 +231,7 @@ namespace SqlPrompter.Metadata
         }
     }
 
-    /// <summary>Cache metadat pro každou kombinaci serveru, databáze a přihlášení.</summary>
+    /// <summary>Metadata cache for every combination of server, database and login.</summary>
     public sealed class MetadataCacheManager
     {
         private readonly ConcurrentDictionary<string, DatabaseMetadataCache> caches =

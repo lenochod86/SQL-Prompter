@@ -6,12 +6,12 @@ using Microsoft.VisualStudio.Utilities;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Název typu obsahu SQL editoru v SSMS 22 neznáme, proto se rozšíření registruje
-    /// pro "any" a SQL editor pozná až za běhu. Výsledek je odpověď na otázku 1.
+    /// The content type name of the SQL editor in SSMS 22 is unknown, so the extension registers
+    /// for "any" and recognizes the SQL editor at runtime. The result answers question 1.
     /// </summary>
     internal static class SqlContentTypes
     {
-        /// <summary>Přesný název typu obsahu lze vynutit proměnnou prostředí.</summary>
+        /// <summary>The exact content type name can be forced with an environment variable.</summary>
         public const string OverrideVariable = "SQLPROMPTER_CONTENT_TYPE";
 
         public static bool IsSql(IContentType contentType)
@@ -31,7 +31,7 @@ namespace SqlPrompter.Prototype
                 .Any(t => t.TypeName.IndexOf("sql", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        /// <summary>Např. "SQL Server Tools -> code -> text".</summary>
+        /// <summary>E.g. "SQL Server Tools -> code -> text".</summary>
         public static string Describe(IContentType contentType)
         {
             if (contentType == null)

@@ -9,8 +9,8 @@ using System.Text.RegularExpressions;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Vypíše veřejné vlastnosti objektu do logu. Hodnoty, které vypadají jako tajemství
-    /// (heslo, token, …), se nikdy nevypisují, jen informace, zda jsou vyplněné.
+    /// Logs the public properties of an object. Values that look like secrets
+    /// (password, token, …) are never logged, only whether they are set.
     /// </summary>
     internal static class ObjectDumper
     {
@@ -37,7 +37,7 @@ namespace SqlPrompter.Prototype
             var type = value.GetType();
             if (IsSecretName(label))
             {
-                Log.Write(area, indent + label + " = [skryto, vyplněno: " + IsFilled(value) + "] (" + type.FullName + ")");
+                Log.Write(area, indent + label + " = [hidden, set: " + IsFilled(value) + "] (" + type.FullName + ")");
                 return;
             }
 
@@ -49,7 +49,7 @@ namespace SqlPrompter.Prototype
 
             if (!visited.Add(value))
             {
-                Log.Write(area, indent + label + " = (už vypsáno) " + type.FullName);
+                Log.Write(area, indent + label + " = (already dumped) " + type.FullName);
                 return;
             }
 
@@ -91,7 +91,7 @@ namespace SqlPrompter.Prototype
                 catch (Exception ex)
                 {
                     var inner = (ex as TargetInvocationException)?.InnerException ?? ex;
-                    Log.Write(area, indent + "  " + property.Name + " = (výjimka " + inner.GetType().Name + ")");
+                    Log.Write(area, indent + "  " + property.Name + " = (exception " + inner.GetType().Name + ")");
                     continue;
                 }
 

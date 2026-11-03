@@ -9,11 +9,11 @@ using Microsoft.VisualStudio.Utilities;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Otázka 1: pro každý nový textový pohled vypíše typ obsahu (i bázové typy),
-    /// role pohledu, buffery v grafu a to, zda pro něj editor podporuje moderní
-    /// (asynchronní) našeptávání.
-    /// Otázka 2: sleduje všechny asynchronní relace našeptávání a vypisuje, kolik položek
-    /// dodal který zdroj a které texty se opakují mezi zdroji.
+    /// Question 1: for every new text view logs the content type (including base types),
+    /// the view roles, the buffers in the graph and whether the editor supports modern
+    /// (asynchronous) completion for it.
+    /// Question 2: watches all asynchronous completion sessions and logs how many items
+    /// each source provided and which texts repeat across sources.
     /// </summary>
     [Export(typeof(IWpfTextViewCreationListener))]
     [ContentType("any")]
@@ -29,7 +29,7 @@ namespace SqlPrompter.Prototype
         {
             this.asyncBroker = asyncBroker;
             asyncBroker.CompletionTriggered += OnCompletionTriggered;
-            Log.Write("q1", "MEF komponenta TextViewDiagnostics vytvořena (MEF rozšíření se načetlo).");
+            Log.Write("q1", "MEF component TextViewDiagnostics created (the MEF extension loaded).");
         }
 
         public void TextViewCreated(IWpfTextView textView)
@@ -41,7 +41,7 @@ namespace SqlPrompter.Prototype
                 Log.Write(
                     "q1",
                     string.Format(
-                        "Nový pohled: typObsahu={0}; SQL={1}; asyncCompletionSupported={2}; role=[{3}]",
+                        "New view: contentType={0}; SQL={1}; asyncCompletionSupported={2}; roles=[{3}]",
                         SqlContentTypes.Describe(buffer.ContentType),
                         isSql,
                         asyncBroker.IsCompletionSupported(buffer.ContentType),
@@ -58,13 +58,13 @@ namespace SqlPrompter.Prototype
 
                 if (isSql)
                 {
-                    // Vlastnosti bufferu můžou prozradit, kde SSMS drží připojení okna (otázka 3).
+                    // Buffer properties may reveal where SSMS keeps the window connection (question 3).
                     foreach (var property in buffer.Properties.PropertyList)
                     {
                         Log.Write(
                             "q3",
                             string.Format(
-                                "  vlastnost bufferu: klíč={0}; hodnota={1}",
+                                "  buffer property: key={0}; value={1}",
                                 DescribeKey(property.Key),
                                 property.Value?.GetType().FullName ?? "(null)"));
                     }
@@ -90,7 +90,7 @@ namespace SqlPrompter.Prototype
         {
             var session = e.CompletionSession;
             var contentType = e.TextView.TextBuffer.ContentType;
-            Log.Write("q2", "Asynchronní relace našeptávání spuštěna, typObsahu=\"" + contentType.TypeName + "\"");
+            Log.Write("q2", "Asynchronous completion session started, contentType=\"" + contentType.TypeName + "\"");
 
             string lastSignature = null;
             session.ItemsUpdated += (s, args) =>
@@ -117,8 +117,8 @@ namespace SqlPrompter.Prototype
                         .Take(20)
                         .ToList();
 
-                    Log.Write("q2", "  položky podle zdroje: " + signature);
-                    Log.Write("q2", "  texty od více zdrojů (max 20): " + (duplicates.Count == 0 ? "žádné" : string.Join(", ", duplicates)));
+                    Log.Write("q2", "  items by source: " + signature);
+                    Log.Write("q2", "  texts from several sources (max 20): " + (duplicates.Count == 0 ? "none" : string.Join(", ", duplicates)));
                 }
                 catch (Exception ex)
                 {
@@ -126,7 +126,7 @@ namespace SqlPrompter.Prototype
                 }
             };
 
-            session.Dismissed += (s, args) => Log.Write("q2", "Asynchronní relace našeptávání zavřena.");
+            session.Dismissed += (s, args) => Log.Write("q2", "Asynchronous completion session dismissed.");
         }
     }
 }

@@ -7,16 +7,16 @@ namespace SqlPrompter.Core.Completion
 {
     public enum ReadinessState
     {
-        /// <summary>Lze sestavit úplný seznam návrhů.</summary>
+        /// <summary>A complete list of suggestions can be built.</summary>
         Ready,
 
-        /// <summary>Metadata databáze ještě nejsou načtená.</summary>
+        /// <summary>Database metadata is not loaded yet.</summary>
         NeedsMetadata,
 
-        /// <summary>Chybí sloupce některých objektů; po jejich načtení bude Ready.</summary>
+        /// <summary>Columns of some objects are missing; Ready once they are loaded.</summary>
         NeedsColumns,
 
-        /// <summary>Kontext odkazuje na něco, co rozšíření nezná (CTE, dočasná tabulka, jiná databáze …).</summary>
+        /// <summary>The context refers to something the extension does not know (CTE, temporary table, another database …).</summary>
         Unsupported,
     }
 
@@ -30,12 +30,12 @@ namespace SqlPrompter.Core.Completion
 
         public ReadinessState State { get; }
 
-        /// <summary>Objekty, jejichž sloupce je potřeba načíst.</summary>
+        /// <summary>Objects whose columns need to be loaded.</summary>
         public IReadOnlyList<DbObject> MissingColumns { get; }
 
         /// <summary>
-        /// Zjistí, jestli metadata stačí na úplný seznam a co je případně potřeba načíst.
-        /// Seznam se nabízí i tak; chybějící části se doplní při dalším našeptání.
+        /// Determines whether the metadata is enough for a complete list and what needs to be loaded.
+        /// The list is offered anyway; missing parts are added on the next completion.
         /// </summary>
         public static Readiness Evaluate(CaretContext context, IDatabaseMetadata metadata)
         {
@@ -65,7 +65,7 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        /// <summary>Najde objekt v metadatech pro zdroj tabulky, nebo null.</summary>
+        /// <summary>Finds the object in the metadata for a table source, or null.</summary>
         public static DbObject Resolve(TableSource source, IDatabaseMetadata metadata)
         {
             if (source.Kind != TableSourceKind.Object || metadata == null || source.NameParts.Count > 3)
@@ -109,7 +109,7 @@ namespace SqlPrompter.Core.Completion
                 var dbObject = Resolve(source, metadata);
                 if (dbObject == null)
                 {
-                    // Vnější zdroje jsou jen doplněk; neznámý zdroj v aktuálním bloku by seznam ochudil.
+                    // Outer sources are only a bonus; an unknown source in the current block would make the list incomplete.
                     if (source.ScopeLevel == 0 || source == context.QualifiedSource)
                     {
                         return new Readiness(ReadinessState.Unsupported, null);

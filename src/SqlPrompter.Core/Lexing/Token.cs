@@ -5,16 +5,16 @@ namespace SqlPrompter.Core.Lexing
 {
     public enum TokenKind
     {
-        /// <summary>Identifikátor nebo klíčové slovo, včetně dočasných tabulek (#t).</summary>
+        /// <summary>Identifier or keyword, including temporary tables (#t).</summary>
         Word,
 
-        /// <summary>[name] nebo "name".</summary>
+        /// <summary>[name] or "name".</summary>
         QuotedIdentifier,
 
-        /// <summary>@name nebo @@name.</summary>
+        /// <summary>@name or @@name.</summary>
         Variable,
 
-        /// <summary>'text' nebo N'text'.</summary>
+        /// <summary>'text' or N'text'.</summary>
         String,
 
         Number,
@@ -44,28 +44,28 @@ namespace SqlPrompter.Core.Lexing
 
         public int Start { get; }
 
-        /// <summary>Pozice za posledním znakem.</summary>
+        /// <summary>Position after the last character.</summary>
         public int End { get; }
 
         public string Text { get; }
 
-        /// <summary>Chybí uzavírací znak (řetězec, komentář, [identifikátor]) a token končí koncem textu.</summary>
+        /// <summary>The closing character is missing (string, comment, [identifier]) and the token ends at the end of the text.</summary>
         public bool IsUnterminated { get; }
 
-        /// <summary>Text slova velkými písmeny, u jiných tokenů null.</summary>
+        /// <summary>Upper-case text of a word; null for other tokens.</summary>
         public string Upper => Kind == TokenKind.Word ? upper ?? (upper = Text.ToUpperInvariant()) : null;
 
         public bool IsWord(string keyword) => Kind == TokenKind.Word && string.Equals(Text, keyword, StringComparison.OrdinalIgnoreCase);
 
         public bool IsLineComment => Kind == TokenKind.Comment && Text.StartsWith("--", StringComparison.Ordinal);
 
-        /// <summary>Část víceúrovňového názvu: slovo, [identifikátor] nebo "identifikátor".</summary>
+        /// <summary>Part of a multi-part name: word, [identifier] or "identifier".</summary>
         public bool IsNamePart => Kind == TokenKind.Word || Kind == TokenKind.QuotedIdentifier;
 
-        /// <summary>Identifikátor, který není rezervované klíčové slovo.</summary>
+        /// <summary>Identifier that is not a reserved keyword.</summary>
         public bool IsIdentifier => Kind == TokenKind.QuotedIdentifier || (Kind == TokenKind.Word && !Keywords.IsReserved(Text));
 
-        /// <summary>Hodnota identifikátoru bez oddělovačů a escapování.</summary>
+        /// <summary>Identifier value without delimiters and escaping.</summary>
         public string IdentifierValue
         {
             get

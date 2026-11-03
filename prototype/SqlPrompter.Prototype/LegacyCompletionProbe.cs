@@ -9,13 +9,13 @@ using Microsoft.VisualStudio.Utilities;
 namespace SqlPrompter.Prototype
 {
     /// <summary>
-    /// Otázky 1 a 2, starší rozhraní: pokud SQL editor místo IAsyncCompletionSource
-    /// používá ICompletionSource, tato sonda vypíše cizí sady návrhů (vestavěné IntelliSense)
-    /// a přidá vlastní sadu "SQL Prompter".
+    /// Questions 1 and 2, legacy API: if the SQL editor uses ICompletionSource instead of
+    /// IAsyncCompletionSource, this probe logs the other completion sets (built-in IntelliSense)
+    /// and adds its own "SQL Prompter" set.
     ///
-    /// Ve VS existence staršího zdroje pro daný typ obsahu může přepnout editor do staršího
-    /// režimu našeptávání. Sonda je proto ve výchozím stavu vypnutá a zapíná ji proměnná
-    /// prostředí SQLPROMPTER_LEGACY_PROBE=1. Pouští se jako samostatný běh, viz README.
+    /// In VS a legacy source for a content type may switch the editor to legacy
+    /// completion. The probe is therefore off by default and is turned on by the environment
+    /// variable SQLPROMPTER_LEGACY_PROBE=1. It is run separately, see the README.
     /// </summary>
     [Export(typeof(ICompletionSourceProvider))]
     [Name("SqlPrompter.Prototype.LegacyProbe")]
@@ -33,7 +33,7 @@ namespace SqlPrompter.Prototype
                 return null;
             }
 
-            Log.Write("q1", "ICompletionSourceProvider (starší API) volán pro typObsahu=" + SqlContentTypes.Describe(textBuffer.ContentType));
+            Log.Write("q1", "ICompletionSourceProvider (legacy API) called for contentType=" + SqlContentTypes.Describe(textBuffer.ContentType));
             return textBuffer.Properties.GetOrCreateSingletonProperty(() => new LegacyCompletionProbe(textBuffer));
         }
     }
@@ -51,13 +51,13 @@ namespace SqlPrompter.Prototype
         {
             try
             {
-                Log.Write("q2", "Starší relace našeptávání, existujících sad: " + completionSets.Count);
+                Log.Write("q2", "Legacy completion session, existing sets: " + completionSets.Count);
                 foreach (var set in completionSets)
                 {
                     Log.Write(
                         "q2",
                         string.Format(
-                            "  sada moniker=\"{0}\" název=\"{1}\" položek={2} ukázka=[{3}]",
+                            "  set moniker=\"{0}\" name=\"{1}\" items={2} sample=[{3}]",
                             set.Moniker,
                             set.DisplayName,
                             set.Completions.Count,

@@ -7,9 +7,9 @@ using System.Threading;
 namespace SqlPrompter.Ssms
 {
     /// <summary>
-    /// Lokální diagnostický log v %LOCALAPPDATA%\SqlPrompter\sqlprompter.log, nic se neodesílá.
-    /// Zápis běží na vlastním vlákně, volání z vlákna UI jen vloží řádek do fronty.
-    /// Do logu nikdy nepatří hesla ani obsah skriptů.
+    /// Local diagnostic log in %LOCALAPPDATA%\SqlPrompter\sqlprompter.log; nothing is sent anywhere.
+    /// Writing runs on its own thread; a call from the UI thread only queues the line.
+    /// Passwords and script contents never go into the log.
     /// </summary>
     internal static class Log
     {
@@ -55,7 +55,7 @@ namespace SqlPrompter.Ssms
                 }
                 catch
                 {
-                    // Chybu logu není kam nahlásit.
+                    // There is nowhere to report a logging failure.
                 }
             }
         }

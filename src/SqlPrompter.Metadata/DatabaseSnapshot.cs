@@ -5,7 +5,7 @@ using SqlPrompter.Core.Model;
 
 namespace SqlPrompter.Metadata
 {
-    /// <summary>Neměnný snímek metadat jedné databáze. Doplnění sloupců vytvoří nový snímek.</summary>
+    /// <summary>Immutable metadata snapshot of one database. Adding columns creates a new snapshot.</summary>
     public sealed class DatabaseSnapshot : IDatabaseMetadata
     {
         private readonly Dictionary<string, DbObject> byName;
@@ -54,7 +54,7 @@ namespace SqlPrompter.Metadata
 
         public IReadOnlyList<DbObject> Objects { get; }
 
-        /// <summary>Otisk stavu objektů v databázi; když se změní, snímek je zastaralý.</summary>
+        /// <summary>Fingerprint of the objects in the database; when it changes, the snapshot is stale.</summary>
         public string Version { get; }
 
         public int LoadedColumnObjects => columns.Count;
@@ -88,7 +88,7 @@ namespace SqlPrompter.Metadata
 
         public bool HasColumns(int objectId) => columns.ContainsKey(objectId);
 
-        /// <summary>Nový snímek s doplněnými sloupci. Původní se nemění.</summary>
+        /// <summary>New snapshot with the added columns. The original is unchanged.</summary>
         public DatabaseSnapshot WithColumns(IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> added)
         {
             if (added == null || added.Count == 0)

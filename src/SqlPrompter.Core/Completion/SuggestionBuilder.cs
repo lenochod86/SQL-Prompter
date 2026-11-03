@@ -39,18 +39,18 @@ namespace SqlPrompter.Core.Completion
 
         public string InsertText { get; }
 
-        /// <summary>Text, podle kterého se seznam filtruje při psaní.</summary>
+        /// <summary>Text the list is filtered by while typing.</summary>
         public string FilterText { get; }
 
-        /// <summary>Krátký doplněk vpravo v seznamu, např. schéma nebo alias.</summary>
+        /// <summary>Short suffix on the right of the list, e.g. schema or alias.</summary>
         public string Suffix { get; }
 
         public string Description { get; }
 
-        /// <summary>Pořadí skupiny v seznamu, menší dřív.</summary>
+        /// <summary>Order of the group in the list, lower first.</summary>
         public int Group { get; }
 
-        /// <summary>Klíč řazení: skupina, potom text.</summary>
+        /// <summary>Sort key: group, then text.</summary>
         public string SortText => Group.ToString("D2") + DisplayText;
 
         public override string ToString() => Kind + " " + DisplayText + " → " + InsertText;
@@ -85,7 +85,7 @@ namespace SqlPrompter.Core.Completion
             foreach (var function in Keywords.BuiltInFunctions)
             {
                 var text = Keywords.ApplyCase(function, context.TypedPrefix);
-                yield return new Suggestion(SuggestionKind.Function, text, text, text, null, "vestavěná funkce", group);
+                yield return new Suggestion(SuggestionKind.Function, text, text, text, null, "built-in function", group);
             }
         }
 
@@ -94,7 +94,7 @@ namespace SqlPrompter.Core.Completion
             foreach (var type in Keywords.DataTypes)
             {
                 var text = Keywords.ApplyCase(type, context.TypedPrefix);
-                yield return new Suggestion(SuggestionKind.DataType, text, text, text, null, "datový typ", group);
+                yield return new Suggestion(SuggestionKind.DataType, text, text, text, null, "data type", group);
             }
         }
 
@@ -136,7 +136,7 @@ namespace SqlPrompter.Core.Completion
 
             foreach (var schema in metadata.Schemas)
             {
-                yield return new Suggestion(SuggestionKind.Schema, schema, SqlIdentifier.Quote(schema, quote), schema, null, "schéma", 1);
+                yield return new Suggestion(SuggestionKind.Schema, schema, SqlIdentifier.Quote(schema, quote), schema, null, "schema", 1);
             }
 
             foreach (var keyword in context.PreferredKeywords)
@@ -154,15 +154,15 @@ namespace SqlPrompter.Core.Completion
             {
                 case DbObjectKind.View:
                     kind = SuggestionKind.View;
-                    description = "pohled";
+                    description = "view";
                     break;
                 case DbObjectKind.TableFunction:
                     kind = SuggestionKind.TableFunction;
-                    description = "tabulková funkce";
+                    description = "table-valued function";
                     break;
                 default:
                     kind = SuggestionKind.Table;
-                    description = "tabulka";
+                    description = "table";
                     break;
             }
 
@@ -189,7 +189,7 @@ namespace SqlPrompter.Core.Completion
                 .Where(x => x.Object != null && metadata.GetColumns(x.Object) != null)
                 .ToList();
 
-            // Sloupec se stejným názvem ve více zdrojích stejného bloku se vkládá s aliasem.
+            // A column whose name exists in several sources of the same block is inserted with its alias.
             var ambiguous = new HashSet<string>(
                 resolved.Where(x => x.Source.ScopeLevel == 0)
                     .SelectMany(x => metadata.GetColumns(x.Object).Select(c => c.Name).Distinct(StringComparer.OrdinalIgnoreCase))
@@ -214,9 +214,9 @@ namespace SqlPrompter.Core.Completion
             foreach (var source in context.Sources.Where(s => s.ReferenceName != null)
                          .GroupBy(s => s.ReferenceName, StringComparer.OrdinalIgnoreCase).Select(g => g.First()))
             {
-                var target = source.Kind == TableSourceKind.Derived ? "odvozená tabulka" : string.Join(".", source.NameParts);
+                var target = source.Kind == TableSourceKind.Derived ? "derived table" : string.Join(".", source.NameParts);
                 yield return new Suggestion(SuggestionKind.Alias, source.ReferenceName, SqlIdentifier.Quote(source.ReferenceName, quote),
-                    source.ReferenceName, source.Alias != null ? target : null, (source.Alias != null ? "alias " : "zdroj ") + target, 1);
+                    source.ReferenceName, source.Alias != null ? target : null, (source.Alias != null ? "alias " : "source ") + target, 1);
             }
 
             foreach (var function in FunctionSuggestions(context, 3))
