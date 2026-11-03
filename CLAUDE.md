@@ -84,7 +84,7 @@ Repository: `lenochod86/SQL-Prompter`, main branch `main`.
 
 ## Environments
 
-- **Locally on Windows:** the VSIX can be built and installed into SSMS 22. The user runs installation, uninstallation and SSMS configuration changes; give them the exact command.
+- **Locally on Windows:** the VSIX can be built and installed into SSMS 22. The user runs installation, uninstallation and SSMS configuration changes; give them the exact command. A SQL Server test instance runs in Docker on `localhost,1433`; use the `test-database` skill (`.claude/skills/test-database/`) to create test databases and data yourself.
 - **In the cloud:** neither SSMS nor the VSIX build is available. Work on Core, Metadata and tests; CI builds the VSIX (`.github/workflows/build.yml`).
 - **From mobile:** the user may not have SSMS at hand. Ask for SSMS results as a screenshot or the log (`%LOCALAPPDATA%\SqlPrompter\sqlprompter.log`).
 
