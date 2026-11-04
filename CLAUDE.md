@@ -32,6 +32,8 @@ MVP 0.2.x runs in SSMS 22.11. What is done and what comes next is in `docs/roadm
 
 Repository: `lenochod86/SQL-Prompter`, main branch `main`.
 
+Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator with write access), so the user can tell their own actions from Claude's. The token is in the `GH_TOKEN` environment variable and commits use that account as the author (local `git config`). Do not switch to the user's account, do not change the git author, and never write the token anywhere. If `gh api user` does not return `claude-lenochod86`, stop and tell the user.
+
 ### Workflow for every piece of work
 
 1. **Issue.** Every separate piece of work (a roadmap item or group of items, a bug, a research task) has a GitHub issue. Create it before writing code if it does not exist yet.
