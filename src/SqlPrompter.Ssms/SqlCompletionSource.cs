@@ -219,7 +219,7 @@ namespace SqlPrompter.Ssms
                 this,
                 Icons[suggestion.Kind],
                 Filters,
-                suggestion.Suffix ?? string.Empty,
+                SettingsService.Current.Behavior.MarkItems ? suggestion.MarkedSuffix : suggestion.Suffix ?? string.Empty,
                 suggestion.InsertText,
                 suggestion.SortText,
                 suggestion.FilterText,

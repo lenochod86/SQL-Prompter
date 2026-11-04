@@ -22,6 +22,15 @@ namespace SqlPrompter.Ssms
         }
 
         [Category("Suggestions")]
+        [DisplayName("Mark items with SQL Prompter")]
+        [Description("Shows \"SQL Prompter\" on the right of every item so that it is obvious the list is ours and not the built-in one.")]
+        public bool MarkItems
+        {
+            get => values.MarkItems;
+            set => values.MarkItems = value;
+        }
+
+        [Category("Suggestions")]
         [DisplayName("Keyword case")]
         [Description("MatchTyped inserts upper case, or lower case if you started typing in lower case.")]
         public KeywordCase KeywordCase

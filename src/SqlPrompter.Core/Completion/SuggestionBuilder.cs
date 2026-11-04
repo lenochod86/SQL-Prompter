@@ -54,6 +54,11 @@ namespace SqlPrompter.Core.Completion
 
         public string Description { get; }
 
+        /// <summary>The suffix with the "SQL Prompter" marker appended, shown on the right of the list.</summary>
+        public string MarkedSuffix => string.IsNullOrEmpty(Suffix) ? MarkerText : Suffix + " · " + MarkerText;
+
+        public const string MarkerText = "SQL Prompter";
+
         /// <summary>Order of the group in the list, lower first.</summary>
         public int Group { get; }
 

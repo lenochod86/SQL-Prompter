@@ -74,6 +74,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "commitOnClosingBracket")]
         public bool CommitOnClosingBracket { get; set; }
 
+        /// <summary>Adds the text "SQL Prompter" to the right side of every item so that our list is recognizable at a glance.</summary>
+        [DataMember(Name = "markItems")]
+        public bool MarkItems { get; set; }
+
         public KeywordCase KeywordCase { get; set; }
 
         /// <summary>The JSON serializer writes enums as numbers; the file holds the readable name instead.</summary>
@@ -103,6 +107,7 @@ namespace SqlPrompter.Core.Settings
             CommitOnSemicolon = false;
             CommitOnClosingBracket = false;
             KeywordCase = KeywordCase.MatchTyped;
+            MarkItems = true;
         }
     }
 }

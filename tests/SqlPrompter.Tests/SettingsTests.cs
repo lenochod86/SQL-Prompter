@@ -30,6 +30,19 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void ItemsAreMarkedByDefaultAndTheMarkerKeepsTheSuffix()
+        {
+            Assert.True(new PrompterSettings().Behavior.MarkItems);
+            Assert.True(SettingsJson.Deserialize("{}").Behavior.MarkItems);
+            Assert.False(SettingsJson.Deserialize("{ \"behavior\": { \"markItems\": false } }").Behavior.MarkItems);
+
+            var plain = new Suggestion(SuggestionKind.Keyword, "select", "select", "select", null, null, 0);
+            var withSchema = new Suggestion(SuggestionKind.Table, "Users", "dbo.Users", "Users", "dbo", null, 0);
+            Assert.Equal("SQL Prompter", plain.MarkedSuffix);
+            Assert.Equal("dbo · SQL Prompter", withSchema.MarkedSuffix);
+        }
+
+        [Fact]
         public void JsonRoundTripKeepsEverything()
         {
             var settings = new PrompterSettings();
