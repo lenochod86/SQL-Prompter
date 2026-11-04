@@ -65,6 +65,9 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
   - `requires-testing`: the user should test the VSIX from the branch in SSMS (the comment says what to test and which version).
   - `requires-review`: a pull request is ready and waits for the user's review and approval to merge.
   - `blocked`: work cannot continue until something outside the issue happens (the comment says what).
+  - `needs-research`: the behavior of SSMS or its API must be found out before implementing. It means "waits for research", unlike `research`, which marks the kind of work.
+  - `needs-info`: the issue lacks a specification or material that Claude must supply (e.g. a precise scope or acceptance criteria).
+  - `ready`: the issue is thought through and work on it can start. Remove it when the work starts.
   - An item can have more than one of these labels.
 - When the user answers in chat, add a short comment with the answer to the issue, so the decision stays in the history.
 
