@@ -75,111 +75,111 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] Refresh metadata after DDL executed in the window (`CREATE`, `ALTER`, `DROP`) (#8)
 - [x] CI checks: VSIX and menu version bumps, one build per push, warnings as errors, Dependabot (#17)
 
-### Phase 1: Script knowledge and aliases (M)
+### Phase 1: Script knowledge and aliases (M) (#22)
 
 - [ ] **Settings foundation:** pages in Tools → Options → SQL Prompter, JSON file, export and import. Every later feature adds its options (#9).
 - [ ] **SQL Prompt settings import** (`.settings`): aliases, qualification, commit keys. Other parts follow with later phases (#9).
-- [ ] **Script model**, i.e. definitions in the script computed in the background:
+- [ ] **Script model**, i.e. definitions in the script computed in the background (#15):
   - [ ] columns of CTEs and derived tables
   - [ ] `#tables` from `CREATE TABLE` and `SELECT … INTO`
   - [ ] `@tables`
   - [ ] variables and parameters with types, including the parameters of the procedure being edited
-- [ ] **Automatic aliases** when inserting a table:
+- [ ] **Automatic aliases** when inserting a table (#23):
   - [ ] from the capital letters of the name (`OrderItems` → `oi`), avoiding collisions in the query
   - [ ] custom aliases
   - [ ] ignored prefixes
   - [ ] `AS` option
-- [ ] **Qualification:** objects with schema, columns with alias (`a.Column`)
-- [ ] After `SELECT` without `FROM`, columns of all tables in the database; choosing a column adds `FROM` with its table and alias
-- [ ] Three-part names and tracking `USE`
-- [ ] Synonyms
-- [ ] **Linked servers, loaded lazily**, so that the initial load stays fast even for a customer with five linked servers full of tables:
+- [ ] **Qualification:** objects with schema, columns with alias (`a.Column`) (#23)
+- [ ] After `SELECT` without `FROM`, columns of all tables in the database; choosing a column adds `FROM` with its table and alias (#24)
+- [ ] Three-part names and tracking `USE` (#25)
+- [ ] Synonyms (#25)
+- [ ] **Linked servers, loaded lazily**, so that the initial load stays fast even for a customer with five linked servers full of tables (#26):
   - [ ] only their names first (`sys.servers`)
   - [ ] the server's databases after choosing a server
   - [ ] schemas and objects after choosing a database
   - [ ] columns only when a table is used
 
-### Phase 2: JOINs (M)
+### Phase 2: JOINs (M) (#27)
 
-- [ ] Metadata of primary and foreign keys, including multi-column keys
-- [ ] After `JOIN`, tables linked by a foreign key to the tables in the query first, with an item for the whole clause `Table AS t ON t.IdX = x.IdX`
-- [ ] Complete conditions after `ON`:
+- [ ] Metadata of primary and foreign keys, including multi-column keys (#28)
+- [ ] After `JOIN`, tables linked by a foreign key to the tables in the query first, with an item for the whole clause `Table AS t ON t.IdX = x.IdX` (#28)
+- [ ] Complete conditions after `ON` (#29):
   - [ ] by foreign keys
   - [ ] by matching column names
   - [ ] optionally by matching types
   - [ ] individual columns of multi-column keys
-- [ ] Option for the column order in the condition (new table left or right)
-- [ ] Tests on a schema similar to real ones (convention `IdTable` ↔ `Table.IdTable`)
+- [ ] Option for the column order in the condition (new table left or right) (#29)
+- [ ] Tests on a schema similar to real ones (convention `IdTable` ↔ `Table.IdTable`) (#29)
 
-### Phase 3: Snippets (M)
+### Phase 3: Snippets (M) (#30)
 
-- [ ] **Storage in the same JSON format as SQL Prompt** (`prefix`, `description`, `body`, `placeholders`). An existing snippet folder can be read directly or copied.
-- [ ] Import from the XML backup (`.sqlpromptsnippet`)
-- [ ] Snippet suggestions in the list with their own icon and filter; expanding a shortcut with Tab
-- [ ] Placeholders: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$`
-- [ ] **Custom fields directly in the text:**
+- [ ] **Storage in the same JSON format as SQL Prompt** (`prefix`, `description`, `body`, `placeholders`). An existing snippet folder can be read directly or copied. (#31)
+- [ ] Import from the XML backup (`.sqlpromptsnippet`) (#31)
+- [ ] Snippet suggestions in the list with their own icon and filter; expanding a shortcut with Tab (#32)
+- [ ] Placeholders: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$` (#32)
+- [ ] **Custom fields directly in the text:** (#33)
   - highlighted and navigated with Tab;
   - a repeated field is updated everywhere at once;
   - Enter or Esc ends editing and the caret ends at `$CURSOR$`.
-- [ ] Snippets on a selection (`$SELECTEDTEXT$`, e.g. wrapping the selection in `ISNULL(…)`) from a selection actions menu
-- [ ] Snippet management: list, editing, new snippet from a selection
+- [ ] Snippets on a selection (`$SELECTEDTEXT$`, e.g. wrapping the selection in `ISNULL(…)`) from a selection actions menu (#34)
+- [ ] Snippet management: list, editing, new snippet from a selection (#34)
 
-### Phase 4: Coloring by server and database (S to M, research first)
+### Phase 4: Coloring by server and database (S to M, research first) (#35)
 
-- [ ] **Research:** how to color the document tab, the window frame and the status bar in SSMS 22. SSMS only has a custom connection color in the status bar, set in the connect dialog. There is no verified API for tab or frame colors.
-- [ ] Tab color
-- [ ] Query window frame color, if possible
-- [ ] Status bar color, if possible
-- [ ] Environments (name and color) and server + database → environment rules with wildcards
-- [ ] Import of SQL Prompt colors
+- [ ] **Research:** how to color the document tab, the window frame and the status bar in SSMS 22. SSMS only has a custom connection color in the status bar, set in the connect dialog. There is no verified API for tab or frame colors. (#36)
+- [ ] Tab color (#37)
+- [ ] Query window frame color, if possible (#37)
+- [ ] Status bar color, if possible (#37)
+- [ ] Environments (name and color) and server + database → environment rules with wildcards (#38)
+- [ ] Import of SQL Prompt colors (#38)
 
-### Phase 5: Navigation and execution (S to M, research first)
+### Phase 5: Navigation and execution (S to M, research first) (#39)
 
-- [ ] **Research:** opening a new window with a connection. Candidate: `ScriptFactory.CreateNewBlankScript` with the current window's connection, which we can already read.
-- [ ] **F12 on the object at the caret:**
+- [ ] **Research:** opening a new window with a connection. Candidate: `ScriptFactory.CreateNewBlankScript` with the current window's connection, which we can already read. (#40)
+- [ ] **F12 on the object at the caret:** (#41)
   - [ ] a procedure, view, function or trigger opens in a new window on the same server and database as `CREATE OR ALTER`
   - [ ] a table opens its `CREATE TABLE` script
-- [ ] **Shift+F5: run the statement at the caret.** The existing statement splitting finds its bounds; the statement is selected, run through Query.Execute and the selection restored. Check for a shortcut conflict.
-- [ ] Ctrl+F12: show the object in Object Explorer (later)
+- [ ] **Shift+F5: run the statement at the caret.** The existing statement splitting finds its bounds; the statement is selected, run through Query.Execute and the selection restored. Check for a shortcut conflict. (#42)
+- [ ] Ctrl+F12: show the object in Object Explorer (later) (#41)
 
-### Phase 6: Extended IntelliSense (L)
+### Phase 6: Extended IntelliSense (L) (#43)
 
-- [ ] `INSERT`: full statement with the column list, optionally with `VALUES` and default values
-- [ ] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters
-- [ ] Functions with parentheses and parameters
-- [ ] Expanding `*` with Tab into a column list with aliases
-- [ ] Object definition panel next to the list (`CREATE` script, as in SQL Prompt)
-- [ ] Parameter info
-- [ ] Ranking by usage (statistics stay local, nothing is sent anywhere)
+- [ ] `INSERT`: full statement with the column list, optionally with `VALUES` and default values (#44)
+- [ ] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters (#44)
+- [ ] Functions with parentheses and parameters (#44)
+- [ ] Expanding `*` with Tab into a column list with aliases (#45)
+- [ ] Object definition panel next to the list (`CREATE` script, as in SQL Prompt) (#46)
+- [ ] Parameter info (#45)
+- [ ] Ranking by usage (statistics stay local, nothing is sent anywhere) (#47)
 
-### Phase 7: Tools (M to L)
+### Phase 7: Tools (M to L) (#48)
 
 The user uses almost all of them; the order within the phase is agreed before it starts.
 
-- [ ] Query history and restoring tabs when SSMS starts
-- [ ] Refactoring:
+- [ ] Query history and restoring tabs when SSMS starts (#49)
+- [ ] Refactoring (#50):
   - [ ] qualify names
   - [ ] expand `*`
   - [ ] insert semicolons
   - [ ] remove square brackets
   - [ ] unused variables
   - [ ] script summary
-- [ ] Execution warnings (`DELETE` or `UPDATE` without `WHERE` …)
-- [ ] Code analysis
-- [ ] Selection actions: add commas, add quotes and commas
-- [ ] Highlighting matching objects in the script
-- [ ] Auto-closing `'` and `[`
-- [ ] Script as INSERT from the results grid (not yet known whether SSMS 22 allows it)
+- [ ] Execution warnings (`DELETE` or `UPDATE` without `WHERE` …) (#51)
+- [ ] Code analysis (#51)
+- [ ] Selection actions: add commas, add quotes and commas (#52)
+- [ ] Highlighting matching objects in the script (#52)
+- [ ] Auto-closing `'` and `[` (#52)
+- [ ] Script as INSERT from the results grid (not yet known whether SSMS 22 allows it) (#53)
 
-### Phase 8: Formatting (L)
+### Phase 8: Formatting (L) (#54)
 
 Wanted, but not a priority, so it comes last.
 
-- [ ] Formatter over tokens with structure from ScriptDOM; keeps comments and refuses a change that would alter the meaning
-- [ ] Options following the SQL Prompt style and import of a `.json` style (the user's style is the main test case)
-- [ ] Formatting actions: `N` prefix for strings, semicolons, removing unnecessary brackets, adding or removing `AS`, casing, optionally qualification and expanding `*`
-- [ ] Formatting the document or the selection
-- [ ] Upper case while typing
+- [ ] Formatter over tokens with structure from ScriptDOM; keeps comments and refuses a change that would alter the meaning (#55)
+- [ ] Options following the SQL Prompt style and import of a `.json` style (the user's style is the main test case) (#56)
+- [ ] Formatting actions: `N` prefix for strings, semicolons, removing unnecessary brackets, adding or removing `AS`, casing, optionally qualification and expanding `*` (#57)
+- [ ] Formatting the document or the selection (#57)
+- [ ] Upper case while typing (#57)
 
 ## Risks
 
