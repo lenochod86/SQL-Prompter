@@ -49,6 +49,8 @@ namespace SqlPrompter.Ssms
     {
         private const string DescriptionKey = "SqlPrompter.Description";
         internal const string FromEditKey = "SqlPrompter.FromEdit";
+        internal const string DetailKey = "SqlPrompter.Detail";
+        internal const string DescriptionPropertyKey = DescriptionKey;
 
         /// <summary>Button at the bottom of the list that shows the list comes from SQL Prompter.</summary>
         private static readonly ImmutableArray<CompletionFilter> Filters = ImmutableArray.Create(
@@ -237,6 +239,11 @@ namespace SqlPrompter.Ssms
                 suggestion.SortText,
                 suggestion.FilterText,
                 ImmutableArray<ImageElement>.Empty);
+            if (!string.IsNullOrEmpty(suggestion.Detail))
+            {
+                item.Properties.AddProperty(DetailKey, suggestion.Detail);
+            }
+
             if (suggestion.Description != null)
             {
                 item.Properties.AddProperty(DescriptionKey, suggestion.Description);

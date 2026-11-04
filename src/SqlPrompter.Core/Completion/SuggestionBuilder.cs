@@ -32,7 +32,7 @@ namespace SqlPrompter.Core.Completion
 
     public sealed class Suggestion
     {
-        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null)
+        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null)
         {
             Kind = kind;
             DisplayText = displayText;
@@ -42,6 +42,7 @@ namespace SqlPrompter.Core.Completion
             Description = description;
             Group = group;
             FromClause = fromClause;
+            Detail = detail;
         }
 
         public SuggestionKind Kind { get; }
@@ -68,6 +69,9 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>Text such as "FROM dbo.Users AS u" that choosing the item adds at the end of the select list; null for most items.</summary>
         public string FromClause { get; }
+
+        /// <summary>Short text shown next to the name, e.g. "nvarchar(50) not null" for a column.</summary>
+        public string Detail { get; }
 
         /// <summary>Sort key: group, then text.</summary>
         public string SortText => Group.ToString("D2") + DisplayText;
@@ -99,7 +103,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause);
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -458,14 +462,14 @@ namespace SqlPrompter.Core.Completion
                 var column = match.Value;
                 var type = column.TypeName.Length > 0 ? " " + column.TypeName + (column.IsNullable ? " null" : " not null") : string.Empty;
                 yield return new Suggestion(SuggestionKind.Column, column.Name, insert, column.Name, table.Name,
-                    column.Name + type + " (" + table + "), adds " + from, 0, from);
+                    column.Name + type + " (" + table + "), adds " + from, 0, from, type.Trim());
             }
         }
 
         private static Suggestion ColumnSuggestion(DbColumn column, string insertText, string suffix, string owner, int group)
         {
             var type = column.TypeName.Length > 0 ? " " + column.TypeName + (column.IsNullable ? " null" : " not null") : string.Empty;
-            return new Suggestion(SuggestionKind.Column, column.Name, insertText, column.Name, suffix, column.Name + type + " (" + owner + ")", group);
+            return new Suggestion(SuggestionKind.Column, column.Name, insertText, column.Name, suffix, column.Name + type + " (" + owner + ")", group, null, type.Trim());
         }
     }
 }
