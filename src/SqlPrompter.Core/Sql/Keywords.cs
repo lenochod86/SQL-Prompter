@@ -80,6 +80,15 @@ namespace SqlPrompter.Core.Sql
             "TRANSLATE", "TRIM", "TRY_CAST", "TRY_CONVERT", "UPPER", "YEAR",
         };
 
+        private static readonly HashSet<string> NoArguments = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "DB_NAME", "DENSE_RANK", "GETDATE", "GETUTCDATE", "NEWID", "RANK", "ROW_NUMBER", "SCHEMA_NAME", "SCOPE_IDENTITY",
+            "SYSDATETIME", "SYSUTCDATETIME",
+        };
+
+        /// <summary>True for built-in functions that are usually called without arguments, so the caret goes after the parentheses.</summary>
+        public static bool TakesNoArguments(string function) => function != null && NoArguments.Contains(function);
+
         /// <summary>SQL Server system data types.</summary>
         public static readonly IReadOnlyList<string> DataTypes = new[]
         {

@@ -171,7 +171,8 @@ namespace SqlPrompter.Core.Completion
             foreach (var function in Keywords.BuiltInFunctions)
             {
                 var text = Keywords.ApplyCase(function, context.TypedPrefix);
-                yield return new Suggestion(SuggestionKind.Function, text, text, text, null, "built-in function", group);
+                // The name comes with parentheses; the caret goes between them unless the function takes no arguments.
+                yield return new Suggestion(SuggestionKind.Function, text, text + "()", text, null, "built-in function", group, caretBack: Keywords.TakesNoArguments(function) ? 0 : 1);
             }
         }
 

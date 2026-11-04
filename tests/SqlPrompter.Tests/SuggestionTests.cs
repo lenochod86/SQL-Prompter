@@ -57,7 +57,7 @@ namespace SqlPrompter.Tests
             Assert.Contains(columns, i => i.InsertText == "o.Id");
             Assert.Contains(columns, i => i.InsertText == "Email");
             Assert.Contains(items, i => i.Kind == SuggestionKind.Alias && i.InsertText == "u");
-            Assert.Contains(items, i => i.Kind == SuggestionKind.Function && i.InsertText == "COUNT");
+            Assert.Contains(items, i => i.Kind == SuggestionKind.Function && i.InsertText == "COUNT()");
             Assert.True(columns.Max(c => c.Group) < items.Where(i => i.Kind == SuggestionKind.Keyword).Min(k => k.Group));
         }
 

@@ -79,6 +79,27 @@ namespace SqlPrompter.Tests
             Assert.Equal(0, without.CaretBack);
         }
 
+
+        [Fact]
+        public void BuiltInFunctionsComeWithParentheses()
+        {
+            var items = SuggestionBuilder.Build(Analyze("SELECT |"), WithFunctions());
+
+            var count = items.Single(i => i.Kind == SuggestionKind.Function && i.DisplayText == "COUNT");
+            Assert.Equal("COUNT()", count.InsertText);
+            Assert.Equal(1, count.CaretBack);
+            var now = items.Single(i => i.Kind == SuggestionKind.Function && i.DisplayText == "GETDATE");
+            Assert.Equal("GETDATE()", now.InsertText);
+            Assert.Equal(0, now.CaretBack);
+        }
+
+        [Fact]
+        public void BuiltInFunctionsFollowTheTypedCase()
+        {
+            var items = SuggestionBuilder.Build(Analyze("select get|"), WithFunctions());
+
+            Assert.Equal("getdate()", items.Single(i => i.Kind == SuggestionKind.Function && i.DisplayText == "getdate").InsertText);
+        }
         [Fact]
         public void ForcedKeywordCaseKeepsTheCaretPosition()
         {
