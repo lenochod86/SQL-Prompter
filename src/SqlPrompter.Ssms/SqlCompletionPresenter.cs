@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.ComponentModel.Composition;
 using System.Linq;
 using System.Windows;
@@ -20,8 +19,9 @@ using Microsoft.VisualStudio.Utilities;
 namespace SqlPrompter.Ssms
 {
     /// <summary>
-    /// Research prototype (#61): our own completion list. Each row shows the kind icon, the name with the typed text
-    /// highlighted, a detail (column type) after it and the suffix (alias, schema, "SQL Prompter") on the right.
+    /// Our own completion list (research #61). Each row shows the kind icon, the name with the typed text in bold,
+    /// a detail (column type) after it and the suffix (alias, schema, "SQL Prompter") on the right.
+    /// Only <see cref="SqlCompletionPresenter.VisibleRows"/> rows exist, whatever the number of items, so thousands of items stay cheap.
     /// </summary>
     [Export(typeof(ICompletionPresenterProvider))]
     [Name("SqlPrompter.Presenter")]
@@ -29,55 +29,74 @@ namespace SqlPrompter.Ssms
     [Order(Before = "default")]
     internal sealed class SqlCompletionPresenterProvider : ICompletionPresenterProvider
     {
-        public CompletionPresenterOptions Options { get; } = new CompletionPresenterOptions(12);
+        public CompletionPresenterOptions Options { get; } = new CompletionPresenterOptions(SqlCompletionPresenter.VisibleRows);
 
-        public ICompletionPresenter GetOrCreate(ITextView textView)
-        {
-            Log.Write("Presenter requested for a text view.");
-            return textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionPresenter((IWpfTextView)textView));
-        }
+        public ICompletionPresenter GetOrCreate(ITextView textView) =>
+            textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionPresenter((IWpfTextView)textView));
     }
 
     internal sealed class SqlCompletionPresenter : ICompletionPresenter
     {
+        public const int VisibleRows = 12;
+
         private const double RowHeight = 22;
+        private const double ListWidth = 600;
+        private const double DescriptionWidth = 380;
 
         private readonly IWpfTextView view;
         private readonly Popup popup;
-        private readonly StackPanel rows = new StackPanel();
-        private readonly ScrollViewer scroll;
+        private readonly Popup descriptionPopup;
+        private readonly TextBlock descriptionText;
+        private readonly StackPanel rowPanel = new StackPanel();
+        private readonly ScrollBar scrollBar;
+        private readonly List<Row> rows = new List<Row>();
         private object lastItemList;
         private IReadOnlyList<CompletionItemWithHighlight> items = new CompletionItemWithHighlight[0];
+        private int offset;
+        private int selected = -1;
         private bool soft;
+        private bool updatingScrollBar;
 
         public SqlCompletionPresenter(IWpfTextView view)
         {
             this.view = view;
-            scroll = new ScrollViewer
+            for (var i = 0; i < VisibleRows; i++)
             {
-                Content = rows,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Focusable = false,
-                MinWidth = 420,
-                MaxWidth = 900,
-                MaxHeight = RowHeight * 12,
-            };
-            var border = new Border { BorderThickness = new Thickness(1), Child = scroll, Focusable = false };
-            border.SetResourceReference(Border.BackgroundProperty, VsBrushes.ToolWindowBackgroundKey);
-            border.SetResourceReference(Border.BorderBrushProperty, VsBrushes.ToolWindowBorderKey);
-            popup = new Popup
+                var row = new Row(this);
+                rows.Add(row);
+                rowPanel.Children.Add(row.Root);
+            }
+
+            scrollBar = new ScrollBar { Orientation = Orientation.Vertical, Width = 14, Visibility = Visibility.Collapsed, Focusable = false };
+            scrollBar.ValueChanged += (s, e) =>
             {
-                Child = border,
-                AllowsTransparency = false,
-                StaysOpen = true,
-                Focusable = false,
-                Placement = PlacementMode.Relative,
-                PlacementTarget = view.VisualElement,
+                if (!updatingScrollBar)
+                {
+                    offset = (int)Math.Round(scrollBar.Value);
+                    Render();
+                }
             };
+
+            var grid = new Grid { Width = ListWidth, Focusable = false };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(rowPanel, 0);
+            Grid.SetColumn(scrollBar, 1);
+            grid.Children.Add(rowPanel);
+            grid.Children.Add(scrollBar);
+            grid.PreviewMouseWheel += (s, e) =>
+            {
+                Scroll(e.Delta > 0 ? -3 : 3);
+                e.Handled = true;
+            };
+
+            popup = CreatePopup(grid);
+            descriptionText = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = DescriptionWidth, Margin = new Thickness(8, 6, 8, 6) };
+            descriptionText.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+            descriptionPopup = CreatePopup(descriptionText);
         }
 
-#pragma warning disable CS0067 // never raised in the prototype: no filter buttons yet
+#pragma warning disable CS0067 // never raised yet: no filter buttons
         public event EventHandler<CompletionFilterChangedEventArgs> FiltersChanged;
 
         public event EventHandler<CompletionClosedEventArgs> CompletionClosed;
@@ -87,13 +106,11 @@ namespace SqlPrompter.Ssms
 
         public event EventHandler<CompletionItemEventArgs> CommitRequested;
 
-
-
         public void Open(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
         {
-            Log.Write("Presenter opened with " + presentation.ItemList.Count + " items.");
             Update(session, presentation);
             popup.IsOpen = true;
+            descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
         }
 
         public void Update(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
@@ -103,21 +120,92 @@ namespace SqlPrompter.Ssms
             {
                 lastItemList = presentation.ItemList;
                 items = presentation.ItemList.ToList();
-                Rebuild();
+                offset = 0;
+                scrollBar.Visibility = items.Count > VisibleRows ? Visibility.Visible : Visibility.Collapsed;
+                updatingScrollBar = true;
+                scrollBar.Minimum = 0;
+                scrollBar.Maximum = Math.Max(0, items.Count - VisibleRows);
+                scrollBar.ViewportSize = VisibleRows;
+                scrollBar.LargeChange = VisibleRows;
+                scrollBar.SmallChange = 1;
+                updatingScrollBar = false;
             }
 
-            Select(presentation.SelectedItemIndex);
+            selected = presentation.SelectedItemIndex;
+            EnsureSelectedVisible();
+            Render();
             Position(presentation);
-        }
-
-        public void Dispose()
-        {
-            popup.IsOpen = false;
+            if (popup.IsOpen)
+            {
+                descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
+            }
         }
 
         public void Close()
         {
             popup.IsOpen = false;
+            descriptionPopup.IsOpen = false;
+        }
+
+        public void Dispose() => Close();
+
+        private static Popup CreatePopup(UIElement content)
+        {
+            var border = new Border { BorderThickness = new Thickness(1), Child = content, Focusable = false };
+            border.SetResourceReference(Border.BackgroundProperty, VsBrushes.ToolWindowBackgroundKey);
+            border.SetResourceReference(Border.BorderBrushProperty, VsBrushes.ToolWindowBorderKey);
+            return new Popup { Child = border, AllowsTransparency = false, StaysOpen = true, Focusable = false, Placement = PlacementMode.Relative };
+        }
+
+        private void Scroll(int delta)
+        {
+            offset = Math.Max(0, Math.Min(Math.Max(0, items.Count - VisibleRows), offset + delta));
+            Render();
+        }
+
+        private void EnsureSelectedVisible()
+        {
+            if (selected >= 0)
+            {
+                if (selected < offset)
+                {
+                    offset = selected;
+                }
+                else if (selected >= offset + VisibleRows)
+                {
+                    offset = selected - VisibleRows + 1;
+                }
+            }
+
+            offset = Math.Max(0, Math.Min(Math.Max(0, items.Count - VisibleRows), offset));
+        }
+
+        private void Render()
+        {
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var index = offset + i;
+                if (index < items.Count)
+                {
+                    rows[i].Bind(items[index], index == selected, soft);
+                }
+                else
+                {
+                    rows[i].Root.Visibility = Visibility.Collapsed;
+                }
+            }
+
+            updatingScrollBar = true;
+            scrollBar.Value = offset;
+            updatingScrollBar = false;
+
+            string description = null;
+            if (selected >= 0 && selected < items.Count)
+            {
+                items[selected].CompletionItem.Properties.TryGetProperty(SqlCompletionSource.DescriptionPropertyKey, out description);
+            }
+
+            descriptionText.Text = description ?? string.Empty;
         }
 
         private void Position(CompletionPresentationViewModel presentation)
@@ -127,8 +215,19 @@ namespace SqlPrompter.Ssms
                 var span = presentation.ApplicableToSpan.GetSpan(view.TextSnapshot);
                 var line = view.GetTextViewLineContainingBufferPosition(span.Start);
                 var bounds = line.GetCharacterBounds(span.Start);
-                popup.HorizontalOffset = bounds.Left - view.ViewportLeft;
-                popup.VerticalOffset = bounds.Bottom - view.ViewportTop + 2;
+                var height = Math.Min(items.Count, VisibleRows) * RowHeight + 2;
+                var left = bounds.Left - view.ViewportLeft;
+                var below = bounds.Bottom - view.ViewportTop + 2;
+                var above = bounds.Top - view.ViewportTop - height - 2;
+
+                // Above the caret when the list does not fit below and there is room above.
+                var top = below + height > view.ViewportHeight && above >= 0 ? above : below;
+                popup.PlacementTarget = view.VisualElement;
+                popup.HorizontalOffset = left;
+                popup.VerticalOffset = top;
+                descriptionPopup.PlacementTarget = view.VisualElement;
+                descriptionPopup.HorizontalOffset = left + ListWidth + 4;
+                descriptionPopup.VerticalOffset = top;
             }
             catch (Exception ex)
             {
@@ -136,130 +235,114 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private void Rebuild()
+        private void OnRowClicked(Row row, int clickCount)
         {
-            rows.Children.Clear();
-            for (var i = 0; i < items.Count; i++)
+            var item = row.Item?.CompletionItem;
+            if (item == null)
             {
-                rows.Children.Add(CreateRow(items[i], i));
+                return;
+            }
+
+            if (clickCount >= 2)
+            {
+                CommitRequested?.Invoke(this, new CompletionItemEventArgs(item));
+            }
+            else
+            {
+                CompletionItemSelected?.Invoke(this, new CompletionItemSelectedEventArgs(item, suggestionItemSelected: false));
             }
         }
 
-        private FrameworkElement CreateRow(CompletionItemWithHighlight entry, int index)
+        /// <summary>One reusable row of the list.</summary>
+        private sealed class Row
         {
-            var item = entry.CompletionItem;
-            var grid = new Grid { Height = RowHeight, Background = Brushes.Transparent, Focusable = false };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            private readonly CrispImage icon;
+            private readonly TextBlock name;
+            private readonly TextBlock suffix;
 
-            var icon = new CrispImage
+            public Row(SqlCompletionPresenter owner)
             {
-                Moniker = new ImageMoniker { Guid = item.Icon.ImageId.Guid, Id = item.Icon.ImageId.Id },
-                Width = 16,
-                Height = 16,
-                Margin = new Thickness(6, 0, 6, 0),
-            };
-            Grid.SetColumn(icon, 0);
-            grid.Children.Add(icon);
+                Root = new Grid { Height = RowHeight, Background = Brushes.Transparent, Focusable = false };
+                Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                Root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var text = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-            text.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
-            AddHighlighted(text, item.DisplayText, entry.HighlightedSpans);
-            if (item.Properties.TryGetProperty(SqlCompletionSource.DetailKey, out string detail))
-            {
-                var run = new Run(" " + detail) { FontSize = 11 };
-                run.SetResourceReference(TextElement.ForegroundProperty, VsBrushes.ControlLinkTextKey);
-                text.Inlines.Add(run);
+                icon = new CrispImage { Width = 16, Height = 16, Margin = new Thickness(6, 0, 6, 0) };
+                Grid.SetColumn(icon, 0);
+                Root.Children.Add(icon);
+
+                name = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+                name.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+                Grid.SetColumn(name, 1);
+                Root.Children.Add(name);
+
+                suffix = new TextBlock { Margin = new Thickness(16, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center, Opacity = 0.6, FontSize = 11 };
+                suffix.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+                Grid.SetColumn(suffix, 2);
+                Root.Children.Add(suffix);
+
+                Root.MouseLeftButtonDown += (s, e) =>
+                {
+                    owner.OnRowClicked(this, e.ClickCount);
+                    e.Handled = true;
+                };
             }
 
-            Grid.SetColumn(text, 1);
-            grid.Children.Add(text);
+            public Grid Root { get; }
 
-            var suffix = new TextBlock
-            {
-                Text = item.Suffix,
-                Margin = new Thickness(16, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Opacity = 0.6,
-                FontSize = 11,
-            };
-            suffix.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
-            Grid.SetColumn(suffix, 2);
-            grid.Children.Add(suffix);
+            public CompletionItemWithHighlight? Item { get; private set; }
 
-            grid.MouseLeftButtonDown += (s, e) =>
+            public void Bind(CompletionItemWithHighlight entry, bool isSelected, bool isSoft)
             {
-                if (e.ClickCount >= 2)
+                Item = entry;
+                var item = entry.CompletionItem;
+                Root.Visibility = Visibility.Visible;
+                icon.Moniker = new ImageMoniker { Guid = item.Icon.ImageId.Guid, Id = item.Icon.ImageId.Id };
+
+                name.Inlines.Clear();
+                AddHighlighted(name, item.DisplayText, entry.HighlightedSpans);
+                if (item.Properties.TryGetProperty(SqlCompletionSource.DetailKey, out string detail))
                 {
-                    CommitRequested?.Invoke(this, new CompletionItemEventArgs(item));
+                    var run = new Run(" " + detail) { FontSize = 11 };
+                    run.SetResourceReference(TextElement.ForegroundProperty, VsBrushes.ControlLinkTextKey);
+                    name.Inlines.Add(run);
+                }
+
+                suffix.Text = item.Suffix;
+                if (isSelected)
+                {
+                    Root.SetResourceReference(Panel.BackgroundProperty, isSoft ? VsBrushes.ToolWindowBorderKey : VsBrushes.HighlightKey);
                 }
                 else
                 {
-                    CompletionItemSelected?.Invoke(this, new CompletionItemSelectedEventArgs(item, suggestionItemSelected: false));
+                    Root.ClearValue(Panel.BackgroundProperty);
+                    Root.Background = Brushes.Transparent;
                 }
-
-                e.Handled = true;
-            };
-            if (item.Properties.TryGetProperty("SqlPrompter.Description", out string description))
-            {
-                grid.ToolTip = description;
             }
 
-            return grid;
-        }
-
-        private static void AddHighlighted(TextBlock block, string text, ImmutableArray<Microsoft.VisualStudio.Text.Span> spans)
-        {
-            var position = 0;
-            foreach (var span in spans.OrderBy(s => s.Start))
+            private static void AddHighlighted(TextBlock block, string text, System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.Text.Span> spans)
             {
-                if (span.Start < position || span.End > text.Length)
+                var position = 0;
+                foreach (var span in spans.OrderBy(s => s.Start))
                 {
-                    continue;
-                }
-
-                if (span.Start > position)
-                {
-                    block.Inlines.Add(new Run(text.Substring(position, span.Start - position)));
-                }
-
-                block.Inlines.Add(new Run(text.Substring(span.Start, span.Length)) { FontWeight = FontWeights.Bold });
-                position = span.End;
-            }
-
-            if (position < text.Length)
-            {
-                block.Inlines.Add(new Run(text.Substring(position)));
-            }
-        }
-
-        private void Select(int index)
-        {
-            for (var i = 0; i < rows.Children.Count; i++)
-            {
-                var row = (Grid)rows.Children[i];
-                if (i == index)
-                {
-                    if (soft)
+                    if (span.Start < position || span.End > text.Length)
                     {
-                        row.SetResourceReference(Panel.BackgroundProperty, VsBrushes.ToolWindowBorderKey);
+                        continue;
                     }
-                    else
-                    {
-                        row.SetResourceReference(Panel.BackgroundProperty, VsBrushes.HighlightKey);
-                    }
-                }
-                else
-                {
-                    row.ClearValue(Panel.BackgroundProperty);
-                    row.Background = Brushes.Transparent;
-                }
-            }
 
-            if (index >= 0 && index < rows.Children.Count)
-            {
-                ((FrameworkElement)rows.Children[index]).BringIntoView();
+                    if (span.Start > position)
+                    {
+                        block.Inlines.Add(new Run(text.Substring(position, span.Start - position)));
+                    }
+
+                    block.Inlines.Add(new Run(text.Substring(span.Start, span.Length)) { FontWeight = FontWeights.Bold });
+                    position = span.End;
+                }
+
+                if (position < text.Length)
+                {
+                    block.Inlines.Add(new Run(text.Substring(position)));
+                }
             }
         }
     }
