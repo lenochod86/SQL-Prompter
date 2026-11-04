@@ -136,7 +136,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 ### Phase 5: Navigation and execution (S to M, research first) (#39)
 
-- [ ] **Research:** opening a new window with a connection. Candidate: `ScriptFactory.CreateNewBlankScript` with the current window's connection, which we can already read. (#40)
+- [x] **Research:** opening a new window with a connection. Candidate: `ScriptFactory.CreateNewBlankScript` with the current window's connection, which we can already read. (#40)
 - [ ] **F12 on the object at the caret:** (#41)
   - [ ] a procedure, view, function or trigger opens in a new window on the same server and database as `CREATE OR ALTER`
   - [ ] a table opens its `CREATE TABLE` script
