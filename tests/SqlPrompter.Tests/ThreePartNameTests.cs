@@ -46,9 +46,9 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
-        public void ServerQualifiedNamesAreStillNotResolved()
+        public void NamesWithMoreThanFourPartsAreNotResolved()
         {
-            Assert.Equal(ContextKind.Name, Analyze("SELECT * FROM Srv.Archive.dbo.|").Kind);
+            Assert.Equal(ContextKind.Name, Analyze("SELECT * FROM Srv.Archive.dbo.Users.|").Kind);
         }
 
         [Fact]

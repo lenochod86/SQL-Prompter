@@ -147,9 +147,9 @@ namespace SqlPrompter.Core.Analysis
             var commaInFrom = anchor.Kind == TokenKind.Comma && anchorAtBlockLevel && clauseState.InFrom && clauseState.Clause == Clause.From;
             if (objectKeywords != null || commaInFrom)
             {
-                if (qualifier.Count > 2)
+                if (qualifier.Count > 3)
                 {
-                    // Another database or server: the extension does not know its objects.
+                    // More parts than server.database.schema.: not resolved.
                     return Make(ContextKind.Name);
                 }
 

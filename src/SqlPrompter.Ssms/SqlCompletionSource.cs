@@ -68,6 +68,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Function] = Icon(KnownMonikers.ScalarFunction, "Function"),
             [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Data type"),
             [SuggestionKind.Database] = Icon(KnownMonikers.Database, "Database"),
+            [SuggestionKind.LinkedServer] = Icon(KnownMonikers.LinkedServer, "Linked server"),
             [SuggestionKind.ScriptTable] = Icon(KnownMonikers.Table, "Table defined in the script"),
             [SuggestionKind.Variable] = Icon(KnownMonikers.LocalVariable, "Variable"),
         };
@@ -113,7 +114,7 @@ namespace SqlPrompter.Ssms
                 // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
                 var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
                 RequestScriptColumns(prepared, script);
-                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions()).Select(s => ToItem(s, prepared)).ToImmutableArray();
+                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns)).Select(s => ToItem(s, prepared)).ToImmutableArray();
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 return Task.FromResult(new CompletionContext(items, null, hint));
             }
@@ -163,8 +164,16 @@ namespace SqlPrompter.Ssms
                     metadata = PrepareMetadata(context, otherDatabase, out cache, out loader);
                 }
             }
+            else if (LinkedServerName.TryResolve(context, metadata, out var linkedServer, out var linkedDatabase, out var insideLinked))
+            {
+                // Srv.|, Srv.Db.| : names of a linked server, loaded lazily in the background (nothing until then).
+                context = insideLinked;
+                metadata = service.LinkedMetadata(linkedServer, linkedDatabase);
+                cache = null;
+                loader = null;
+            }
 
-            pending = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader);
+            pending = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns());
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
@@ -270,7 +279,8 @@ namespace SqlPrompter.Ssms
                 int batchStart,
                 int caretInBatch,
                 DatabaseMetadataCache cache,
-                IMetadataLoader loader)
+                IMetadataLoader loader,
+                Func<TableSource, IReadOnlyList<DbColumn>> remoteColumns)
             {
                 Snapshot = snapshot;
                 Context = context;
@@ -280,9 +290,12 @@ namespace SqlPrompter.Ssms
                 CaretInBatch = caretInBatch;
                 Cache = cache;
                 Loader = loader;
+                RemoteColumns = remoteColumns;
             }
 
             public string Batch { get; }
+
+            public Func<TableSource, IReadOnlyList<DbColumn>> RemoteColumns { get; }
 
             public int BatchStart { get; }
 

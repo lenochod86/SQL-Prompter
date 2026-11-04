@@ -76,6 +76,9 @@ namespace SqlPrompter.Core.Model
         /// <summary>Names of the databases on the server that the login can access; empty if unknown.</summary>
         IReadOnlyList<string> Databases { get; }
 
+        /// <summary>Names of the linked servers (sys.servers); empty if unknown. Their contents are loaded lazily and elsewhere.</summary>
+        IReadOnlyList<string> LinkedServers { get; }
+
         /// <summary>Finds an object like SQL Server does: without a schema in the default schema, then in dbo.</summary>
         DbObject FindObject(string schema, string name);
 

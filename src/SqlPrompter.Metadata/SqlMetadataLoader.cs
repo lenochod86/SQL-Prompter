@@ -19,6 +19,15 @@ namespace SqlPrompter.Metadata
         /// <summary>Loads the columns of the given objects. An object that no longer exists is missing from the result.</summary>
         Task<IReadOnlyDictionary<int, IReadOnlyList<DbColumn>>> LoadColumnsAsync(IReadOnlyCollection<int> objectIds, CancellationToken cancellationToken);
 
+        /// <summary>Names of the databases of a linked server. Slow and may fail: only called lazily, in the background.</summary>
+        Task<IReadOnlyList<string>> LoadLinkedDatabasesAsync(string linkedServer, CancellationToken cancellationToken);
+
+        /// <summary>Columns of one table of a linked server, loaded when the table is used.</summary>
+        Task<IReadOnlyList<DbColumn>> LoadLinkedColumnsAsync(string linkedServer, string database, string schema, string table, CancellationToken cancellationToken);
+
+        /// <summary>Tables and views of one database of a linked server.</summary>
+        Task<IReadOnlyList<RemoteObject>> LoadLinkedObjectsAsync(string linkedServer, string database, CancellationToken cancellationToken);
+
         /// <summary>Fingerprint of the objects; a cheap query to find out whether the snapshot is stale.</summary>
         Task<string> GetVersionAsync(CancellationToken cancellationToken);
     }
@@ -46,7 +55,10 @@ WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT') AND o.is_ms_shipped = 0
 ORDER BY c.object_id, c.column_id;
 
 -- For three-part names.
-SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;";
+SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;
+
+-- Only the names of the linked servers; what is in them is loaded when one is chosen.
+SELECT name FROM sys.servers WHERE is_linked = 1 ORDER BY name;";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -106,9 +118,16 @@ FROM sys.objects;";
                         databases.Add(reader.GetString(0));
                     }
 
+                    var linkedServers = new List<string>();
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        linkedServers.Add(reader.GetString(0));
+                    }
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
-                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases);
+                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers);
                 }
             }
         }
@@ -143,7 +162,10 @@ WHERE c.object_id IN (" + string.Join(", ", names) + @")
 ORDER BY c.object_id, c.column_id;
 
 -- For three-part names.
-SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;";
+SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;
+
+-- Only the names of the linked servers; what is in them is loaded when one is chosen.
+SELECT name FROM sys.servers WHERE is_linked = 1 ORDER BY name;";
 
                 using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
@@ -171,6 +193,124 @@ SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER 
             }
 
             return lists.ToDictionary(p => p.Key, p => (IReadOnlyList<DbColumn>)p.Value);
+        }
+
+        /// <summary>Seconds a call to a linked server may take before it is given up on.</summary>
+        private const int LinkedServerTimeoutSeconds = 15;
+
+        public async Task<IReadOnlyList<string>> LoadLinkedDatabasesAsync(string linkedServer, CancellationToken cancellationToken)
+        {
+            using (var connection = await OpenAsync(cancellationToken).ConfigureAwait(false))
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandType = CommandType.StoredProcedure;
+                command.CommandText = "sp_catalogs";
+                command.CommandTimeout = LinkedServerTimeoutSeconds;
+                AddParameter(command, "@server_name", linkedServer);
+                var result = new List<string>();
+                using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        result.Add(reader.GetString(0));
+                    }
+                }
+
+                return result.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+            }
+        }
+
+        public async Task<IReadOnlyList<RemoteObject>> LoadLinkedObjectsAsync(string linkedServer, string database, CancellationToken cancellationToken)
+        {
+            using (var connection = await OpenAsync(cancellationToken).ConfigureAwait(false))
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandType = CommandType.StoredProcedure;
+                command.CommandText = "sp_tables_ex";
+                command.CommandTimeout = LinkedServerTimeoutSeconds;
+                AddParameter(command, "@table_server", linkedServer);
+                AddParameter(command, "@table_catalog", database);
+                var result = new List<RemoteObject>();
+                using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        if (reader.IsDBNull(1) || reader.IsDBNull(2))
+                        {
+                            continue;
+                        }
+
+                        var type = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim().ToUpperInvariant();
+                        result.Add(new RemoteObject(
+                            reader.GetString(1),
+                            reader.GetString(2),
+                            type == "VIEW" ? DbObjectKind.View : DbObjectKind.Table,
+                            type == "SYSTEM TABLE" || type == "SYSTEM VIEW"));
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        public async Task<IReadOnlyList<DbColumn>> LoadLinkedColumnsAsync(string linkedServer, string database, string schema, string table, CancellationToken cancellationToken)
+        {
+            using (var connection = await OpenAsync(cancellationToken).ConfigureAwait(false))
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandType = CommandType.StoredProcedure;
+                command.CommandText = "sp_columns_ex";
+                command.CommandTimeout = LinkedServerTimeoutSeconds;
+                AddParameter(command, "@table_server", linkedServer);
+                AddParameter(command, "@table_name", table);
+                AddParameter(command, "@table_schema", schema);
+                AddParameter(command, "@table_catalog", database);
+                var result = new List<DbColumn>();
+                using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // TABLE_CAT, TABLE_SCHEM, TABLE_NAME, COLUMN_NAME, DATA_TYPE, TYPE_NAME, COLUMN_SIZE, BUFFER_LENGTH, DECIMAL_DIGITS, NUM_PREC_RADIX, NULLABLE, …
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        var type = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Replace(" identity", string.Empty);
+                        var size = reader.IsDBNull(6) ? 0 : Convert.ToInt32(reader.GetValue(6));
+                        var scale = reader.IsDBNull(8) ? 0 : Convert.ToInt32(reader.GetValue(8));
+                        var typeText = SqlMetadataLoader.FormatLinkedType(type, size, scale);
+                        result.Add(new DbColumn(reader.GetString(3), typeText, !reader.IsDBNull(10) && Convert.ToInt32(reader.GetValue(10)) != 0));
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        /// <summary>Type with its length as sp_columns_ex reports it (size in characters or digits).</summary>
+        internal static string FormatLinkedType(string type, int size, int scale)
+        {
+            switch (type.ToLowerInvariant())
+            {
+                case "varchar":
+                case "char":
+                case "nvarchar":
+                case "nchar":
+                case "varbinary":
+                case "binary":
+                    return type + "(" + (size <= 0 || size > 8000 ? "max" : size.ToString()) + ")";
+                case "decimal":
+                case "numeric":
+                    return type + "(" + size + "," + scale + ")";
+                default:
+                    return type;
+            }
+        }
+
+        private static void AddParameter(DbCommand command, string name, string value)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.DbType = DbType.String;
+            parameter.Value = value;
+            command.Parameters.Add(parameter);
         }
 
         public async Task<string> GetVersionAsync(CancellationToken cancellationToken)

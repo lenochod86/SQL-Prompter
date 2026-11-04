@@ -53,6 +53,44 @@ namespace SqlPrompter.Ssms
             return cache;
         }
 
+        /// <summary>
+        /// Databases of a linked server (database null) or the objects of one of its databases, for the active window's connection.
+        /// Null until loaded; the loading starts here, in the background, and never blocks.
+        /// </summary>
+        public RemoteSnapshot LinkedMetadata(string server, string database)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var settings = SsmsConnection.GetActive();
+            if (settings == null || !settings.CanConnect)
+            {
+                return null;
+            }
+
+            var linked = Caches.GetLinkedServers(settings);
+            var loader = CreateLoader(settings);
+            return database == null ? linked.GetServer(server, loader) : linked.GetDatabase(server, database, loader);
+        }
+
+        /// <summary>
+        /// Columns of tables on linked servers for the active window's connection, as a function that is safe to call off the UI thread:
+        /// it returns what is cached (null while loading, which it starts) and never waits.
+        /// </summary>
+        public System.Func<SqlPrompter.Core.Analysis.TableSource, System.Collections.Generic.IReadOnlyList<SqlPrompter.Core.Model.DbColumn>> LinkedColumns()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var settings = SsmsConnection.GetActive();
+            if (settings == null || !settings.CanConnect)
+            {
+                return null;
+            }
+
+            var linked = Caches.GetLinkedServers(settings);
+            var loader = CreateLoader(settings);
+            return source => source.NameParts.Count == 4
+                ? linked.GetColumns(source.NameParts[0], source.NameParts[1], source.NameParts[2], source.NameParts[3], loader)
+                : null;
+        }
+
         private IMetadataLoader CreateLoader(ConnectionSettings settings) =>
             new SqlMetadataLoader(() => SqlClientConnections.Create(settings.BuildConnectionString(ApplicationName)));
     }

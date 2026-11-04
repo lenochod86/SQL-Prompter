@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using SqlPrompter.Core.Analysis;
+using SqlPrompter.Core.Model;
 using SqlPrompter.Core.Settings;
 
 namespace SqlPrompter.Core.Completion
@@ -10,14 +14,23 @@ namespace SqlPrompter.Core.Completion
             KeywordCase.MatchTyped,
             new AliasSettings { AddAliases = false, QualifyColumnsWithAliases = false });
 
-        public SuggestionOptions(KeywordCase keywordCase, AliasSettings aliases)
+        public SuggestionOptions(KeywordCase keywordCase, AliasSettings aliases, Func<TableSource, IReadOnlyList<DbColumn>> remoteColumns = null)
         {
             KeywordCase = keywordCase;
             Aliases = aliases ?? new AliasSettings();
+            RemoteColumns = remoteColumns;
         }
 
         public KeywordCase KeywordCase { get; }
 
         public AliasSettings Aliases { get; }
+
+        /// <summary>
+        /// Columns of a table on a linked server (a four-part source), or null while they load or if unknown. Must be fast and never wait
+        /// for the database; null (the property) when linked servers are not supported by the caller.
+        /// </summary>
+        public Func<TableSource, IReadOnlyList<DbColumn>> RemoteColumns { get; }
+
+        public SuggestionOptions WithRemoteColumns(Func<TableSource, IReadOnlyList<DbColumn>> remoteColumns) => new SuggestionOptions(KeywordCase, Aliases, remoteColumns);
     }
 }
