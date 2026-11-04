@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlPrompter.Core.Analysis;
 using SqlPrompter.Core.Model;
+using SqlPrompter.Core.Settings;
 using SqlPrompter.Core.Sql;
 
 namespace SqlPrompter.Core.Completion
@@ -65,9 +66,30 @@ namespace SqlPrompter.Core.Completion
     public static class SuggestionBuilder
     {
         /// <param name="script">Definitions in the script (CTEs, temporary tables, variables); optional.</param>
-        public static IReadOnlyList<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata, ScriptModel script = null)
+        /// <param name="keywordCase">Casing of keywords, built-in functions and data types.</param>
+        public static IReadOnlyList<Suggestion> Build(
+            CaretContext context,
+            IDatabaseMetadata metadata,
+            ScriptModel script = null,
+            KeywordCase keywordCase = KeywordCase.MatchTyped)
         {
-            script = script ?? ScriptModel.Empty;
+            var suggestions = BuildCore(context, metadata, script ?? ScriptModel.Empty);
+            return keywordCase == KeywordCase.MatchTyped ? suggestions : suggestions.Select(s => ForceCase(s, keywordCase)).ToList();
+        }
+
+        private static Suggestion ForceCase(Suggestion s, KeywordCase keywordCase)
+        {
+            if (s.Kind != SuggestionKind.Keyword && s.Kind != SuggestionKind.Function && s.Kind != SuggestionKind.DataType)
+            {
+                return s;
+            }
+
+            string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group);
+        }
+
+        private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
+        {
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
