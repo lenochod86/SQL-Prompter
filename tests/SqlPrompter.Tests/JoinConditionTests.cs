@@ -191,7 +191,7 @@ namespace SqlPrompter.Tests
             var items = SuggestionBuilder.Build(Analyze("SELECT * FROM dbo.Orders o JOIN dbo.OrderLines ol ON |"), db, null, Options());
 
             // The foreign key does not need columns; the name matches do.
-            Assert.Single(items.Where(i => i.Kind == SuggestionKind.JoinCondition));
+            Assert.Single(items, i => i.Kind == SuggestionKind.JoinCondition);
         }
 
         [Fact]
