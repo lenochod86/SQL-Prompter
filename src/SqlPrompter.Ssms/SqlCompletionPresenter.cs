@@ -68,12 +68,19 @@ namespace SqlPrompter.Ssms
         private int selected = -1;
         private bool soft;
         private bool updatingScrollBar;
+        private Row suggestionRow;
+        private bool showSuggestion;
+        private bool suggestionSelected;
+        private CompletionItem suggestionItem;
         private double listWidth = MinListWidth;
         private readonly Grid listGrid;
 
         public SqlCompletionPresenter(IWpfTextView view)
         {
             this.view = view;
+            suggestionRow = new Row(this) { IsSuggestion = true };
+            suggestionRow.Root.Visibility = Visibility.Collapsed;
+            rowPanel.Children.Add(suggestionRow.Root);
             for (var i = 0; i < VisibleRows; i++)
             {
                 var row = new Row(this);
@@ -148,7 +155,10 @@ namespace SqlPrompter.Ssms
                 updatingScrollBar = false;
             }
 
-            selected = presentation.SelectedItemIndex;
+            showSuggestion = presentation.DisplaySuggestionItem && presentation.SuggestionItem != null;
+            suggestionSelected = showSuggestion && presentation.SelectSuggestionItem;
+            selected = suggestionSelected ? -1 : presentation.SelectedItemIndex;
+            suggestionItem = presentation.SuggestionItem;
             EnsureSelectedVisible();
             Render();
             Position(presentation);
@@ -214,6 +224,15 @@ namespace SqlPrompter.Ssms
 
         private void Render()
         {
+            if (showSuggestion)
+            {
+                suggestionRow.BindSuggestion(new CompletionItemWithHighlight(suggestionItem), suggestionSelected);
+            }
+            else
+            {
+                suggestionRow.Root.Visibility = Visibility.Collapsed;
+            }
+
             for (var i = 0; i < rows.Count; i++)
             {
                 var index = offset + i;
@@ -247,7 +266,7 @@ namespace SqlPrompter.Ssms
                 var span = presentation.ApplicableToSpan.GetSpan(view.TextSnapshot);
                 var line = view.GetTextViewLineContainingBufferPosition(span.Start);
                 var bounds = line.GetCharacterBounds(span.Start);
-                var height = Math.Min(items.Count, VisibleRows) * RowHeight + 2;
+                var height = (Math.Min(items.Count, VisibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + 2;
                 var left = bounds.Left - view.ViewportLeft;
                 var below = bounds.Bottom - view.ViewportTop + 2;
                 var above = bounds.Top - view.ViewportTop - height - 2;
@@ -270,6 +289,7 @@ namespace SqlPrompter.Ssms
         private void OnRowClicked(Row row, int clickCount)
         {
             var item = row.Item?.CompletionItem;
+            var isSuggestion = row.IsSuggestion;
             if (item == null)
             {
                 return;
@@ -281,7 +301,7 @@ namespace SqlPrompter.Ssms
             }
             else
             {
-                CompletionItemSelected?.Invoke(this, new CompletionItemSelectedEventArgs(item, suggestionItemSelected: false));
+                CompletionItemSelected?.Invoke(this, new CompletionItemSelectedEventArgs(item, suggestionItemSelected: isSuggestion));
             }
         }
 
@@ -330,13 +350,36 @@ namespace SqlPrompter.Ssms
 
             public Grid Root { get; }
 
+            public bool IsSuggestion { get; set; }
+
             public CompletionItemWithHighlight? Item { get; private set; }
+
+            /// <summary>The "suggestion item": what the user typed, shown as the first row; Enter keeps it instead of inserting a suggestion.</summary>
+            public void BindSuggestion(CompletionItemWithHighlight entry, bool isSelected)
+            {
+                Item = entry;
+                Root.Visibility = Visibility.Visible;
+                icon.Visibility = Visibility.Hidden;
+                name.Inlines.Clear();
+                name.Inlines.Add(new Run(entry.CompletionItem.DisplayText) { FontStyle = FontStyles.Italic });
+                suffix.Text = string.Empty;
+                if (isSelected)
+                {
+                    Root.SetResourceReference(Panel.BackgroundProperty, VsBrushes.HighlightKey);
+                }
+                else
+                {
+                    Root.ClearValue(Panel.BackgroundProperty);
+                    Root.Background = Brushes.Transparent;
+                }
+            }
 
             public void Bind(CompletionItemWithHighlight entry, bool isSelected, bool isSoft)
             {
                 Item = entry;
                 var item = entry.CompletionItem;
                 Root.Visibility = Visibility.Visible;
+                icon.Visibility = Visibility.Visible;
                 icon.Moniker = new ImageMoniker { Guid = item.Icon.ImageId.Guid, Id = item.Icon.ImageId.Id };
 
                 name.Inlines.Clear();

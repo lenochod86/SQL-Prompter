@@ -1,4 +1,4 @@
-param([switch]$Attach)
+param([switch]$Attach, [switch]$WindowsAuth, [string]$Server, [string]$Database = "master")
 # Starts SSMS 22 connected to the Docker test instance (login from %LOCALAPPDATA%\SqlPrompter\testdb.json) and waits for a query window.
 # The password is typed into the login dialog through UI Automation; it is never printed.
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
@@ -9,7 +9,8 @@ public class MS { [DllImport("user32.dll")] public static extern bool SetCursorP
 $A = [System.Windows.Automation.AutomationElement]; $T = [System.Windows.Automation.TreeScope]
 $cfg = Get-Content "$env:LOCALAPPDATA\SqlPrompter\testdb.json" | ConvertFrom-Json
 $exe = "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\SSMS.exe"
-$p = if ($Attach) { Get-Process SSMS | Select-Object -First 1 } else { Start-Process $exe -ArgumentList "-S", $cfg.server, "-U", $cfg.user, "-d", "master", "-C", "-N", "Optional" -PassThru }
+$ssmsArgs = if ($WindowsAuth) { @("-S", $Server, "-d", $Database, "-C", "-N", "Optional") } else { @("-S", $cfg.server, "-U", $cfg.user, "-d", $Database, "-C", "-N", "Optional") }
+$p = if ($Attach) { Get-Process SSMS | Select-Object -First 1 } else { Start-Process $exe -ArgumentList $ssmsArgs -PassThru }
 function Win { $A::RootElement.FindAll($T::Children, (New-Object System.Windows.Automation.PropertyCondition($A::ProcessIdProperty, [int]$p.Id))) }
 function Named($name, $type = $null) {
     $c = New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, $name)
@@ -34,7 +35,7 @@ for ($i = 0; $i -lt 60; $i++) {
     }
 }
 # 2. login failed (no password) -> OK; then password + Connect
-for ($i = 0; $i -lt 30; $i++) {
+for ($i = 0; $i -lt $(if ($WindowsAuth) { 0 } else { 30 }); $i++) {
     Start-Sleep 1
     $pw = Named "Password" ([System.Windows.Automation.ControlType]::Edit)
     if ($pw) {
