@@ -60,7 +60,12 @@ Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator w
 Chat messages can get lost or overlooked, so everything that needs the user's attention is also recorded on GitHub.
 
 - Every question to the user (a decision, a missing fact, a request for an SSMS test, a request for approval) is also posted as a comment on the related issue or pull request, in English, with the same content as in chat. If there is no related issue, create one.
-- Every issue or pull request that waits for the user gets the label `needs-user`. Create the label if it is missing. Remove the label as soon as the user has answered or done what was needed.
+- Every issue or pull request that waits for the user gets a label that says what it waits for. Create a label if it is missing. Remove the label as soon as the user has answered or done what was needed.
+  - `needs-user`: a decision, an answer or a missing fact (the question is in a comment).
+  - `requires-testing`: the user should test the VSIX from the branch in SSMS (the comment says what to test and which version).
+  - `requires-review`: a pull request is ready and waits for the user's review and approval to merge.
+  - `blocked`: work cannot continue until something outside the issue happens (the comment says what).
+  - An item can have more than one of these labels.
 - When the user answers in chat, add a short comment with the answer to the issue, so the decision stays in the history.
 
 ### Rules
