@@ -140,7 +140,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] **F12 on the object at the caret:** (#41)
   - [x] a procedure, view, function or trigger opens in a new window on the same server and database as `CREATE OR ALTER`
   - [x] a table opens its `CREATE TABLE` script
-- [ ] **Shift+F5: run the statement at the caret.** The existing statement splitting finds its bounds; the statement is selected, run through Query.Execute and the selection restored. Check for a shortcut conflict. (#42)
+- [x] **Shift+F5: run the statement at the caret.** The existing statement splitting finds its bounds; the statement is selected, run through Query.Execute and the selection restored. Check for a shortcut conflict. (#42)
 - [ ] Ctrl+F12: show the object in Object Explorer (later) (#41)
 
 ### Phase 6: Extended IntelliSense (L) (#43)
