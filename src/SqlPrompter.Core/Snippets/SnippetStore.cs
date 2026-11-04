@@ -223,7 +223,8 @@ namespace SqlPrompter.Core.Snippets
 
         private static string FileName(Snippet snippet)
         {
-            var prefix = new string((snippet.Prefix ?? string.Empty).Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
+            // A fixed set (the characters Windows forbids), so that the name does not depend on the operating system.
+            var prefix = new string((snippet.Prefix ?? string.Empty).Select(c => char.IsControl(c) || @"\/:*?""<>|".IndexOf(c) >= 0 ? (char)95 : c).ToArray());
             return prefix + "-" + snippet.Id + ".json";
         }
     }
