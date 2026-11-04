@@ -94,7 +94,8 @@ namespace SqlPrompter.Core.Snippets
             var defaults = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var placeholder in snippet.Placeholders ?? new List<SnippetPlaceholder>())
             {
-                defaults[placeholder.Name] = placeholder.DefaultValue ?? string.Empty;
+                // A field without a default value shows its name, otherwise it would be an invisible empty field.
+                defaults[placeholder.Name] = string.IsNullOrEmpty(placeholder.DefaultValue) ? placeholder.Name : placeholder.DefaultValue;
             }
 
             var body = Normalize(snippet.Body ?? string.Empty, context.NewLine, context.Indent);
