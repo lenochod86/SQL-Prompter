@@ -11,7 +11,7 @@ namespace SqlPrompter.Tests
 {
     public class JoinSuggestionTests
     {
-        private static readonly SuggestionOptions Aliased = new SuggestionOptions(KeywordCase.MatchTyped, new AliasSettings());
+        private static readonly SuggestionOptions Aliased = new SuggestionOptions(KeywordCase.MatchTyped, new AliasSettings(), null, new JoinSettings { NewTableOnLeft = true });
 
         /// <summary>Users ← Orders ← OrderLines ← Shipments (the last key has two columns), Products without keys.</summary>
         private static DatabaseSnapshot Shop()
@@ -105,7 +105,7 @@ namespace SqlPrompter.Tests
         [Fact]
         public void WithoutAliasesTheTableNameIsUsed()
         {
-            var options = new SuggestionOptions(KeywordCase.MatchTyped, new AliasSettings { AddAliases = false });
+            var options = new SuggestionOptions(KeywordCase.MatchTyped, new AliasSettings { AddAliases = false }, null, new JoinSettings { NewTableOnLeft = true });
 
             var items = After("SELECT * FROM dbo.Users u JOIN |", options);
 
@@ -115,7 +115,7 @@ namespace SqlPrompter.Tests
         [Fact]
         public void KeywordCaseAppliesToOn()
         {
-            var options = new SuggestionOptions(KeywordCase.Lower, new AliasSettings());
+            var options = new SuggestionOptions(KeywordCase.Lower, new AliasSettings(), null, new JoinSettings { NewTableOnLeft = true });
 
             Assert.Contains(After("SELECT * FROM dbo.Users u JOIN |", options), i => i.InsertText == "dbo.Orders as o on o.IdUser = u.IdUser");
         }

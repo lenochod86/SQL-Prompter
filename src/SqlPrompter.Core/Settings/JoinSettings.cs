@@ -11,7 +11,7 @@ namespace SqlPrompter.Core.Settings
             SetDefaults();
         }
 
-        /// <summary>The new table stands left of the equals sign (<c>o.IdUser = u.IdUser</c>), otherwise right (<c>u.IdUser = o.IdUser</c>).</summary>
+        /// <summary>The new table stands left of the equals sign (<c>o.IdUser = u.IdUser</c>), otherwise right (<c>u.IdUser = o.IdUser</c>, the default).</summary>
         [DataMember(Name = "newTableOnLeft")]
         public bool NewTableOnLeft { get; set; }
 
@@ -34,8 +34,9 @@ namespace SqlPrompter.Core.Settings
 
         private void SetDefaults()
         {
-            // Follows the user's SQL Prompt settings (partial FK conditions, name matched conditions, flipped column order).
-            NewTableOnLeft = true;
+            // Follows the user's SQL Prompt settings: partial FK conditions and name matched conditions on, "swap order of columns" on,
+            // which puts the new table on the right (SQL Prompt's default is table2.id = table1.id, the new table on the left).
+            NewTableOnLeft = false;
             IncludePartialKeyConditions = true;
             NameMatchedConditions = true;
             RequireSameTypeForNameMatches = false;

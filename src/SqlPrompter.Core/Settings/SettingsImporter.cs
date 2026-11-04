@@ -101,7 +101,7 @@ namespace SqlPrompter.Core.Settings
             var joins = settings.Joins;
             Take(engine, "IncludePartialFKJoinConditions", "Join conditions for single columns of multi-column keys", v => joins.IncludePartialKeyConditions = v);
             Take(engine, "AlwaysIncludeNameMatchedJoinConditions", "Join conditions by matching column names", v => joins.NameMatchedConditions = v);
-            Take(engine, "FlipColumnsOnJoinCondition", "New table on the left in join conditions (SQL Prompt: flip columns)", v => joins.NewTableOnLeft = v);
+            Take(engine, "FlipColumnsOnJoinCondition", "New table on the left in join conditions (SQL Prompt: swap order of columns, which puts it on the right)", v => joins.NewTableOnLeft = !v);
 
             var custom = ReadCustomAliases(engine);
             if (custom != null)

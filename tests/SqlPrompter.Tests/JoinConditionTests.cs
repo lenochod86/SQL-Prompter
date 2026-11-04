@@ -42,7 +42,7 @@ namespace SqlPrompter.Tests
                 });
         }
 
-        private static SuggestionOptions Options(JoinSettings joins = null) => new SuggestionOptions(KeywordCase.MatchTyped, null, null, joins);
+        private static SuggestionOptions Options(JoinSettings joins = null) => new SuggestionOptions(KeywordCase.MatchTyped, null, null, joins ?? new JoinSettings { NewTableOnLeft = true });
 
         private static IReadOnlyList<Suggestion> Conditions(string sql, JoinSettings joins = null) =>
             SuggestionBuilder.Build(Analyze(sql), Shop(), null, Options(joins)).Where(i => i.Kind == SuggestionKind.JoinCondition).OrderBy(i => i.SortText).ToList();
@@ -108,9 +108,18 @@ namespace SqlPrompter.Tests
         [Fact]
         public void SingleColumnsCanBeTurnedOff()
         {
-            var items = Conditions("SELECT * FROM dbo.OrderLines ol JOIN dbo.Shipments s ON |", new JoinSettings { IncludePartialKeyConditions = false });
+            var items = Conditions("SELECT * FROM dbo.OrderLines ol JOIN dbo.Shipments s ON |", new JoinSettings { NewTableOnLeft = true, IncludePartialKeyConditions = false });
 
             Assert.Equal(new[] { "s.IdOrder = ol.IdOrder AND s.IdLine = ol.IdLine" }, items.Where(i => i.Suffix == "FK_Shipments_OrderLines").Select(i => i.InsertText).ToArray());
+        }
+
+        [Fact]
+        public void ByDefaultTheNewTableIsOnTheRightLikeInTheUsersSqlPromptSettings()
+        {
+            var items = SuggestionBuilder.Build(Analyze("SELECT * FROM dbo.Users u JOIN dbo.Orders o ON |"), Shop(), null, new SuggestionOptions(KeywordCase.MatchTyped, null))
+                .Where(i => i.Kind == SuggestionKind.JoinCondition).OrderBy(i => i.SortText).ToList();
+
+            Assert.Equal("u.IdUser = o.IdUser", items.First().InsertText);
         }
 
         [Fact]
@@ -134,8 +143,8 @@ namespace SqlPrompter.Tests
         [Fact]
         public void NameMatchesCanBeTurnedOffOrNeedTheSameType()
         {
-            var off = Conditions("SELECT * FROM dbo.Orders o JOIN dbo.OrderLines ol ON |", new JoinSettings { NameMatchedConditions = false });
-            var typed = Conditions("SELECT * FROM dbo.Orders o JOIN dbo.OrderLines ol ON |", new JoinSettings { RequireSameTypeForNameMatches = true });
+            var off = Conditions("SELECT * FROM dbo.Orders o JOIN dbo.OrderLines ol ON |", new JoinSettings { NewTableOnLeft = true, NameMatchedConditions = false });
+            var typed = Conditions("SELECT * FROM dbo.Orders o JOIN dbo.OrderLines ol ON |", new JoinSettings { NewTableOnLeft = true, RequireSameTypeForNameMatches = true });
 
             Assert.DoesNotContain(off, i => i.Suffix == "same name");
             Assert.DoesNotContain(typed, i => i.Suffix == "same name");
@@ -210,8 +219,8 @@ namespace SqlPrompter.Tests
 
             Assert.False(joins.IncludePartialKeyConditions);
             Assert.False(joins.NameMatchedConditions);
-            Assert.False(joins.NewTableOnLeft);
-            Assert.True(new PrompterSettings().Joins.NewTableOnLeft);
+            Assert.True(joins.NewTableOnLeft);
+            Assert.False(new PrompterSettings().Joins.NewTableOnLeft);
         }
     }
 }
