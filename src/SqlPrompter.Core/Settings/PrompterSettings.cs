@@ -29,7 +29,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "joins")]
         public JoinSettings Joins { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone() };
+        [DataMember(Name = "snippets")]
+        public SnippetSettings Snippets { get; set; }
+
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Snippets = Snippets.Clone() };
 
         public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
             new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins);
@@ -44,6 +47,7 @@ namespace SqlPrompter.Core.Settings
             Behavior = Behavior ?? new BehaviorSettings();
             Aliases = Aliases ?? new AliasSettings();
             Joins = Joins ?? new JoinSettings();
+            Snippets = Snippets ?? new SnippetSettings();
         }
 
         private void SetDefaults()
@@ -52,6 +56,7 @@ namespace SqlPrompter.Core.Settings
             Behavior = new BehaviorSettings();
             Aliases = new AliasSettings();
             Joins = new JoinSettings();
+            Snippets = new SnippetSettings();
         }
     }
 

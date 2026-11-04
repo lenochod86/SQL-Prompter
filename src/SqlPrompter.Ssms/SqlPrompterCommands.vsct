@@ -22,6 +22,9 @@
       <Group guid="guidSqlPrompterCmdSet" id="SettingsGroup" priority="0x0200">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="SnippetsGroup" priority="0x0300">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
@@ -46,6 +49,24 @@
           <ButtonText>Import Settings...</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidImportSnippets" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
+        <Strings>
+          <ButtonText>Import Snippets...</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenSnippetsFolder" priority="0x0101" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
+        <Strings>
+          <ButtonText>Open Snippets Folder</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidReloadSnippets" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
+        <Strings>
+          <ButtonText>Reload Snippets</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -62,6 +83,10 @@
       <IDSymbol name="MetadataGroup" value="0x1010" />
       <IDSymbol name="DiagnosticsGroup" value="0x1011" />
       <IDSymbol name="SettingsGroup" value="0x1012" />
+      <IDSymbol name="SnippetsGroup" value="0x1013" />
+      <IDSymbol name="cmdidImportSnippets" value="0x0104" />
+      <IDSymbol name="cmdidOpenSnippetsFolder" value="0x0105" />
+      <IDSymbol name="cmdidReloadSnippets" value="0x0106" />
       <IDSymbol name="cmdidExportSettings" value="0x0102" />
       <IDSymbol name="cmdidImportSettings" value="0x0103" />
       <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
