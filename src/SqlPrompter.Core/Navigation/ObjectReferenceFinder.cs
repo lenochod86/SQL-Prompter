@@ -68,7 +68,8 @@ namespace SqlPrompter.Core.Navigation
                 return null;
             }
 
-            var sources = ContextAnalyzer.Analyze(text, caret).Sources;
+            // The sources are taken from the start of the name; in any context an alias is part of them.
+            var sources = ContextAnalyzer.SourcesAt(text, tokens[index].Start);
             if (parts.Count <= 2)
             {
                 var alias = sources.FirstOrDefault(s => string.Equals(s.ReferenceName, parts[0], StringComparison.OrdinalIgnoreCase) && (parts.Count == 2 || s.Alias != null));

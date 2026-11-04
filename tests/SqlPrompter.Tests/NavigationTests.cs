@@ -30,6 +30,13 @@ namespace SqlPrompter.Tests
             Assert.Equal("dbo.Orders", Find("SELECT o.I|d FROM dbo.Orders o").ToString());
         }
 
+
+        [Fact]
+        public void AliasAtTheEndOfTheTextIsResolved()
+        {
+            Assert.Equal("dbo.vCustomers", Find("SELECT * FROM dbo.vCustomers v|").ToString());
+            Assert.Equal("dbo.vCustomers", Find("SELECT * FROM dbo.vCustomers AS v|").ToString());
+        }
         [Fact]
         public void TableNameWithoutAliasQualifiesItsColumns()
         {

@@ -137,9 +137,9 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 ### Phase 5: Navigation and execution (S to M, research first) (#39)
 
 - [x] **Research:** opening a new window with a connection. Candidate: `ScriptFactory.CreateNewBlankScript` with the current window's connection, which we can already read. (#40)
-- [ ] **F12 on the object at the caret:** (#41)
-  - [ ] a procedure, view, function or trigger opens in a new window on the same server and database as `CREATE OR ALTER`
-  - [ ] a table opens its `CREATE TABLE` script
+- [x] **F12 on the object at the caret:** (#41)
+  - [x] a procedure, view, function or trigger opens in a new window on the same server and database as `CREATE OR ALTER`
+  - [x] a table opens its `CREATE TABLE` script
 - [ ] **Shift+F5: run the statement at the caret.** The existing statement splitting finds its bounds; the statement is selected, run through Query.Execute and the selection restored. Check for a shortcut conflict. (#42)
 - [ ] Ctrl+F12: show the object in Object Explorer (later) (#41)
 
