@@ -59,6 +59,42 @@ namespace SqlPrompter.Core.Model
         public bool IsNullable { get; }
     }
 
+    /// <summary>One column pair of a foreign key: the column of the referencing (child) table and the column it points to.</summary>
+    public sealed class DbForeignKeyColumn
+    {
+        public DbForeignKeyColumn(string column, string referencedColumn)
+        {
+            Column = column;
+            ReferencedColumn = referencedColumn;
+        }
+
+        public string Column { get; }
+
+        public string ReferencedColumn { get; }
+    }
+
+    /// <summary>A foreign key, possibly over several columns, in the order of its columns.</summary>
+    public sealed class DbForeignKey
+    {
+        public DbForeignKey(string name, int childObjectId, int referencedObjectId, IReadOnlyList<DbForeignKeyColumn> columns)
+        {
+            Name = name;
+            ChildObjectId = childObjectId;
+            ReferencedObjectId = referencedObjectId;
+            Columns = columns;
+        }
+
+        public string Name { get; }
+
+        /// <summary>The table that has the foreign key.</summary>
+        public int ChildObjectId { get; }
+
+        /// <summary>The table the key points to.</summary>
+        public int ReferencedObjectId { get; }
+
+        public IReadOnlyList<DbForeignKeyColumn> Columns { get; }
+    }
+
     /// <summary>
     /// Immutable metadata snapshot of one database. Implementations must not wait for the database:
     /// anything not loaded yet is returned as null.
@@ -78,6 +114,12 @@ namespace SqlPrompter.Core.Model
 
         /// <summary>Names of the linked servers (sys.servers); empty if unknown. Their contents are loaded lazily and elsewhere.</summary>
         IReadOnlyList<string> LinkedServers { get; }
+
+        /// <summary>Foreign keys between the tables of the database; empty if unknown.</summary>
+        IReadOnlyList<DbForeignKey> ForeignKeys { get; }
+
+        /// <summary>The columns of the primary key of the object in key order, or an empty list.</summary>
+        IReadOnlyList<string> GetPrimaryKey(DbObject dbObject);
 
         /// <summary>Finds an object like SQL Server does: without a schema in the default schema, then in dbo.</summary>
         DbObject FindObject(string schema, string name);

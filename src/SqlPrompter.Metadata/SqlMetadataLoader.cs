@@ -58,7 +58,25 @@ ORDER BY c.object_id, c.column_id;
 SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;
 
 -- Only the names of the linked servers; what is in them is loaded when one is chosen.
-SELECT name FROM sys.servers WHERE is_linked = 1 ORDER BY name;";
+SELECT name FROM sys.servers WHERE is_linked = 1 ORDER BY name;
+
+-- Foreign keys with their column pairs, for JOIN suggestions.
+SELECT fk.object_id, fk.name, fk.parent_object_id, fk.referenced_object_id, pc.name, rc.name
+FROM sys.foreign_keys AS fk
+JOIN sys.foreign_key_columns AS c ON c.constraint_object_id = fk.object_id
+JOIN sys.columns AS pc ON pc.object_id = c.parent_object_id AND pc.column_id = c.parent_column_id
+JOIN sys.columns AS rc ON rc.object_id = c.referenced_object_id AND rc.column_id = c.referenced_column_id
+WHERE fk.is_ms_shipped = 0
+ORDER BY fk.object_id, c.constraint_column_id;
+
+-- Primary keys.
+SELECT i.object_id, c.name
+FROM sys.indexes AS i
+JOIN sys.index_columns AS ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+JOIN sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+JOIN sys.objects AS o ON o.object_id = i.object_id
+WHERE i.is_primary_key = 1 AND o.is_ms_shipped = 0
+ORDER BY i.object_id, ic.key_ordinal;";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -125,9 +143,54 @@ FROM sys.objects;";
                         linkedServers.Add(reader.GetString(0));
                     }
 
+                    var foreignKeys = new List<DbForeignKey>();
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    int currentKey = int.MinValue;
+                    string keyName = null;
+                    int childId = 0, referencedId = 0;
+                    var keyColumns = new List<DbForeignKeyColumn>();
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        var keyId = reader.GetInt32(0);
+                        if (keyId != currentKey)
+                        {
+                            if (currentKey != int.MinValue)
+                            {
+                                foreignKeys.Add(new DbForeignKey(keyName, childId, referencedId, keyColumns));
+                            }
+
+                            currentKey = keyId;
+                            keyName = reader.GetString(1);
+                            childId = reader.GetInt32(2);
+                            referencedId = reader.GetInt32(3);
+                            keyColumns = new List<DbForeignKeyColumn>();
+                        }
+
+                        keyColumns.Add(new DbForeignKeyColumn(reader.GetString(4), reader.GetString(5)));
+                    }
+
+                    if (currentKey != int.MinValue)
+                    {
+                        foreignKeys.Add(new DbForeignKey(keyName, childId, referencedId, keyColumns));
+                    }
+
+                    var primaryKeys = new Dictionary<int, List<string>>();
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        var objectId = reader.GetInt32(0);
+                        if (!primaryKeys.TryGetValue(objectId, out var key))
+                        {
+                            primaryKeys[objectId] = key = new List<string>();
+                        }
+
+                        key.Add(reader.GetString(1));
+                    }
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
-                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers);
+                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers, foreignKeys,
+                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value));
                 }
             }
         }
@@ -165,7 +228,25 @@ ORDER BY c.object_id, c.column_id;
 SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;
 
 -- Only the names of the linked servers; what is in them is loaded when one is chosen.
-SELECT name FROM sys.servers WHERE is_linked = 1 ORDER BY name;";
+SELECT name FROM sys.servers WHERE is_linked = 1 ORDER BY name;
+
+-- Foreign keys with their column pairs, for JOIN suggestions.
+SELECT fk.object_id, fk.name, fk.parent_object_id, fk.referenced_object_id, pc.name, rc.name
+FROM sys.foreign_keys AS fk
+JOIN sys.foreign_key_columns AS c ON c.constraint_object_id = fk.object_id
+JOIN sys.columns AS pc ON pc.object_id = c.parent_object_id AND pc.column_id = c.parent_column_id
+JOIN sys.columns AS rc ON rc.object_id = c.referenced_object_id AND rc.column_id = c.referenced_column_id
+WHERE fk.is_ms_shipped = 0
+ORDER BY fk.object_id, c.constraint_column_id;
+
+-- Primary keys.
+SELECT i.object_id, c.name
+FROM sys.indexes AS i
+JOIN sys.index_columns AS ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+JOIN sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+JOIN sys.objects AS o ON o.object_id = i.object_id
+WHERE i.is_primary_key = 1 AND o.is_ms_shipped = 0
+ORDER BY i.object_id, ic.key_ordinal;";
 
                 using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {

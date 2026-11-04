@@ -12,6 +12,7 @@ using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
+using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
@@ -40,7 +41,18 @@ namespace SqlPrompter.Ssms
         public const int VisibleRows = 12;
 
         private const double RowHeight = 22;
-        private const double ListWidth = 600;
+
+        /// <summary>Icons are drawn for this background so that they get the colors of the current theme.</summary>
+        private static Color BackgroundColor
+        {
+            get
+            {
+                var c = VSColorTheme.GetThemedColor(EnvironmentColors.ToolWindowBackgroundColorKey);
+                return Color.FromArgb(c.A, c.R, c.G, c.B);
+            }
+        }
+        private const double MinListWidth = 420;
+        private const double MaxListWidth = 1000;
         private const double DescriptionWidth = 380;
 
         private readonly IWpfTextView view;
@@ -56,6 +68,8 @@ namespace SqlPrompter.Ssms
         private int selected = -1;
         private bool soft;
         private bool updatingScrollBar;
+        private double listWidth = MinListWidth;
+        private readonly Grid listGrid;
 
         public SqlCompletionPresenter(IWpfTextView view)
         {
@@ -77,7 +91,8 @@ namespace SqlPrompter.Ssms
                 }
             };
 
-            var grid = new Grid { Width = ListWidth, Focusable = false };
+            var grid = new Grid { Width = listWidth, Focusable = false };
+            listGrid = grid;
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(rowPanel, 0);
@@ -120,6 +135,8 @@ namespace SqlPrompter.Ssms
             {
                 lastItemList = presentation.ItemList;
                 items = presentation.ItemList.ToList();
+                listWidth = MeasureWidth(items);
+                listGrid.Width = listWidth;
                 offset = 0;
                 scrollBar.Visibility = items.Count > VisibleRows ? Visibility.Visible : Visibility.Collapsed;
                 updatingScrollBar = true;
@@ -155,6 +172,21 @@ namespace SqlPrompter.Ssms
             border.SetResourceReference(Border.BackgroundProperty, VsBrushes.ToolWindowBackgroundKey);
             border.SetResourceReference(Border.BorderBrushProperty, VsBrushes.ToolWindowBorderKey);
             return new Popup { Child = border, AllowsTransparency = false, StaysOpen = true, Focusable = false, Placement = PlacementMode.Relative };
+        }
+
+        /// <summary>Width that fits the longest row (estimated from the text lengths), within limits.</summary>
+        private static double MeasureWidth(IReadOnlyList<CompletionItemWithHighlight> list)
+        {
+            double widest = 0;
+            foreach (var entry in list)
+            {
+                var item = entry.CompletionItem;
+                item.Properties.TryGetProperty(SqlCompletionSource.DetailKey, out string detail);
+                var width = 7.2 * (item.DisplayText.Length + (detail?.Length ?? 0) + 1) + 24 + 6.2 * (item.Suffix?.Length ?? 0);
+                widest = Math.Max(widest, width);
+            }
+
+            return Math.Max(MinListWidth, Math.Min(MaxListWidth, widest + 70));
         }
 
         private void Scroll(int delta)
@@ -226,7 +258,7 @@ namespace SqlPrompter.Ssms
                 popup.HorizontalOffset = left;
                 popup.VerticalOffset = top;
                 descriptionPopup.PlacementTarget = view.VisualElement;
-                descriptionPopup.HorizontalOffset = left + ListWidth + 4;
+                descriptionPopup.HorizontalOffset = left + listWidth + 4;
                 descriptionPopup.VerticalOffset = top;
             }
             catch (Exception ex)
@@ -258,6 +290,8 @@ namespace SqlPrompter.Ssms
         {
             private readonly CrispImage icon;
             private readonly TextBlock name;
+            private readonly CrispImage keyIcon;
+            private readonly InlineUIContainer keyContainer;
             private readonly TextBlock suffix;
 
             public Row(SqlCompletionPresenter owner)
@@ -265,6 +299,7 @@ namespace SqlPrompter.Ssms
                 Root = new Grid { Height = RowHeight, Background = Brushes.Transparent, Focusable = false };
                 Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 Root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                 icon = new CrispImage { Width = 16, Height = 16, Margin = new Thickness(6, 0, 6, 0) };
@@ -276,9 +311,14 @@ namespace SqlPrompter.Ssms
                 Grid.SetColumn(name, 1);
                 Root.Children.Add(name);
 
+                keyIcon = new CrispImage { Width = 16, Height = 16, Margin = new Thickness(4, 0, 0, 0) };
+                keyContainer = new InlineUIContainer(keyIcon) { BaselineAlignment = BaselineAlignment.Center };
+                ImageThemingUtilities.SetImageBackgroundColor(icon, BackgroundColor);
+                ImageThemingUtilities.SetImageBackgroundColor(keyIcon, BackgroundColor);
+
                 suffix = new TextBlock { Margin = new Thickness(16, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center, Opacity = 0.6, FontSize = 11 };
                 suffix.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
-                Grid.SetColumn(suffix, 2);
+                Grid.SetColumn(suffix, 3);
                 Root.Children.Add(suffix);
 
                 Root.MouseLeftButtonDown += (s, e) =>
@@ -308,6 +348,11 @@ namespace SqlPrompter.Ssms
                     name.Inlines.Add(run);
                 }
 
+                if (item.Properties.TryGetProperty(SqlCompletionSource.KeyKey, out SqlPrompter.Core.Completion.KeyKind key))
+                {
+                    keyIcon.Moniker = key == SqlPrompter.Core.Completion.KeyKind.Primary ? KnownMonikers.Key : KnownMonikers.ForeignKey;
+                    name.Inlines.Add(keyContainer);
+                }
                 suffix.Text = item.Suffix;
                 if (isSelected)
                 {

@@ -33,9 +33,16 @@ namespace SqlPrompter.Core.Completion
         Variable,
     }
 
+    public enum KeyKind
+    {
+        None,
+        Primary,
+        Foreign,
+    }
+
     public sealed class Suggestion
     {
-        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null)
+        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null, KeyKind key = KeyKind.None)
         {
             Kind = kind;
             DisplayText = displayText;
@@ -46,6 +53,7 @@ namespace SqlPrompter.Core.Completion
             Group = group;
             FromClause = fromClause;
             Detail = detail;
+            Key = key;
         }
 
         public SuggestionKind Kind { get; }
@@ -75,6 +83,9 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>Short text shown next to the name, e.g. "nvarchar(50) not null" for a column.</summary>
         public string Detail { get; }
+
+        /// <summary>For a column: whether it is part of the primary key or of a foreign key (shown as a key icon).</summary>
+        public KeyKind Key { get; }
 
         /// <summary>Sort key: group, then text.</summary>
         public string SortText => Group.ToString("D2") + DisplayText;
@@ -106,7 +117,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail);
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -218,6 +229,14 @@ namespace SqlPrompter.Core.Completion
                 yield break;
             }
 
+            if (context.AfterJoin)
+            {
+                foreach (var join in JoinSuggestions.Build(context, metadata, options))
+                {
+                    yield return join;
+                }
+            }
+
             foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem))
             {
                 var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(dbObject.Schema, quote) + "." : string.Empty) +
@@ -259,14 +278,14 @@ namespace SqlPrompter.Core.Completion
                 return string.Empty;
             }
 
-            var alias = AliasGenerator.Generate(objectName, context.Sources.Select(s => s.ReferenceName).Where(n => n != null), options.Aliases);
-            return AliasDefinition(alias, context, options);
+            var alias = AliasGenerator.Generate(objectName, context.ReferenceNamesInUse(), options.Aliases);
+            return AliasDefinition(alias, options, context.QuoteIdentifiers);
         }
 
         /// <summary>" AS alias" or " alias" as set in the options.</summary>
-        private static string AliasDefinition(string alias, CaretContext context, SuggestionOptions options)
+        internal static string AliasDefinition(string alias, SuggestionOptions options, bool quoteIdentifiers)
         {
-            var quoted = SqlIdentifier.Quote(alias, context.QuoteIdentifiers);
+            var quoted = SqlIdentifier.Quote(alias, quoteIdentifiers);
             if (!options.Aliases.IncludeAs)
             {
                 return " " + quoted;
@@ -320,11 +339,18 @@ namespace SqlPrompter.Core.Completion
         /// <summary>Columns of one table source and how to describe their owner.</summary>
         private sealed class SourceColumns
         {
-            public SourceColumns(TableSource source, IReadOnlyList<DbColumn> columns, string owner)
+            public SourceColumns(TableSource source, IReadOnlyList<DbColumn> columns, string owner, DbObject dbObject = null, IDatabaseMetadata metadata = null)
             {
                 Source = source;
                 Columns = columns;
                 Owner = owner;
+                if (dbObject != null && metadata != null)
+                {
+                    primary = new HashSet<string>(metadata.GetPrimaryKey(dbObject), StringComparer.OrdinalIgnoreCase);
+                    foreign = new HashSet<string>(
+                        metadata.ForeignKeys.Where(k => k.ChildObjectId == dbObject.Id).SelectMany(k => k.Columns.Select(c => c.Column)),
+                        StringComparer.OrdinalIgnoreCase);
+                }
             }
 
             public TableSource Source { get; }
@@ -332,6 +358,11 @@ namespace SqlPrompter.Core.Completion
             public IReadOnlyList<DbColumn> Columns { get; }
 
             public string Owner { get; }
+
+            private readonly HashSet<string> primary = new HashSet<string>();
+            private readonly HashSet<string> foreign = new HashSet<string>();
+
+            public KeyKind KeyOf(DbColumn column) => primary.Contains(column.Name) ? KeyKind.Primary : foreign.Contains(column.Name) ? KeyKind.Foreign : KeyKind.None;
         }
 
         /// <summary>Columns of a source defined in the script or found in the database; null if they are not known (yet).</summary>
@@ -353,7 +384,7 @@ namespace SqlPrompter.Core.Completion
 
             var dbObject = Readiness.Resolve(source, metadata);
             var columns = dbObject != null ? metadata.GetColumns(dbObject) : null;
-            return columns == null ? null : new SourceColumns(source, columns, dbObject.ToString());
+            return columns == null ? null : new SourceColumns(source, columns, dbObject.ToString(), dbObject, metadata);
         }
 
         private static IEnumerable<Suggestion> ExpressionSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -364,7 +395,7 @@ namespace SqlPrompter.Core.Completion
                 var qualified = ResolveColumns(context.QualifiedSource, metadata, script, options);
                 foreach (var column in qualified?.Columns ?? Array.Empty<DbColumn>())
                 {
-                    yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, quote), null, qualified.Owner, 0);
+                    yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, quote), null, qualified.Owner, 0, qualified.KeyOf(column));
                 }
 
                 yield break;
@@ -393,7 +424,7 @@ namespace SqlPrompter.Core.Completion
                     var name = SqlIdentifier.Quote(column.Name, quote);
                     var qualify = !inner || ambiguous.Contains(column.Name) || options.Aliases.QualifyColumnsWithAliases;
                     var insert = qualify ? SqlIdentifier.Quote(reference, quote) + "." + name : name;
-                    yield return ColumnSuggestion(column, insert, reference, x.Owner, inner ? 0 : 2);
+                    yield return ColumnSuggestion(column, insert, reference, x.Owner, inner ? 0 : 2, x.KeyOf(column));
                 }
             }
 
@@ -447,6 +478,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             var quote = context.QuoteIdentifiers;
+            var keys = new KeyLookup(metadata);
             var matches = new List<KeyValuePair<DbObject, DbColumn>>();
             foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem && (o.Kind == DbObjectKind.Table || o.Kind == DbObjectKind.View)))
             {
@@ -473,18 +505,45 @@ namespace SqlPrompter.Core.Completion
                 var name = SqlIdentifier.Quote(match.Value.Name, quote);
                 var insert = options.Aliases.QualifyColumnsWithAliases ? SqlIdentifier.Quote(owner, quote) + "." + name : name;
                 var from = "FROM " + (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(table.Schema, quote) + "." : string.Empty) +
-                    SqlIdentifier.Quote(table.Name, quote) + (alias != null ? AliasDefinition(alias, context, options) : string.Empty);
+                    SqlIdentifier.Quote(table.Name, quote) + (alias != null ? AliasDefinition(alias, options, context.QuoteIdentifiers) : string.Empty);
                 var column = match.Value;
                 var type = column.TypeName.Length > 0 ? " " + column.TypeName + (column.IsNullable ? " null" : " not null") : string.Empty;
                 yield return new Suggestion(SuggestionKind.Column, column.Name, insert, column.Name, table.Name,
-                    column.Name + type + " (" + table + "), adds " + from, 0, from, type.Trim());
+                    column.Name + type + " (" + table + "), adds " + from, 0, from, type.Trim(), keys.KeyOf(table, column.Name));
             }
         }
 
-        private static Suggestion ColumnSuggestion(DbColumn column, string insertText, string suffix, string owner, int group)
+        /// <summary>Primary and foreign key columns per table, computed once per table.</summary>
+        private sealed class KeyLookup
+        {
+            private readonly IDatabaseMetadata metadata;
+            private readonly Dictionary<int, KeyValuePair<HashSet<string>, HashSet<string>>> cache = new Dictionary<int, KeyValuePair<HashSet<string>, HashSet<string>>>();
+
+            public KeyLookup(IDatabaseMetadata metadata)
+            {
+                this.metadata = metadata;
+            }
+
+            public KeyKind KeyOf(DbObject table, string column)
+            {
+                if (!cache.TryGetValue(table.Id, out var sets))
+                {
+                    sets = new KeyValuePair<HashSet<string>, HashSet<string>>(
+                        new HashSet<string>(metadata.GetPrimaryKey(table), StringComparer.OrdinalIgnoreCase),
+                        new HashSet<string>(
+                            metadata.ForeignKeys.Where(k => k.ChildObjectId == table.Id).SelectMany(k => k.Columns.Select(c => c.Column)),
+                            StringComparer.OrdinalIgnoreCase));
+                    cache[table.Id] = sets;
+                }
+
+                return sets.Key.Contains(column) ? KeyKind.Primary : sets.Value.Contains(column) ? KeyKind.Foreign : KeyKind.None;
+            }
+        }
+
+        private static Suggestion ColumnSuggestion(DbColumn column, string insertText, string suffix, string owner, int group, KeyKind key)
         {
             var type = column.TypeName.Length > 0 ? " " + column.TypeName + (column.IsNullable ? " null" : " not null") : string.Empty;
-            return new Suggestion(SuggestionKind.Column, column.Name, insertText, column.Name, suffix, column.Name + type + " (" + owner + ")", group, null, type.Trim());
+            return new Suggestion(SuggestionKind.Column, column.Name, insertText, column.Name, suffix, column.Name + type + " (" + owner + ")", group, null, type.Trim(), key);
         }
     }
 }

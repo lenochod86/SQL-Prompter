@@ -11,6 +11,7 @@ namespace SqlPrompter.Metadata
         private readonly Dictionary<string, DbObject> byName;
         private readonly HashSet<string> schemaSet;
         private readonly IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> columns;
+        private readonly IReadOnlyDictionary<int, IReadOnlyList<string>> primaryKeys;
 
         public DatabaseSnapshot(
             string databaseName,
@@ -20,7 +21,9 @@ namespace SqlPrompter.Metadata
             string version,
             IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> columns = null,
             IReadOnlyList<string> databases = null,
-            IReadOnlyList<string> linkedServers = null)
+            IReadOnlyList<string> linkedServers = null,
+            IReadOnlyList<DbForeignKey> foreignKeys = null,
+            IReadOnlyDictionary<int, IReadOnlyList<string>> primaryKeys = null)
         {
             DatabaseName = databaseName ?? string.Empty;
             DefaultSchema = string.IsNullOrEmpty(defaultSchema) ? "dbo" : defaultSchema;
@@ -28,6 +31,8 @@ namespace SqlPrompter.Metadata
             Objects = objects ?? Array.Empty<DbObject>();
             Databases = databases ?? Array.Empty<string>();
             LinkedServers = linkedServers ?? Array.Empty<string>();
+            ForeignKeys = foreignKeys ?? Array.Empty<DbForeignKey>();
+            this.primaryKeys = primaryKeys ?? new Dictionary<int, IReadOnlyList<string>>();
             Version = version;
             this.columns = columns ?? new Dictionary<int, IReadOnlyList<DbColumn>>();
             schemaSet = new HashSet<string>(Schemas, StringComparer.OrdinalIgnoreCase);
@@ -46,6 +51,8 @@ namespace SqlPrompter.Metadata
             Objects = source.Objects;
             Databases = source.Databases;
             LinkedServers = source.LinkedServers;
+            ForeignKeys = source.ForeignKeys;
+            primaryKeys = source.primaryKeys;
             Version = source.Version;
             byName = source.byName;
             schemaSet = source.schemaSet;
@@ -63,6 +70,11 @@ namespace SqlPrompter.Metadata
         public IReadOnlyList<string> Databases { get; }
 
         public IReadOnlyList<string> LinkedServers { get; }
+
+        public IReadOnlyList<DbForeignKey> ForeignKeys { get; }
+
+        public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) =>
+            dbObject != null && primaryKeys.TryGetValue(dbObject.Id, out var key) ? key : Array.Empty<string>();
 
         /// <summary>Fingerprint of the objects in the database; when it changes, the snapshot is stale.</summary>
         public string Version { get; }

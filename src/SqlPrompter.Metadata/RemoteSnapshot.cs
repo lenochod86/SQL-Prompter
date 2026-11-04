@@ -63,6 +63,10 @@ namespace SqlPrompter.Metadata
 
         public IReadOnlyList<string> LinkedServers => Array.Empty<string>();
 
+        public IReadOnlyList<DbForeignKey> ForeignKeys => Array.Empty<DbForeignKey>();
+
+        public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) => Array.Empty<string>();
+
         public DbObject FindObject(string schema, string name) =>
             Objects.FirstOrDefault(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase) &&
                                         (string.IsNullOrEmpty(schema) || string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)));
