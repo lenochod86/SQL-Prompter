@@ -20,6 +20,9 @@ namespace SqlPrompter.Core.Completion
         Function,
         DataType,
 
+        /// <summary>Database on the server, for three-part names.</summary>
+        Database,
+
         /// <summary>CTE, temporary table or table variable defined in the script.</summary>
         ScriptTable,
 
@@ -190,9 +193,16 @@ namespace SqlPrompter.Core.Completion
             }
 
             var quote = context.QuoteIdentifiers;
+            if (context.Qualifier.Count > 1)
+            {
+                // A name with more parts (server.db.schema.) is not resolved.
+                yield break;
+            }
+
             if (context.Qualifier.Count == 1)
             {
-                var schema = context.Qualifier[0];
+                // An empty schema (db..) means the default one.
+                var schema = context.Qualifier[0].Length == 0 ? metadata.DefaultSchema : context.Qualifier[0];
                 foreach (var dbObject in metadata.Objects.Where(o => string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
                 {
                     yield return ObjectSuggestion(dbObject, SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject), null);
@@ -211,6 +221,11 @@ namespace SqlPrompter.Core.Completion
             foreach (var schema in metadata.Schemas)
             {
                 yield return new Suggestion(SuggestionKind.Schema, schema, SqlIdentifier.Quote(schema, quote), schema, null, "schema", 1);
+            }
+
+            foreach (var database in context.InOtherDatabase ? Array.Empty<string>() : metadata.Databases.ToArray())
+            {
+                yield return new Suggestion(SuggestionKind.Database, database, SqlIdentifier.Quote(database, quote), database, null, "database", 1);
             }
 
             foreach (var keyword in context.PreferredKeywords)
@@ -272,6 +287,10 @@ namespace SqlPrompter.Core.Completion
                     kind = SuggestionKind.View;
                     description = "view";
                     break;
+                case DbObjectKind.Synonym:
+                    kind = SuggestionKind.Table;
+                    description = "synonym";
+                    break;
                 case DbObjectKind.TableFunction:
                     kind = SuggestionKind.TableFunction;
                     description = "table-valued function";
@@ -282,7 +301,8 @@ namespace SqlPrompter.Core.Completion
                     break;
             }
 
-            return new Suggestion(kind, dbObject.Name, insertText, dbObject.Name, suffix, description + " " + dbObject, 0);
+            var target = dbObject.SynonymTarget != null ? " → " + string.Join(".", dbObject.SynonymTarget) : string.Empty;
+            return new Suggestion(kind, dbObject.Name, insertText, dbObject.Name, suffix, description + " " + dbObject + target, 0);
         }
 
         /// <summary>Columns of one table source and how to describe their owner.</summary>

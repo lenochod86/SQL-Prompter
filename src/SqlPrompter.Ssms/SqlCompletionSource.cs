@@ -65,6 +65,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Alias] = Icon(KnownMonikers.LocalVariable, "Alias"),
             [SuggestionKind.Function] = Icon(KnownMonikers.ScalarFunction, "Function"),
             [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Data type"),
+            [SuggestionKind.Database] = Icon(KnownMonikers.Database, "Database"),
             [SuggestionKind.ScriptTable] = Icon(KnownMonikers.Table, "Table defined in the script"),
             [SuggestionKind.Variable] = Icon(KnownMonikers.LocalVariable, "Variable"),
         };
@@ -149,7 +150,18 @@ namespace SqlPrompter.Ssms
                 return CompletionStartData.DoesNotParticipateInCompletion;
             }
 
-            var metadata = PrepareMetadata(context, out var cache, out var loader);
+            var usedDatabase = SqlBatch.FindUsedDatabase(snapshot, triggerLocation.Position);
+            var metadata = PrepareMetadata(context, usedDatabase, out var cache, out var loader);
+            if (ForeignDatabase.TryResolve(context, metadata, out var otherDatabase, out var insideDatabase))
+            {
+                // OtherDb.| : continue with the objects of that database.
+                context = insideDatabase;
+                if (!string.Equals(otherDatabase, metadata.DatabaseName, StringComparison.OrdinalIgnoreCase))
+                {
+                    metadata = PrepareMetadata(context, otherDatabase, out cache, out loader);
+                }
+            }
+
             pending = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader);
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
@@ -160,10 +172,10 @@ namespace SqlPrompter.Ssms
         /// Returns metadata from the cache and starts loading missing parts in the background. It never waits for the database:
         /// the list is built from what is available and completed on the next completion.
         /// </summary>
-        private IDatabaseMetadata PrepareMetadata(CaretContext context, out DatabaseMetadataCache cache, out IMetadataLoader loader)
+        private IDatabaseMetadata PrepareMetadata(CaretContext context, string database, out DatabaseMetadataCache cache, out IMetadataLoader loader)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            cache = service.CacheForActiveWindow(out loader);
+            cache = service.CacheForActiveWindow(out loader, database);
             var metadata = cache?.Current;
             if (cache == null || metadata == null)
             {

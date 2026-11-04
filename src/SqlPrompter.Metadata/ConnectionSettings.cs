@@ -53,6 +53,10 @@ namespace SqlPrompter.Metadata
 
         public bool CanConnect => Authentication != AuthenticationKind.Unsupported;
 
+        /// <summary>The same connection to another database on the server (e.g. after USE).</summary>
+        public ConnectionSettings WithDatabase(string database) =>
+            new ConnectionSettings(Server, database, Authentication, UserName, Password, Encrypt, TrustServerCertificate);
+
         /// <summary>Metadata cache key. Does not contain the password.</summary>
         public string CacheKey => string.Join("|", Server, Database, Authentication, UserName).ToLowerInvariant();
 

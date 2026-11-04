@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlPrompter.Core.Model;
+using SqlPrompter.Core.Sql;
 using DbColumn = SqlPrompter.Core.Model.DbColumn;
 
 namespace SqlPrompter.Metadata
@@ -30,10 +31,11 @@ SELECT DB_NAME(), SCHEMA_NAME();
 
 SELECT name FROM sys.schemas WHERE schema_id < 16384 ORDER BY name;
 
-SELECT o.object_id, s.name, o.name, o.type, o.is_ms_shipped
+SELECT o.object_id, s.name, o.name, o.type, o.is_ms_shipped, sn.base_object_name
 FROM sys.all_objects AS o
 JOIN sys.schemas AS s ON s.schema_id = o.schema_id
-WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT');
+LEFT JOIN sys.synonyms AS sn ON sn.object_id = o.object_id
+WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT', 'SN');
 
 -- Columns of user objects right away, of system objects on demand.
 SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable
@@ -41,7 +43,10 @@ FROM sys.columns AS c
 JOIN sys.objects AS o ON o.object_id = c.object_id
 JOIN sys.types AS t ON t.user_type_id = c.user_type_id
 WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT') AND o.is_ms_shipped = 0
-ORDER BY c.object_id, c.column_id;";
+ORDER BY c.object_id, c.column_id;
+
+-- For three-part names.
+SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -87,15 +92,23 @@ FROM sys.objects;";
                             reader.GetString(1),
                             reader.GetString(2),
                             ToKind(reader.GetString(3).Trim()),
-                            reader.GetBoolean(4)));
+                            reader.GetBoolean(4),
+                            reader.IsDBNull(5) ? null : SqlIdentifier.SplitName(reader.GetString(5))));
                     }
 
                     await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
                     var columns = await ReadColumnsAsync(reader, cancellationToken).ConfigureAwait(false);
 
+                    var databases = new List<string>();
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        databases.Add(reader.GetString(0));
+                    }
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
-                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns);
+                    return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases);
                 }
             }
         }
@@ -127,7 +140,10 @@ SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nul
 FROM sys.all_columns AS c
 JOIN sys.types AS t ON t.user_type_id = c.user_type_id
 WHERE c.object_id IN (" + string.Join(", ", names) + @")
-ORDER BY c.object_id, c.column_id;";
+ORDER BY c.object_id, c.column_id;
+
+-- For three-part names.
+SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;";
 
                 using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
@@ -193,6 +209,8 @@ ORDER BY c.object_id, c.column_id;";
         {
             switch (type)
             {
+                case "SN":
+                    return DbObjectKind.Synonym;
                 case "V":
                     return DbObjectKind.View;
                 case "IF":

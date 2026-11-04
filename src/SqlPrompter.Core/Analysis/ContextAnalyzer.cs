@@ -66,11 +66,23 @@ namespace SqlPrompter.Core.Analysis
             // Qualifier: a.b.| -> [a, b]
             var qualifier = new List<string>();
             var nameStart = caretIndex;
-            while (nameStart >= 2 && tokens[nameStart - 1].Kind == TokenKind.Dot &&
-                   (tokens[nameStart - 2].IsNamePart || tokens[nameStart - 2].Kind == TokenKind.Variable))
+            while (nameStart >= 2 && tokens[nameStart - 1].Kind == TokenKind.Dot)
             {
-                qualifier.Insert(0, tokens[nameStart - 2].IdentifierValue);
-                nameStart -= 2;
+                if (tokens[nameStart - 2].IsNamePart || tokens[nameStart - 2].Kind == TokenKind.Variable)
+                {
+                    qualifier.Insert(0, tokens[nameStart - 2].IdentifierValue);
+                    nameStart -= 2;
+                }
+                else if (nameStart >= 3 && tokens[nameStart - 2].Kind == TokenKind.Dot && tokens[nameStart - 3].IsNamePart)
+                {
+                    // db..| : the schema between the dots is left out, i.e. the default one.
+                    qualifier.Insert(0, string.Empty);
+                    nameStart -= 1;
+                }
+                else
+                {
+                    break;
+                }
             }
 
             var unknownQualifier = nameStart >= 1 && tokens[nameStart - 1].Kind == TokenKind.Dot; // db..t, @t.column
@@ -135,7 +147,7 @@ namespace SqlPrompter.Core.Analysis
             var commaInFrom = anchor.Kind == TokenKind.Comma && anchorAtBlockLevel && clauseState.InFrom && clauseState.Clause == Clause.From;
             if (objectKeywords != null || commaInFrom)
             {
-                if (qualifier.Count > 1)
+                if (qualifier.Count > 2)
                 {
                     // Another database or server: the extension does not know its objects.
                     return Make(ContextKind.Name);

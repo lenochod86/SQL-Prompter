@@ -27,7 +27,8 @@ namespace SqlPrompter.Ssms
         /// Cache for the active window's connection; starts loading its snapshot in the background if there is none yet.
         /// Null when the window is not connected or the authentication type is not supported.
         /// </summary>
-        public DatabaseMetadataCache CacheForActiveWindow(out IMetadataLoader loader)
+        /// <param name="database">Database chosen by USE in the script, if it differs from the window's.</param>
+        public DatabaseMetadataCache CacheForActiveWindow(out IMetadataLoader loader, string database = null)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             loader = null;
@@ -35,6 +36,11 @@ namespace SqlPrompter.Ssms
             if (settings == null || !settings.CanConnect)
             {
                 return null;
+            }
+
+            if (!string.IsNullOrEmpty(database) && !string.Equals(database, settings.Database, System.StringComparison.OrdinalIgnoreCase))
+            {
+                settings = settings.WithDatabase(database);
             }
 
             var cache = Caches.Get(settings);

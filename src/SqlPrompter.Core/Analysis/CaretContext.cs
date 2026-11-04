@@ -142,6 +142,9 @@ namespace SqlPrompter.Core.Analysis
         /// </summary>
         public bool AliasAllowed { get; internal set; }
 
+        /// <summary>The qualifier started with a database name that was removed from it (three-part name); the metadata is that database's.</summary>
+        public bool InOtherDatabase { get; internal set; }
+
         /// <summary>
         /// A SELECT list without any FROM: columns of all tables are offered and choosing one adds the FROM.
         /// </summary>
@@ -161,6 +164,18 @@ namespace SqlPrompter.Core.Analysis
         /// and Enter must not insert the first suggestion.
         /// </summary>
         public bool SoftSelection { get; internal set; }
+
+        /// <summary>Copy of the context with another qualifier (e.g. without the database part) and without preferred keywords.</summary>
+        internal CaretContext WithQualifier(IReadOnlyList<string> qualifier) => new CaretContext(Kind, ReplaceStart, ReplaceLength, TypedPrefix)
+        {
+            QuoteIdentifiers = QuoteIdentifiers,
+            Qualifier = qualifier,
+            Sources = Sources,
+            QualifiedSource = QualifiedSource,
+            SoftSelection = SoftSelection,
+            AliasAllowed = AliasAllowed,
+            InOtherDatabase = true,
+        };
 
         public override string ToString() => Kind + " [" + string.Join(".", Qualifier) + "] '" + TypedPrefix + "'";
     }

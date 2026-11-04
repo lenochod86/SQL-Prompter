@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.VisualStudio.Text;
+using SqlPrompter.Core.Analysis;
 
 namespace SqlPrompter.Ssms
 {
@@ -39,6 +40,22 @@ namespace SqlPrompter.Ssms
 
             text = snapshot.GetText(start, end - start);
             return true;
+        }
+
+        /// <summary>The database of the nearest USE line above the caret (also in earlier batches, since USE lasts until changed); null if none.</summary>
+        public static string FindUsedDatabase(ITextSnapshot snapshot, int position)
+        {
+            var caretLine = snapshot.GetLineFromPosition(position).LineNumber;
+            for (var number = caretLine; number >= 0 && caretLine - number < MaxLines; number--)
+            {
+                var line = snapshot.GetLineFromLineNumber(number);
+                if (line.Length <= 300 && UseStatement.TryParse(line.GetText(), out var database))
+                {
+                    return database;
+                }
+            }
+
+            return null;
         }
 
         private static bool IsGo(ITextSnapshotLine line) => line.Length <= 40 && Go.IsMatch(line.GetText());
