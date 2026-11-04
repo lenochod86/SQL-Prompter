@@ -182,6 +182,13 @@ Wanted, but not a priority, so it comes last.
 - [ ] Formatting the document or the selection (#57)
 - [ ] Upper case while typing (#57)
 
+### Phase 9: GUI enhancements (M to L) (#83)
+
+The settings are text-based today (colors as `Name=#RRGGBB`, rules as delimited strings, snippet placeholders as text). This phase replaces them with proper graphical controls. It comes last, after formatting. More items are added when they come up.
+
+- [ ] User friendly editing of the coloring settings: a color picker, environments and rules as editable lists with a dropdown of environments, validation in the UI (#84)
+- [ ] Snippet management: placeholders as a table, SQL coloring of the snippet text, a cleaner list without descriptions (#88)
+
 ## Risks
 
 - **Unsupported SSMS API.** Tab coloring, F12 into a new window and running a selection depend on APIs that may not exist or may change. Those phases therefore start with research.
@@ -202,3 +209,7 @@ By the user on 2026-11-03:
 8. **Linked servers:** yes, but lazily. Names first, objects only after choosing a server.
 9. **Language:** everything in the repository is in English; the conversation with the user stays in Czech.
 10. **Workflow:** an issue, a branch and a squash-merged pull request for every piece of work; GitHub deletes merged branches automatically.
+
+By the user on 2026-11-04:
+
+11. **GUI enhancements** come as the last phase, after formatting. The first item is a user friendly editor for the coloring settings, because typing color values as text is too hard to use. The snippet management window follows.
