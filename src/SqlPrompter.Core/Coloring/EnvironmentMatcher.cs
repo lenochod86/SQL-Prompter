@@ -8,7 +8,10 @@ namespace SqlPrompter.Core.Coloring
     /// <summary>Picks the environment of a connection from the coloring rules.</summary>
     public static class EnvironmentMatcher
     {
-        /// <summary>The environment of the first matching rule, or null when coloring is off or nothing matches.</summary>
+        /// <summary>
+        /// The environment of the first matching rule, or null when coloring is off or nothing matches. Rules that name a database
+        /// come before rules for a whole server, so that "server X" does not hide "server X, database Y".
+        /// </summary>
         public static ColorEnvironment Find(ColorSettings settings, string server, string database)
         {
             if (settings == null || !settings.Enabled || string.IsNullOrEmpty(server))
@@ -16,18 +19,22 @@ namespace SqlPrompter.Core.Coloring
                 return null;
             }
 
-            foreach (var rule in settings.Rules)
+            foreach (var withDatabase in new[] { true, false })
             {
-                if (!Matches(rule.Server, server) || !Matches(rule.Database, database ?? string.Empty))
+                foreach (var rule in settings.Rules)
                 {
-                    continue;
-                }
-
-                foreach (var environment in settings.Environments)
-                {
-                    if (string.Equals(environment.Name, rule.Environment, StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(rule.Database) == withDatabase
+                        || !Matches(rule.Server, server) || !Matches(rule.Database, database ?? string.Empty))
                     {
-                        return environment;
+                        continue;
+                    }
+
+                    foreach (var environment in settings.Environments)
+                    {
+                        if (string.Equals(environment.Name, rule.Environment, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return environment;
+                        }
                     }
                 }
             }
