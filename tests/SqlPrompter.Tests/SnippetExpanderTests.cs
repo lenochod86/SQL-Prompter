@@ -80,6 +80,16 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void FieldDeclaredWithAnEmptyDefaultShowsItsName()
+        {
+            var result = SnippetExpander.Expand(Make("UPDATE $table$ SET $col$ = $val$", ("table", ""), ("col", null), ("val", "0")), Plain);
+
+            Assert.Equal("UPDATE table SET col = 0", result.Text);
+            Assert.Equal("table", result.Fields.Single(f => f.Name == "table").DefaultValue);
+            Assert.Equal("col", result.Fields.Single(f => f.Name == "col").DefaultValue);
+        }
+
+        [Fact]
         public void FieldPositionsAreRightAfterBuiltInsThatChangeTheLength()
         {
             var result = SnippetExpander.Expand(Make("$DATE(yyyy)$ $f$ $USER$ $f$", ("f", "ab")), new SnippetContext { Now = new DateTime(2026, 1, 1), User = "joe", NewLine = "\n" });
@@ -129,7 +139,7 @@ namespace SqlPrompter.Tests
 
             Assert.Equal(new[] { "column_name", "schema_name", "table_name", "data_type" }, result.Fields.Select(f => f.Name).ToArray());
             Assert.Equal(2, result.Fields[0].Offsets.Count);
-            Assert.Equal(0, result.Fields[0].Length);
+            Assert.Equal("column_name".Length, result.Fields[0].Length);
             Assert.EndsWith("\nGO\n\n", result.Text);
             Assert.Equal(result.Text.Length, result.CursorOffset);
         }
