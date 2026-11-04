@@ -127,7 +127,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 ### Phase 4: Coloring by server and database (S to M, research first) (#35)
 
-- [ ] **Research:** how to color the document tab, the window frame and the status bar in SSMS 22. SSMS only has a custom connection color in the status bar, set in the connect dialog. There is no verified API for tab or frame colors. (#36)
+- [x] **Research (tab verified; frame and status bar move to #37):** how to color the document tab, the window frame and the status bar in SSMS 22. SSMS only has a custom connection color in the status bar, set in the connect dialog. There is no verified API for tab or frame colors. (#36)
 - [ ] Tab color (#37)
 - [ ] Query window frame color, if possible (#37)
 - [ ] Status bar color, if possible (#37)
