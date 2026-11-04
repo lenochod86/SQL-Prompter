@@ -51,6 +51,7 @@ namespace SqlPrompter.Ssms
         internal const string FromEditKey = "SqlPrompter.FromEdit";
         internal const string DetailKey = "SqlPrompter.Detail";
         internal const string KeyKey = "SqlPrompter.Key";
+        internal const string SnippetKey = "SqlPrompter.Snippet";
         internal const string DescriptionPropertyKey = DescriptionKey;
 
         /// <summary>Button at the bottom of the list that shows the list comes from SQL Prompter.</summary>
@@ -71,6 +72,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Database] = Icon(KnownMonikers.Database, "Database"),
             [SuggestionKind.LinkedServer] = Icon(KnownMonikers.LinkedServer, "Linked server"),
             [SuggestionKind.JoinCondition] = Icon(KnownMonikers.ForeignKeyRelationship, "Join condition"),
+            [SuggestionKind.Snippet] = Icon(KnownMonikers.Snippet, "Snippet"),
             [SuggestionKind.ScriptTable] = Icon(KnownMonikers.Table, "Table defined in the script"),
             [SuggestionKind.Variable] = Icon(KnownMonikers.LocalVariable, "Variable"),
         };
@@ -116,7 +118,7 @@ namespace SqlPrompter.Ssms
                 // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
                 var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
                 RequestScriptColumns(prepared, script);
-                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns)).Select(s => ToItem(s, prepared)).ToImmutableArray();
+                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets)).Select(s => ToItem(s, prepared)).ToImmutableArray();
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 // Where the user probably types a name of their own (an alias), Enter must keep what was typed instead of inserting
                 // a suggestion: the editor then offers the typed text as a "suggestion item" and only Tab inserts a real suggestion.
@@ -253,6 +255,11 @@ namespace SqlPrompter.Ssms
                 suggestion.SortText,
                 suggestion.FilterText,
                 ImmutableArray<ImageElement>.Empty);
+            if (suggestion.Tag is SqlPrompter.Core.Snippets.Snippet snippet)
+            {
+                item.Properties.AddProperty(SnippetKey, snippet);
+            }
+
             if (suggestion.Key != KeyKind.None)
             {
                 item.Properties.AddProperty(KeyKey, suggestion.Key);
@@ -379,9 +386,17 @@ namespace SqlPrompter.Ssms
 
         public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             // Enter and Tab arrive as '\n' and '\t'; they always insert.
             if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || Keys.Commits(typedChar))
             {
+                // A snippet is expanded instead of inserting its prefix; the typed character (Tab, Enter, Space) is swallowed.
+                if (item.Properties.TryGetProperty(SqlCompletionSource.SnippetKey, out SqlPrompter.Core.Snippets.Snippet snippetToExpand) &&
+                    SnippetInserter.TryInsert(session, buffer, snippetToExpand))
+                {
+                    return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
+                }
+
                 // SELECT without FROM: the column is inserted and the missing FROM goes to the end of the select list.
                 // Done here in two edits (not by the default commit) because an insertion at the end of the replaced span
                 // could otherwise be swallowed by it.
