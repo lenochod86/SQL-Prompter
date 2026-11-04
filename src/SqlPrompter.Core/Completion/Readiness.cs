@@ -95,6 +95,23 @@ namespace SqlPrompter.Core.Completion
                 needed.AddRange(context.Sources);
             }
 
+            if (context.SelectWithoutFrom && context.QualifiedSource == null)
+            {
+                // Columns of all tables and views; user objects normally come with the first load.
+                if (metadata == null)
+                {
+                    return new Readiness(ReadinessState.NeedsMetadata, null);
+                }
+
+                var all = metadata.Objects
+                    .Where(o => !o.IsSystem && (o.Kind == DbObjectKind.Table || o.Kind == DbObjectKind.View) && metadata.GetColumns(o) == null)
+                    .ToList();
+                if (all.Count > 0)
+                {
+                    return new Readiness(ReadinessState.NeedsColumns, all);
+                }
+            }
+
             if (needed.Count == 0)
             {
                 return new Readiness(ReadinessState.Ready, null);

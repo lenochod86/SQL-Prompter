@@ -29,7 +29,7 @@ namespace SqlPrompter.Core.Completion
 
     public sealed class Suggestion
     {
-        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group)
+        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null)
         {
             Kind = kind;
             DisplayText = displayText;
@@ -38,6 +38,7 @@ namespace SqlPrompter.Core.Completion
             Suffix = suffix;
             Description = description;
             Group = group;
+            FromClause = fromClause;
         }
 
         public SuggestionKind Kind { get; }
@@ -61,6 +62,9 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>Order of the group in the list, lower first.</summary>
         public int Group { get; }
+
+        /// <summary>Text such as "FROM dbo.Users AS u" that choosing the item adds at the end of the select list; null for most items.</summary>
+        public string FromClause { get; }
 
         /// <summary>Sort key: group, then text.</summary>
         public string SortText => Group.ToString("D2") + DisplayText;
@@ -92,7 +96,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group);
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -229,6 +233,12 @@ namespace SqlPrompter.Core.Completion
             }
 
             var alias = AliasGenerator.Generate(objectName, context.Sources.Select(s => s.ReferenceName).Where(n => n != null), options.Aliases);
+            return AliasDefinition(alias, context, options, context.TypedPrefix);
+        }
+
+        /// <summary>" AS alias" or " alias" as set in the options.</summary>
+        private static string AliasDefinition(string alias, CaretContext context, SuggestionOptions options, string caseHint)
+        {
             var quoted = SqlIdentifier.Quote(alias, context.QuoteIdentifiers);
             if (!options.Aliases.IncludeAs)
             {
@@ -245,7 +255,7 @@ namespace SqlPrompter.Core.Completion
                     asKeyword = "AS";
                     break;
                 default:
-                    asKeyword = Keywords.ApplyCase("AS", context.TypedPrefix);
+                    asKeyword = Keywords.ApplyCase("AS", caseHint);
                     break;
             }
 
@@ -356,6 +366,14 @@ namespace SqlPrompter.Core.Completion
                     source.ReferenceName, source.Alias != null ? target : null, (source.Alias != null ? "alias " : "source ") + target, 1);
             }
 
+            if (context.SelectWithoutFrom)
+            {
+                foreach (var column in AllColumnSuggestions(context, metadata, options))
+                {
+                    yield return column;
+                }
+            }
+
             foreach (var variable in VariableSuggestions(context, script, 2))
             {
                 yield return variable;
@@ -369,6 +387,58 @@ namespace SqlPrompter.Core.Completion
             foreach (var keyword in KeywordSuggestions(context, 4))
             {
                 yield return keyword;
+            }
+        }
+
+        /// <summary>The list is not built for a prefix shorter than this: all columns of a large database are too many items.</summary>
+        private const int AllColumnsMinPrefix = 1;
+
+        private const int AllColumnsLimit = 2000;
+
+        /// <summary>
+        /// SELECT without FROM: columns of all tables and views whose name matches the typed text, those starting with it first.
+        /// Choosing one inserts it (qualified as the options say) and adds FROM with its table at the end of the select list.
+        /// </summary>
+        private static IEnumerable<Suggestion> AllColumnSuggestions(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        {
+            var prefix = context.TypedPrefix;
+            if (metadata == null || prefix.Length < AllColumnsMinPrefix)
+            {
+                yield break;
+            }
+
+            var quote = context.QuoteIdentifiers;
+            var matches = new List<KeyValuePair<DbObject, DbColumn>>();
+            foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem && (o.Kind == DbObjectKind.Table || o.Kind == DbObjectKind.View)))
+            {
+                var columns = metadata.GetColumns(dbObject);
+                if (columns == null)
+                {
+                    continue;
+                }
+
+                matches.AddRange(columns
+                    .Where(c => c.Name.IndexOf(prefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .Select(c => new KeyValuePair<DbObject, DbColumn>(dbObject, c)));
+            }
+
+            foreach (var match in matches
+                         .OrderBy(m => m.Value.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                         .ThenBy(m => m.Value.Name, StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(m => m.Key.ToString(), StringComparer.OrdinalIgnoreCase)
+                         .Take(AllColumnsLimit))
+            {
+                var table = match.Key;
+                var alias = options.Aliases.AddAliases ? AliasGenerator.Generate(table.Name, null, options.Aliases) : null;
+                var owner = alias ?? table.Name;
+                var name = SqlIdentifier.Quote(match.Value.Name, quote);
+                var insert = options.Aliases.QualifyColumnsWithAliases ? SqlIdentifier.Quote(owner, quote) + "." + name : name;
+                var from = "FROM " + (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(table.Schema, quote) + "." : string.Empty) +
+                    SqlIdentifier.Quote(table.Name, quote) + (alias != null ? AliasDefinition(alias, context, options, string.Empty) : string.Empty);
+                var column = match.Value;
+                var type = column.TypeName.Length > 0 ? " " + column.TypeName + (column.IsNullable ? " null" : " not null") : string.Empty;
+                yield return new Suggestion(SuggestionKind.Column, column.Name, insert, column.Name, table.Name,
+                    column.Name + type + " (" + table + "), adds " + from, 5, from);
             }
         }
 

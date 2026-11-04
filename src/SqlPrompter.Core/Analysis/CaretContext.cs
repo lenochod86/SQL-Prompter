@@ -142,6 +142,14 @@ namespace SqlPrompter.Core.Analysis
         /// </summary>
         public bool AliasAllowed { get; internal set; }
 
+        /// <summary>
+        /// A SELECT list without any FROM: columns of all tables are offered and choosing one adds the FROM.
+        /// </summary>
+        public bool SelectWithoutFrom { get; internal set; }
+
+        /// <summary>With <see cref="SelectWithoutFrom"/>, the offset in the analyzed text where " FROM …" is inserted: the end of the select list.</summary>
+        public int FromInsertPosition { get; internal set; } = -1;
+
         /// <summary>For "alias.|", the source the qualifier refers to.</summary>
         public TableSource QualifiedSource { get; internal set; }
 

@@ -218,6 +218,12 @@ namespace SqlPrompter.Core.Analysis
             var expression = Make(ContextKind.Expression);
             expression.Sources = sources;
             expression.SoftSelection = operandBefore;
+            if (qualifier.Count == 0 && clauseState.Clause == Clause.Select && !sources.Any(src => src.ScopeLevel == 0))
+            {
+                expression.SelectWithoutFrom = true;
+                expression.FromInsertPosition = SelectListEnd(structure, tokens, nameStart, block, caret);
+            }
+
             if (qualifier.Count > 0)
             {
                 var target = FindQualifiedSource(sources, qualifier);
@@ -368,6 +374,29 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return null;
+        }
+
+        private static readonly HashSet<string> ClauseAfterSelectList = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "WHERE", "GROUP", "HAVING", "ORDER", "OPTION", "FOR",
+        };
+
+        /// <summary>Offset after the last token of the select list that contains the caret (where a missing FROM belongs).</summary>
+        private static int SelectListEnd(Structure s, List<Token> tokens, int fromIndex, Scope block, int caret)
+        {
+            var end = caret;
+            for (var i = fromIndex; i < block.End && i < tokens.Count; i++)
+            {
+                var token = tokens[i];
+                if (s.Depth[i] == block.Depth && (token.Kind == TokenKind.Semicolon || (token.Upper != null && ClauseAfterSelectList.Contains(token.Upper))))
+                {
+                    break;
+                }
+
+                end = Math.Max(end, token.End);
+            }
+
+            return end;
         }
 
         private struct ClauseState

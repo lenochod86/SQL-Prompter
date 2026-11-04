@@ -48,6 +48,7 @@ namespace SqlPrompter.Ssms
     internal sealed class SqlCompletionSource : IAsyncCompletionSource
     {
         private const string DescriptionKey = "SqlPrompter.Description";
+        internal const string FromEditKey = "SqlPrompter.FromEdit";
 
         /// <summary>Button at the bottom of the list that shows the list comes from SQL Prompter.</summary>
         private static readonly ImmutableArray<CompletionFilter> Filters = ImmutableArray.Create(
@@ -109,7 +110,7 @@ namespace SqlPrompter.Ssms
                 // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
                 var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
                 RequestScriptColumns(prepared, script);
-                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions()).Select(ToItem).ToImmutableArray();
+                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions()).Select(s => ToItem(s, prepared)).ToImmutableArray();
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 return Task.FromResult(new CompletionContext(items, null, hint));
             }
@@ -149,7 +150,7 @@ namespace SqlPrompter.Ssms
             }
 
             var metadata = PrepareMetadata(context, out var cache, out var loader);
-            pending = new Prepared(snapshot, context, metadata, batch, triggerLocation.Position - batchStart, cache, loader);
+            pending = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader);
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
@@ -212,7 +213,7 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private CompletionItem ToItem(Suggestion suggestion)
+        private CompletionItem ToItem(Suggestion suggestion, Prepared prepared)
         {
             var item = new CompletionItem(
                 suggestion.DisplayText,
@@ -229,6 +230,12 @@ namespace SqlPrompter.Ssms
                 item.Properties.AddProperty(DescriptionKey, suggestion.Description);
             }
 
+            if (suggestion.FromClause != null && prepared.Context.FromInsertPosition >= 0)
+            {
+                var position = prepared.BatchStart + prepared.Context.FromInsertPosition;
+                item.Properties.AddProperty(FromEditKey, new FromEdit(prepared.Snapshot.CreateTrackingPoint(position, PointTrackingMode.Positive), " " + suggestion.FromClause));
+            }
+
             return item;
         }
 
@@ -241,6 +248,7 @@ namespace SqlPrompter.Ssms
                 CaretContext context,
                 IDatabaseMetadata metadata,
                 string batch,
+                int batchStart,
                 int caretInBatch,
                 DatabaseMetadataCache cache,
                 IMetadataLoader loader)
@@ -249,12 +257,15 @@ namespace SqlPrompter.Ssms
                 Context = context;
                 Metadata = metadata;
                 Batch = batch;
+                BatchStart = batchStart;
                 CaretInBatch = caretInBatch;
                 Cache = cache;
                 Loader = loader;
             }
 
             public string Batch { get; }
+
+            public int BatchStart { get; }
 
             public int CaretInBatch { get; }
 
@@ -268,6 +279,20 @@ namespace SqlPrompter.Ssms
 
             public IDatabaseMetadata Metadata { get; }
         }
+    }
+
+    /// <summary>Text to insert at the end of the select list when the item is committed.</summary>
+    internal sealed class FromEdit
+    {
+        public FromEdit(ITrackingPoint position, string text)
+        {
+            Position = position;
+            Text = text;
+        }
+
+        public ITrackingPoint Position { get; }
+
+        public string Text { get; }
     }
 
     [Export(typeof(IAsyncCompletionCommitManagerProvider))]
@@ -303,6 +328,25 @@ namespace SqlPrompter.Ssms
             // Enter and Tab arrive as '\n' and '\t'; they always insert.
             if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || Keys.Commits(typedChar))
             {
+                // SELECT without FROM: the column is inserted and the missing FROM goes to the end of the select list.
+                // Done here in two edits (not by the default commit) because an insertion at the end of the replaced span
+                // could otherwise be swallowed by it.
+                if (item.Properties.TryGetProperty(SqlCompletionSource.FromEditKey, out FromEdit edit))
+                {
+                    try
+                    {
+                        var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                        buffer.Replace(span, item.InsertText);
+                        buffer.Insert(edit.Position.GetPosition(buffer.CurrentSnapshot), edit.Text);
+                        session.TextView.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, span.Start + item.InsertText.Length));
+                        return new CommitResult(isHandled: true, CommitBehavior.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Adding the FROM clause failed", ex);
+                    }
+                }
+
                 return CommitResult.Unhandled;
             }
 
