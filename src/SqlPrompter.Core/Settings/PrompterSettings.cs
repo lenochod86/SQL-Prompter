@@ -23,7 +23,13 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "behavior")]
         public BehaviorSettings Behavior { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone() };
+        [DataMember(Name = "aliases")]
+        public AliasSettings Aliases { get; set; }
+
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone() };
+
+        public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
+            new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases);
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context) => SetDefaults();
@@ -33,12 +39,14 @@ namespace SqlPrompter.Core.Settings
         {
             // "behavior": null in the file.
             Behavior = Behavior ?? new BehaviorSettings();
+            Aliases = Aliases ?? new AliasSettings();
         }
 
         private void SetDefaults()
         {
             Version = CurrentVersion;
             Behavior = new BehaviorSettings();
+            Aliases = new AliasSettings();
         }
     }
 
@@ -74,6 +82,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "commitOnClosingBracket")]
         public bool CommitOnClosingBracket { get; set; }
 
+        /// <summary>Adds the text "SQL Prompter" to the right side of every item so that our list is recognizable at a glance.</summary>
+        [DataMember(Name = "markItems")]
+        public bool MarkItems { get; set; }
+
         public KeywordCase KeywordCase { get; set; }
 
         /// <summary>The JSON serializer writes enums as numbers; the file holds the readable name instead.</summary>
@@ -103,6 +115,7 @@ namespace SqlPrompter.Core.Settings
             CommitOnSemicolon = false;
             CommitOnClosingBracket = false;
             KeywordCase = KeywordCase.MatchTyped;
+            MarkItems = true;
         }
     }
 }

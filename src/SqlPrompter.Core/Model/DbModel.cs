@@ -7,17 +7,21 @@ namespace SqlPrompter.Core.Model
         Table,
         View,
         TableFunction,
+
+        /// <summary>Synonym; <see cref="DbObject.SynonymTarget"/> says what it points to.</summary>
+        Synonym,
     }
 
     public sealed class DbObject
     {
-        public DbObject(int id, string schema, string name, DbObjectKind kind, bool isSystem)
+        public DbObject(int id, string schema, string name, DbObjectKind kind, bool isSystem, IReadOnlyList<string> synonymTarget = null)
         {
             Id = id;
             Schema = schema;
             Name = name;
             Kind = kind;
             IsSystem = isSystem;
+            SynonymTarget = synonymTarget;
         }
 
         /// <summary>object_id in the database.</summary>
@@ -31,6 +35,9 @@ namespace SqlPrompter.Core.Model
 
         /// <summary>System object (sys.*, INFORMATION_SCHEMA.*).</summary>
         public bool IsSystem { get; }
+
+        /// <summary>For a synonym, the name parts of the base object (e.g. [dbo, Users]); otherwise null.</summary>
+        public IReadOnlyList<string> SynonymTarget { get; }
 
         public override string ToString() => Schema + "." + Name;
     }
@@ -65,6 +72,9 @@ namespace SqlPrompter.Core.Model
         IReadOnlyList<string> Schemas { get; }
 
         IReadOnlyList<DbObject> Objects { get; }
+
+        /// <summary>Names of the databases on the server that the login can access; empty if unknown.</summary>
+        IReadOnlyList<string> Databases { get; }
 
         /// <summary>Finds an object like SQL Server does: without a schema in the default schema, then in dbo.</summary>
         DbObject FindObject(string schema, string name);

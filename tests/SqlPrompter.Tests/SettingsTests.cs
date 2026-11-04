@@ -30,6 +30,19 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void ItemsAreMarkedByDefaultAndTheMarkerKeepsTheSuffix()
+        {
+            Assert.True(new PrompterSettings().Behavior.MarkItems);
+            Assert.True(SettingsJson.Deserialize("{}").Behavior.MarkItems);
+            Assert.False(SettingsJson.Deserialize("{ \"behavior\": { \"markItems\": false } }").Behavior.MarkItems);
+
+            var plain = new Suggestion(SuggestionKind.Keyword, "select", "select", "select", null, null, 0);
+            var withSchema = new Suggestion(SuggestionKind.Table, "Users", "dbo.Users", "Users", "dbo", null, 0);
+            Assert.Equal("SQL Prompter", plain.MarkedSuffix);
+            Assert.Equal("dbo · SQL Prompter", withSchema.MarkedSuffix);
+        }
+
+        [Fact]
         public void JsonRoundTripKeepsEverything()
         {
             var settings = new PrompterSettings();
@@ -185,8 +198,8 @@ namespace SqlPrompter.Tests
             var context = Analyze("SELECT * FROM dbo.T t |");
             var typed = SuggestionBuilder.Build(Analyze("sel|"), null);
 
-            var upper = SuggestionBuilder.Build(Analyze("sel|"), null, null, KeywordCase.Upper);
-            var lower = SuggestionBuilder.Build(Analyze("SEL|"), null, null, KeywordCase.Lower);
+            var upper = SuggestionBuilder.Build(Analyze("sel|"), null, null, new SuggestionOptions(KeywordCase.Upper, null));
+            var lower = SuggestionBuilder.Build(Analyze("SEL|"), null, null, new SuggestionOptions(KeywordCase.Lower, null));
 
             Assert.Contains(typed, i => i.InsertText == "select");
             Assert.Contains(upper, i => i.InsertText == "SELECT");

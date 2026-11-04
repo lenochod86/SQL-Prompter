@@ -137,6 +137,22 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>Table sources visible from the caret, nearest block first.</summary>
         public IReadOnlyList<TableSource> Sources { get; internal set; } = Array.Empty<TableSource>();
 
+        /// <summary>
+        /// A table is being chosen for FROM, JOIN or APPLY and nothing follows it, so an alias can be inserted with it.
+        /// </summary>
+        public bool AliasAllowed { get; internal set; }
+
+        /// <summary>The qualifier started with a database name that was removed from it (three-part name); the metadata is that database's.</summary>
+        public bool InOtherDatabase { get; internal set; }
+
+        /// <summary>
+        /// A SELECT list without any FROM: columns of all tables are offered and choosing one adds the FROM.
+        /// </summary>
+        public bool SelectWithoutFrom { get; internal set; }
+
+        /// <summary>With <see cref="SelectWithoutFrom"/>, the offset in the analyzed text where " FROM …" is inserted: the end of the select list.</summary>
+        public int FromInsertPosition { get; internal set; } = -1;
+
         /// <summary>For "alias.|", the source the qualifier refers to.</summary>
         public TableSource QualifiedSource { get; internal set; }
 
@@ -148,6 +164,18 @@ namespace SqlPrompter.Core.Analysis
         /// and Enter must not insert the first suggestion.
         /// </summary>
         public bool SoftSelection { get; internal set; }
+
+        /// <summary>Copy of the context with another qualifier (e.g. without the database part) and without preferred keywords.</summary>
+        internal CaretContext WithQualifier(IReadOnlyList<string> qualifier) => new CaretContext(Kind, ReplaceStart, ReplaceLength, TypedPrefix)
+        {
+            QuoteIdentifiers = QuoteIdentifiers,
+            Qualifier = qualifier,
+            Sources = Sources,
+            QualifiedSource = QualifiedSource,
+            SoftSelection = SoftSelection,
+            AliasAllowed = AliasAllowed,
+            InOtherDatabase = true,
+        };
 
         public override string ToString() => Kind + " [" + string.Join(".", Qualifier) + "] '" + TypedPrefix + "'";
     }

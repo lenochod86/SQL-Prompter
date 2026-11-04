@@ -55,7 +55,7 @@ namespace SqlPrompter.Core.Completion
                         return new Readiness(ReadinessState.NeedsMetadata, null);
                     }
 
-                    return context.Qualifier.Count == 1 && !metadata.HasSchema(context.Qualifier[0])
+                    return context.Qualifier.Count == 1 && context.Qualifier[0].Length > 0 && !metadata.HasSchema(context.Qualifier[0])
                         ? new Readiness(ReadinessState.Unsupported, null)
                         : new Readiness(ReadinessState.Ready, null);
 
@@ -80,7 +80,38 @@ namespace SqlPrompter.Core.Completion
                 return null;
             }
 
-            return metadata.FindObject(string.IsNullOrEmpty(source.Schema) ? null : source.Schema, source.ObjectName);
+            return FollowSynonym(metadata.FindObject(string.IsNullOrEmpty(source.Schema) ? null : source.Schema, source.ObjectName), metadata);
+        }
+
+        /// <summary>
+        /// A synonym has no columns of its own: its columns are those of the object it points to in this database.
+        /// Returns the synonym itself if the target is elsewhere or unknown, so that nothing is offered for it.
+        /// </summary>
+        public static DbObject FollowSynonym(DbObject dbObject, IDatabaseMetadata metadata)
+        {
+            for (var hops = 0; dbObject != null && dbObject.Kind == DbObjectKind.Synonym && hops < 8; hops++)
+            {
+                var target = dbObject.SynonymTarget;
+                if (target == null || target.Count == 0 || target.Count > 3)
+                {
+                    return dbObject;
+                }
+
+                if (target.Count == 3 && !string.Equals(target[0], metadata.DatabaseName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return dbObject;
+                }
+
+                var next = metadata.FindObject(target.Count > 1 ? target[target.Count - 2] : null, target[target.Count - 1]);
+                if (next == null)
+                {
+                    return dbObject;
+                }
+
+                dbObject = next;
+            }
+
+            return dbObject;
         }
 
         private static Readiness EvaluateExpression(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
@@ -93,6 +124,23 @@ namespace SqlPrompter.Core.Completion
             else
             {
                 needed.AddRange(context.Sources);
+            }
+
+            if (context.SelectWithoutFrom && context.QualifiedSource == null)
+            {
+                // Columns of all tables and views; user objects normally come with the first load.
+                if (metadata == null)
+                {
+                    return new Readiness(ReadinessState.NeedsMetadata, null);
+                }
+
+                var all = metadata.Objects
+                    .Where(o => !o.IsSystem && (o.Kind == DbObjectKind.Table || o.Kind == DbObjectKind.View) && metadata.GetColumns(o) == null)
+                    .ToList();
+                if (all.Count > 0)
+                {
+                    return new Readiness(ReadinessState.NeedsColumns, all);
+                }
             }
 
             if (needed.Count == 0)
@@ -117,7 +165,7 @@ namespace SqlPrompter.Core.Completion
                 }
 
                 var dbObject = Resolve(source, metadata);
-                if (dbObject == null)
+                if (dbObject == null || dbObject.Kind == DbObjectKind.Synonym)
                 {
                     // Outer sources are only a bonus; an unknown source in the current block would make the list incomplete.
                     if (source.ScopeLevel == 0 || source == context.QualifiedSource)

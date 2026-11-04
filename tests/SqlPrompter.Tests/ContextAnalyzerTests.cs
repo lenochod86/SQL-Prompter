@@ -1,5 +1,6 @@
 using System.Linq;
 using SqlPrompter.Core.Analysis;
+using SqlPrompter.Core.Completion;
 using Xunit;
 using static SqlPrompter.Tests.TestSupport;
 
@@ -39,9 +40,14 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
-        public void ThreePartNameOffersNothing()
+        public void ThreePartNameOfAnUnknownDatabaseOffersNothing()
         {
-            Assert.Equal(ContextKind.Name, Analyze("SELECT * FROM other.dbo.|").Kind);
+            // The qualifier keeps the database part; without such a database the list is empty.
+            var context = Analyze("SELECT * FROM other.dbo.|");
+
+            Assert.Equal(ContextKind.ObjectName, context.Kind);
+            Assert.Equal(new[] { "other", "dbo" }, context.Qualifier);
+            Assert.Empty(SuggestionBuilder.Build(context, SampleDatabase()));
         }
 
         [Fact]

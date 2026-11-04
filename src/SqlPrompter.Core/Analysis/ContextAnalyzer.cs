@@ -66,11 +66,23 @@ namespace SqlPrompter.Core.Analysis
             // Qualifier: a.b.| -> [a, b]
             var qualifier = new List<string>();
             var nameStart = caretIndex;
-            while (nameStart >= 2 && tokens[nameStart - 1].Kind == TokenKind.Dot &&
-                   (tokens[nameStart - 2].IsNamePart || tokens[nameStart - 2].Kind == TokenKind.Variable))
+            while (nameStart >= 2 && tokens[nameStart - 1].Kind == TokenKind.Dot)
             {
-                qualifier.Insert(0, tokens[nameStart - 2].IdentifierValue);
-                nameStart -= 2;
+                if (tokens[nameStart - 2].IsNamePart || tokens[nameStart - 2].Kind == TokenKind.Variable)
+                {
+                    qualifier.Insert(0, tokens[nameStart - 2].IdentifierValue);
+                    nameStart -= 2;
+                }
+                else if (nameStart >= 3 && tokens[nameStart - 2].Kind == TokenKind.Dot && tokens[nameStart - 3].IsNamePart)
+                {
+                    // db..| : the schema between the dots is left out, i.e. the default one.
+                    qualifier.Insert(0, string.Empty);
+                    nameStart -= 1;
+                }
+                else
+                {
+                    break;
+                }
             }
 
             var unknownQualifier = nameStart >= 1 && tokens[nameStart - 1].Kind == TokenKind.Dot; // db..t, @t.column
@@ -135,7 +147,7 @@ namespace SqlPrompter.Core.Analysis
             var commaInFrom = anchor.Kind == TokenKind.Comma && anchorAtBlockLevel && clauseState.InFrom && clauseState.Clause == Clause.From;
             if (objectKeywords != null || commaInFrom)
             {
-                if (qualifier.Count > 1)
+                if (qualifier.Count > 2)
                 {
                     // Another database or server: the extension does not know its objects.
                     return Make(ContextKind.Name);
@@ -143,6 +155,19 @@ namespace SqlPrompter.Core.Analysis
 
                 var objectName = Make(ContextKind.ObjectName);
                 objectName.PreferredKeywords = qualifier.Count == 0 ? objectKeywords ?? Array.Empty<string>() : Array.Empty<string>();
+
+                // Not for INSERT INTO, UPDATE, DELETE FROM … and not when an alias is already typed after the name.
+                var tableSource = commaInFrom || anchor.IsWord("JOIN") || anchor.IsWord("APPLY") ||
+                    (anchor.IsWord("FROM") && !tokens[statementStart].IsWord("DELETE"));
+                var next = caretIndex + (word != null ? 1 : 0);
+                var aliasFollows = next < statementEnd && (tokens[next].Kind == TokenKind.QuotedIdentifier ||
+                    (tokens[next].Kind == TokenKind.Word && !Keywords.CannotBeAlias(tokens[next].Text)) || tokens[next].IsWord("AS"));
+                if (tableSource && !aliasFollows)
+                {
+                    objectName.AliasAllowed = true;
+                    objectName.Sources = CollectSources(structure, scopes);
+                }
+
                 return objectName;
             }
 
@@ -205,6 +230,12 @@ namespace SqlPrompter.Core.Analysis
             var expression = Make(ContextKind.Expression);
             expression.Sources = sources;
             expression.SoftSelection = operandBefore;
+            if (qualifier.Count == 0 && clauseState.Clause == Clause.Select && !sources.Any(src => src.ScopeLevel == 0))
+            {
+                expression.SelectWithoutFrom = true;
+                expression.FromInsertPosition = SelectListEnd(structure, tokens, nameStart, block, caret);
+            }
+
             if (qualifier.Count > 0)
             {
                 var target = FindQualifiedSource(sources, qualifier);
@@ -355,6 +386,29 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return null;
+        }
+
+        private static readonly HashSet<string> ClauseAfterSelectList = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "WHERE", "GROUP", "HAVING", "ORDER", "OPTION", "FOR",
+        };
+
+        /// <summary>Offset after the last token of the select list that contains the caret (where a missing FROM belongs).</summary>
+        private static int SelectListEnd(Structure s, List<Token> tokens, int fromIndex, Scope block, int caret)
+        {
+            var end = caret;
+            for (var i = fromIndex; i < block.End && i < tokens.Count; i++)
+            {
+                var token = tokens[i];
+                if (s.Depth[i] == block.Depth && (token.Kind == TokenKind.Semicolon || (token.Upper != null && ClauseAfterSelectList.Contains(token.Upper))))
+                {
+                    break;
+                }
+
+                end = Math.Max(end, token.End);
+            }
+
+            return end;
         }
 
         private struct ClauseState
