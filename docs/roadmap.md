@@ -67,7 +67,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 ### Phase 0: MVP polish (S)
 
 - [x] Commit keys like SQL Prompt: Enter, Space and Tab commit; dot, comma, parentheses, semicolon and `]` do not commit, they close the list and are typed (a dot then opens the columns) (#6)
-- [ ] Configurable commit keys (#9)
+- [x] Configurable commit keys (#9)
 - [x] Make the SQL Prompter list recognizable at a glance (own icon or marker, like SQL Prompt's list); today it is hard to tell it from the built-in one while testing (#20)
 - [x] Research: our own completion list (presenter) in place of the standard one; prototype with type, highlight and alias columns (#61)
 - [x] Verify in SSMS: empty list for variables, SQL Prompter filter, soft selection while typing an alias (#7)
@@ -78,8 +78,8 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 ### Phase 1: Script knowledge and aliases (M) (#22)
 
-- [ ] **Settings foundation:** pages in Tools → Options → SQL Prompter, JSON file, export and import. Every later feature adds its options (#9).
-- [ ] **SQL Prompt settings import** (`.settings`): aliases, qualification, commit keys. Other parts follow with later phases (#9).
+- [x] **Settings foundation:** pages in Tools → Options → SQL Prompter, JSON file, export and import. Every later feature adds its options (#9).
+- [x] **SQL Prompt settings import** (`.settings`): aliases, qualification, commit keys. Other parts follow with later phases (#9).
 - [ ] **Script model**, i.e. definitions in the script computed in the background (#15):
   - [ ] columns of CTEs and derived tables
   - [ ] `#tables` from `CREATE TABLE` and `SELECT … INTO`
