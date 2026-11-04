@@ -50,6 +50,7 @@ namespace SqlPrompter.Ssms
         private const string DescriptionKey = "SqlPrompter.Description";
         internal const string FromEditKey = "SqlPrompter.FromEdit";
         internal const string DetailKey = "SqlPrompter.Detail";
+        internal const string KeyKey = "SqlPrompter.Key";
         internal const string DescriptionPropertyKey = DescriptionKey;
 
         /// <summary>Button at the bottom of the list that shows the list comes from SQL Prompter.</summary>
@@ -248,6 +249,11 @@ namespace SqlPrompter.Ssms
                 suggestion.SortText,
                 suggestion.FilterText,
                 ImmutableArray<ImageElement>.Empty);
+            if (suggestion.Key != KeyKind.None)
+            {
+                item.Properties.AddProperty(KeyKey, suggestion.Key);
+            }
+
             if (!string.IsNullOrEmpty(suggestion.Detail))
             {
                 item.Properties.AddProperty(DetailKey, suggestion.Detail);

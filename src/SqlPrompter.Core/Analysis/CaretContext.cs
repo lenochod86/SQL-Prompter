@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SqlPrompter.Core.Analysis
 {
@@ -142,6 +143,9 @@ namespace SqlPrompter.Core.Analysis
         /// </summary>
         public bool AliasAllowed { get; internal set; }
 
+        /// <summary>The name follows JOIN, so tables related by a foreign key to the tables of the query can be offered first.</summary>
+        public bool AfterJoin { get; internal set; }
+
         /// <summary>The qualifier started with a database name that was removed from it (three-part name); the metadata is that database's.</summary>
         public bool InOtherDatabase { get; internal set; }
 
@@ -152,6 +156,18 @@ namespace SqlPrompter.Core.Analysis
 
         /// <summary>With <see cref="SelectWithoutFrom"/>, the offset in the analyzed text where " FROM …" is inserted: the end of the select list.</summary>
         public int FromInsertPosition { get; internal set; } = -1;
+
+        /// <summary>
+        /// Names the query already refers to (aliases, or table names without alias), not counting the word being typed:
+        /// in "JOIN o" the "o" is parsed as a table source of its own and must not make the alias "o" look taken.
+        /// </summary>
+        public IEnumerable<string> ReferenceNamesInUse() => Sources
+            .Where(s => s.ReferenceName != null && !IsTypedFragment(s))
+            .Select(s => s.ReferenceName);
+
+        private bool IsTypedFragment(TableSource source) =>
+            TypedPrefix.Length > 0 && source.Alias == null && source.Kind == TableSourceKind.Object && source.NameParts.Count == Qualifier.Count + 1 &&
+            string.Equals(source.ObjectName, TypedPrefix, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>For "alias.|", the source the qualifier refers to.</summary>
         public TableSource QualifiedSource { get; internal set; }
@@ -174,6 +190,7 @@ namespace SqlPrompter.Core.Analysis
             QualifiedSource = QualifiedSource,
             SoftSelection = SoftSelection,
             AliasAllowed = AliasAllowed,
+            AfterJoin = AfterJoin,
             InOtherDatabase = inOtherDatabase,
         };
 

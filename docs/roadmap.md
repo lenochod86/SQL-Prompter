@@ -102,8 +102,8 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 ### Phase 2: JOINs (M) (#27)
 
-- [ ] Metadata of primary and foreign keys, including multi-column keys (#28)
-- [ ] After `JOIN`, tables linked by a foreign key to the tables in the query first, with an item for the whole clause `Table AS t ON t.IdX = x.IdX` (#28)
+- [x] Metadata of primary and foreign keys, including multi-column keys (#28)
+- [x] After `JOIN`, tables linked by a foreign key to the tables in the query first, with an item for the whole clause `Table AS t ON t.IdX = x.IdX` (#28)
 - [ ] Complete conditions after `ON` (#29):
   - [ ] by foreign keys
   - [ ] by matching column names

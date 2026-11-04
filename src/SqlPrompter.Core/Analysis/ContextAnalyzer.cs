@@ -165,6 +165,7 @@ namespace SqlPrompter.Core.Analysis
                 if (tableSource && !aliasFollows)
                 {
                     objectName.AliasAllowed = true;
+                    objectName.AfterJoin = anchor.IsWord("JOIN") && qualifier.Count == 0;
                     objectName.Sources = CollectSources(structure, scopes);
                 }
 
