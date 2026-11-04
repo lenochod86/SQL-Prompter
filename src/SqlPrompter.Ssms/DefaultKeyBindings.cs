@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Microsoft.VisualStudio.Shell;
 
 namespace SqlPrompter.Ssms
@@ -27,11 +28,26 @@ namespace SqlPrompter.Ssms
                 }
 
                 Set(dte, "SQLPrompter.GoToDefinition", "SQL Query Editor::F12");
+                Set(dte, "SQLPrompter.RunStatementAtCaret", "SQL Query Editor::Shift+F5");
             }
             catch (Exception ex)
             {
                 Log.Error("Setting the default keys failed", ex);
             }
+        }
+
+        private static string FindOwner(EnvDTE.DTE dte, string binding)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            foreach (EnvDTE.Command other in dte.Commands)
+            {
+                if (other.Bindings is object[] keys && keys.Any(k => string.Equals(Convert.ToString(k), binding, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return other.Name;
+                }
+            }
+
+            return null;
         }
 
         private static void Set(EnvDTE.DTE dte, string commandName, string binding)
@@ -46,6 +62,13 @@ namespace SqlPrompter.Ssms
             var command = dte.Commands.Item(commandName);
             if (command.Bindings is object[] existing && existing.Length > 0)
             {
+                return;
+            }
+
+            var taken = FindOwner(dte, binding);
+            if (taken != null)
+            {
+                Log.Write("Default key " + binding + " is used by " + taken + "; " + commandName + " keeps no key.");
                 return;
             }
 
