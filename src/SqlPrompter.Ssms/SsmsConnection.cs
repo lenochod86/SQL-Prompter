@@ -41,7 +41,7 @@ namespace SqlPrompter.Ssms
                 return null;
             }
 
-            // AuthenticationType values verified in SSMS 22.11: 1 = SQL Server. 0 = Windows according to older versions.
+            // AuthenticationType values verified in SSMS 22.11: 1 = SQL Server, 0 = Windows (LocalDB window loads without a password).
             var rawAuthentication = Read("AuthenticationType");
             AuthenticationKind authentication;
             switch (rawAuthentication)

@@ -118,7 +118,10 @@ namespace SqlPrompter.Ssms
                 RequestScriptColumns(prepared, script);
                 var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns)).Select(s => ToItem(s, prepared)).ToImmutableArray();
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
-                return Task.FromResult(new CompletionContext(items, null, hint));
+                // Where the user probably types a name of their own (an alias), Enter must keep what was typed instead of inserting
+                // a suggestion: the editor then offers the typed text as a "suggestion item" and only Tab inserts a real suggestion.
+                var suggestion = prepared.Context.SoftSelection ? new SuggestionItemOptions("name or alias", "Enter keeps what you typed; Tab inserts the selected suggestion") : null;
+                return Task.FromResult(new CompletionContext(items, suggestion, hint));
             }
             catch (Exception ex)
             {
