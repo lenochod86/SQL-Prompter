@@ -68,7 +68,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 - [x] Commit keys like SQL Prompt: Enter, Space and Tab commit; dot, comma, parentheses, semicolon and `]` do not commit, they close the list and are typed (a dot then opens the columns) (#6)
 - [ ] Configurable commit keys (#9)
-- [ ] Make the SQL Prompter list recognizable at a glance (own icon or marker, like SQL Prompt's list); today it is hard to tell it from the built-in one while testing (#20)
+- [x] Make the SQL Prompter list recognizable at a glance (own icon or marker, like SQL Prompt's list); today it is hard to tell it from the built-in one while testing (#20)
 - [ ] Verify in SSMS: empty list for variables, SQL Prompter filter, soft selection while typing an alias (#7)
 - [ ] Verify performance on a large database (#7)
 - [ ] Verify Windows authentication (#7)
@@ -85,14 +85,14 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
   - [ ] `@tables`
   - [ ] variables and parameters with types, including the parameters of the procedure being edited
 - [ ] **Automatic aliases** when inserting a table (#23):
-  - [ ] from the capital letters of the name (`OrderItems` → `oi`), avoiding collisions in the query
+  - [x] from the capital letters of the name (`OrderItems` → `oi`), avoiding collisions in the query
   - [ ] custom aliases
   - [ ] ignored prefixes
   - [ ] `AS` option
-- [ ] **Qualification:** objects with schema, columns with alias (`a.Column`) (#23)
-- [ ] After `SELECT` without `FROM`, columns of all tables in the database; choosing a column adds `FROM` with its table and alias (#24)
-- [ ] Three-part names and tracking `USE` (#25)
-- [ ] Synonyms (#25)
+- [x] **Qualification:** objects with schema, columns with alias (`a.Column`) (#23)
+- [x] After `SELECT` without `FROM`, columns of all tables in the database; choosing a column adds `FROM` with its table and alias (#24)
+- [x] Three-part names and tracking `USE` (#25)
+- [x] Synonyms (#25)
 - [ ] **Linked servers, loaded lazily**, so that the initial load stays fast even for a customer with five linked servers full of tables (#26):
   - [ ] only their names first (`sys.servers`)
   - [ ] the server's databases after choosing a server

@@ -148,6 +148,14 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void AsIsUpperCaseEvenWhenTheNameIsTypedInLowerCase()
+        {
+            var items = SuggestionBuilder.Build(Analyze("SELECT * FROM us|"), SampleDatabase(), null, Options());
+
+            Assert.Equal("dbo.Users AS u", items.Single(i => i.DisplayText == "Users").InsertText);
+        }
+
+        [Fact]
         public void AliasWithoutAsAndWithKeywordCase()
         {
             var noAs = SuggestionBuilder.Build(Analyze("SELECT * FROM |"), SampleDatabase(), null, Options(new AliasSettings { IncludeAs = false }));

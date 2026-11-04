@@ -248,11 +248,11 @@ namespace SqlPrompter.Core.Completion
             }
 
             var alias = AliasGenerator.Generate(objectName, context.Sources.Select(s => s.ReferenceName).Where(n => n != null), options.Aliases);
-            return AliasDefinition(alias, context, options, context.TypedPrefix);
+            return AliasDefinition(alias, context, options);
         }
 
         /// <summary>" AS alias" or " alias" as set in the options.</summary>
-        private static string AliasDefinition(string alias, CaretContext context, SuggestionOptions options, string caseHint)
+        private static string AliasDefinition(string alias, CaretContext context, SuggestionOptions options)
         {
             var quoted = SqlIdentifier.Quote(alias, context.QuoteIdentifiers);
             if (!options.Aliases.IncludeAs)
@@ -270,7 +270,7 @@ namespace SqlPrompter.Core.Completion
                     asKeyword = "AS";
                     break;
                 default:
-                    asKeyword = Keywords.ApplyCase("AS", caseHint);
+                    asKeyword = "AS";
                     break;
             }
 
@@ -454,11 +454,11 @@ namespace SqlPrompter.Core.Completion
                 var name = SqlIdentifier.Quote(match.Value.Name, quote);
                 var insert = options.Aliases.QualifyColumnsWithAliases ? SqlIdentifier.Quote(owner, quote) + "." + name : name;
                 var from = "FROM " + (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(table.Schema, quote) + "." : string.Empty) +
-                    SqlIdentifier.Quote(table.Name, quote) + (alias != null ? AliasDefinition(alias, context, options, string.Empty) : string.Empty);
+                    SqlIdentifier.Quote(table.Name, quote) + (alias != null ? AliasDefinition(alias, context, options) : string.Empty);
                 var column = match.Value;
                 var type = column.TypeName.Length > 0 ? " " + column.TypeName + (column.IsNullable ? " null" : " not null") : string.Empty;
                 yield return new Suggestion(SuggestionKind.Column, column.Name, insert, column.Name, table.Name,
-                    column.Name + type + " (" + table + "), adds " + from, 5, from);
+                    column.Name + type + " (" + table + "), adds " + from, 0, from);
             }
         }
 

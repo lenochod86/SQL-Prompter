@@ -335,6 +335,18 @@ namespace SqlPrompter.Ssms
         public bool ShouldCommitCompletion(IAsyncCompletionSession session, SnapshotPoint location, char typedChar, CancellationToken token) =>
             Keys.PotentialCharacters.Contains(typedChar);
 
+        private static void MoveCaret(IAsyncCompletionSession session, ITextBuffer buffer, int position)
+        {
+            try
+            {
+                session.TextView.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, position));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Moving the caret failed", ex);
+            }
+        }
+
         public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token)
         {
             // Enter and Tab arrive as '\n' and '\t'; they always insert.
@@ -350,7 +362,7 @@ namespace SqlPrompter.Ssms
                         var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
                         buffer.Replace(span, item.InsertText);
                         buffer.Insert(edit.Position.GetPosition(buffer.CurrentSnapshot), edit.Text);
-                        session.TextView.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, span.Start + item.InsertText.Length));
+                        MoveCaret(session, buffer, span.Start.Position + item.InsertText.Length);
                         return new CommitResult(isHandled: true, CommitBehavior.None);
                     }
                     catch (Exception ex)
