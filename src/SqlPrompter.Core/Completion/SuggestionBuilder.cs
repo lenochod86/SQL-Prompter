@@ -20,6 +20,9 @@ namespace SqlPrompter.Core.Completion
         Function,
         DataType,
 
+        /// <summary>A snippet; <see cref="Suggestion.Tag"/> holds it and the editor expands it.</summary>
+        Snippet,
+
         /// <summary>A whole join condition such as o.IdUser = u.IdUser, offered after ON.</summary>
         JoinCondition,
 
@@ -45,7 +48,7 @@ namespace SqlPrompter.Core.Completion
 
     public sealed class Suggestion
     {
-        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null, KeyKind key = KeyKind.None)
+        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null, KeyKind key = KeyKind.None, object tag = null)
         {
             Kind = kind;
             DisplayText = displayText;
@@ -57,6 +60,7 @@ namespace SqlPrompter.Core.Completion
             FromClause = fromClause;
             Detail = detail;
             Key = key;
+            Tag = tag;
         }
 
         public SuggestionKind Kind { get; }
@@ -90,6 +94,9 @@ namespace SqlPrompter.Core.Completion
         /// <summary>For a column: whether it is part of the primary key or of a foreign key (shown as a key icon).</summary>
         public KeyKind Key { get; }
 
+        /// <summary>The object the item stands for when it is more than text (a <see cref="SqlPrompter.Core.Snippets.Snippet"/>); null otherwise.</summary>
+        public object Tag { get; }
+
         /// <summary>Sort key: group (negative groups first), then text.</summary>
         public string SortText => (Group + 100).ToString("D3") + DisplayText;
 
@@ -120,7 +127,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key);
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -128,7 +135,7 @@ namespace SqlPrompter.Core.Completion
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
-                    return KeywordSuggestions(context, 0).ToList();
+                    return KeywordSuggestions(context, 0).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
                     return ObjectSuggestions(context, metadata, script, options).ToList();
                 case ContextKind.Expression:
@@ -139,6 +146,7 @@ namespace SqlPrompter.Core.Completion
                     return DataTypeSuggestions(context, 0).ToList();
                 case ContextKind.Fallback:
                     return KeywordSuggestions(context, 0)
+                        .Concat(SnippetSuggestions(context, options))
                         .Concat(FunctionSuggestions(context, 2))
                         .Concat(DataTypeSuggestions(context, 3))
                         .ToList();
@@ -174,6 +182,30 @@ namespace SqlPrompter.Core.Completion
                 yield return new Suggestion(SuggestionKind.Keyword, text, text, text, null, null,
                     preferred.Contains(keyword) ? firstGroup : firstGroup + 1);
             }
+        }
+
+        /// <summary>Snippets whose prefix contains what is typed; nothing before a character is typed, so that the list does not start with a hundred of them.</summary>
+        private static IEnumerable<Suggestion> SnippetSuggestions(CaretContext context, SuggestionOptions options)
+        {
+            if (context.TypedPrefix.Length == 0 || context.Qualifier.Count > 0)
+            {
+                yield break;
+            }
+
+            foreach (var snippet in options.Snippets.Where(s => s.Prefix.IndexOf(context.TypedPrefix, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                var description = string.IsNullOrWhiteSpace(snippet.Description) ? "snippet" : "snippet: " + snippet.Description;
+                yield return new Suggestion(SuggestionKind.Snippet, snippet.Prefix, snippet.Prefix, snippet.Prefix, "snippet", description + "\n\n" + Preview(snippet.Body), 1,
+                    null, string.IsNullOrWhiteSpace(snippet.Description) ? null : snippet.Description, KeyKind.None, snippet);
+            }
+        }
+
+        /// <summary>The start of the body, shown as the description of a snippet.</summary>
+        private static string Preview(string body)
+        {
+            var lines = (body ?? string.Empty).Replace("\r\n", "\n").Split('\n');
+            var text = string.Join("\n", lines.Take(12));
+            return lines.Length > 12 ? text + "\n…" : text;
         }
 
         private static IEnumerable<Suggestion> VariableSuggestions(CaretContext context, ScriptModel script, int group)
@@ -458,6 +490,11 @@ namespace SqlPrompter.Core.Completion
             foreach (var variable in VariableSuggestions(context, script, 2))
             {
                 yield return variable;
+            }
+
+            foreach (var snippet in SnippetSuggestions(context, options))
+            {
+                yield return snippet;
             }
 
             foreach (var function in FunctionSuggestions(context, 3))

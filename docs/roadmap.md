@@ -116,7 +116,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 - [x] **Storage in the same JSON format as SQL Prompt** (`prefix`, `description`, `body`, `placeholders`). An existing snippet folder can be read directly or copied. (#31)
 - [x] Import from the XML backup (`.sqlpromptsnippet`) (#31)
-- [ ] Snippet suggestions in the list with their own icon and filter; expanding a shortcut with Tab (#32)
+- [x] Snippet suggestions in the list with their own icon and filter; expanding a shortcut with Tab (#32)
 - [ ] Placeholders: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$` (#32)
 - [ ] **Custom fields directly in the text:** (#33)
   - highlighted and navigated with Tab;
