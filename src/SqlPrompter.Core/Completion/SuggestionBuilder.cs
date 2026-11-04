@@ -20,6 +20,9 @@ namespace SqlPrompter.Core.Completion
         Function,
         DataType,
 
+        /// <summary>Linked server, for four-part names.</summary>
+        LinkedServer,
+
         /// <summary>Database on the server, for three-part names.</summary>
         Database,
 
@@ -227,6 +230,11 @@ namespace SqlPrompter.Core.Completion
                 yield return new Suggestion(SuggestionKind.Schema, schema, SqlIdentifier.Quote(schema, quote), schema, null, "schema", 1);
             }
 
+            foreach (var server in context.InOtherDatabase ? Array.Empty<string>() : metadata.LinkedServers.ToArray())
+            {
+                yield return new Suggestion(SuggestionKind.LinkedServer, server, SqlIdentifier.Quote(server, quote), server, null, "linked server", 1);
+            }
+
             foreach (var database in context.InOtherDatabase ? Array.Empty<string>() : metadata.Databases.ToArray())
             {
                 yield return new Suggestion(SuggestionKind.Database, database, SqlIdentifier.Quote(database, quote), database, null, "database", 1);
@@ -327,13 +335,20 @@ namespace SqlPrompter.Core.Completion
         }
 
         /// <summary>Columns of a source defined in the script or found in the database; null if they are not known (yet).</summary>
-        private static SourceColumns ResolveColumns(TableSource source, IDatabaseMetadata metadata, ScriptModel script)
+        private static SourceColumns ResolveColumns(TableSource source, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             var scripted = script.Resolve(source, metadata);
             if (scripted != null)
             {
                 var owner = source.Kind == TableSourceKind.Derived ? "derived table" : string.Join(".", source.NameParts);
                 return new SourceColumns(source, scripted.Columns, owner);
+            }
+
+            if (source.Kind == TableSourceKind.Object && source.NameParts.Count == 4 && options.RemoteColumns != null)
+            {
+                // server.database.schema.table: on a linked server, loaded when the table is used.
+                var remote = options.RemoteColumns(source);
+                return remote == null ? null : new SourceColumns(source, remote, string.Join(".", source.NameParts));
             }
 
             var dbObject = Readiness.Resolve(source, metadata);
@@ -346,7 +361,7 @@ namespace SqlPrompter.Core.Completion
             var quote = context.QuoteIdentifiers;
             if (context.QualifiedSource != null)
             {
-                var qualified = ResolveColumns(context.QualifiedSource, metadata, script);
+                var qualified = ResolveColumns(context.QualifiedSource, metadata, script, options);
                 foreach (var column in qualified?.Columns ?? Array.Empty<DbColumn>())
                 {
                     yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, quote), null, qualified.Owner, 0);
@@ -356,7 +371,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             var resolved = context.Sources
-                .Select(s => ResolveColumns(s, metadata, script))
+                .Select(s => ResolveColumns(s, metadata, script, options))
                 .Where(x => x != null)
                 .ToList();
 

@@ -197,6 +197,12 @@ namespace SqlPrompter.Tests
                 return Task.FromResult(result);
             }
 
+            public Task<IReadOnlyList<string>> LoadLinkedDatabasesAsync(string linkedServer, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<IReadOnlyList<RemoteObject>> LoadLinkedObjectsAsync(string linkedServer, string database, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<IReadOnlyList<DbColumn>> LoadLinkedColumnsAsync(string linkedServer, string database, string schema, string table, CancellationToken cancellationToken) => throw new NotSupportedException();
+
             public Task<string> GetVersionAsync(CancellationToken cancellationToken)
             {
                 Interlocked.Increment(ref VersionChecks);

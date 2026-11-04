@@ -94,11 +94,11 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] After `SELECT` without `FROM`, columns of all tables in the database; choosing a column adds `FROM` with its table and alias (#24)
 - [x] Three-part names and tracking `USE` (#25)
 - [x] Synonyms (#25)
-- [ ] **Linked servers, loaded lazily**, so that the initial load stays fast even for a customer with five linked servers full of tables (#26):
-  - [ ] only their names first (`sys.servers`)
-  - [ ] the server's databases after choosing a server
-  - [ ] schemas and objects after choosing a database
-  - [ ] columns only when a table is used
+- [x] **Linked servers, loaded lazily**, so that the initial load stays fast even for a customer with five linked servers full of tables (#26):
+  - [x] only their names first (`sys.servers`)
+  - [x] the server's databases after choosing a server
+  - [x] schemas and objects after choosing a database
+  - [x] columns only when a table is used
 
 ### Phase 2: JOINs (M) (#27)
 

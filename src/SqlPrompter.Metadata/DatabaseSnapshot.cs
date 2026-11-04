@@ -19,13 +19,15 @@ namespace SqlPrompter.Metadata
             IReadOnlyList<DbObject> objects,
             string version,
             IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> columns = null,
-            IReadOnlyList<string> databases = null)
+            IReadOnlyList<string> databases = null,
+            IReadOnlyList<string> linkedServers = null)
         {
             DatabaseName = databaseName ?? string.Empty;
             DefaultSchema = string.IsNullOrEmpty(defaultSchema) ? "dbo" : defaultSchema;
             Schemas = schemas ?? Array.Empty<string>();
             Objects = objects ?? Array.Empty<DbObject>();
             Databases = databases ?? Array.Empty<string>();
+            LinkedServers = linkedServers ?? Array.Empty<string>();
             Version = version;
             this.columns = columns ?? new Dictionary<int, IReadOnlyList<DbColumn>>();
             schemaSet = new HashSet<string>(Schemas, StringComparer.OrdinalIgnoreCase);
@@ -43,6 +45,7 @@ namespace SqlPrompter.Metadata
             Schemas = source.Schemas;
             Objects = source.Objects;
             Databases = source.Databases;
+            LinkedServers = source.LinkedServers;
             Version = source.Version;
             byName = source.byName;
             schemaSet = source.schemaSet;
@@ -58,6 +61,8 @@ namespace SqlPrompter.Metadata
         public IReadOnlyList<DbObject> Objects { get; }
 
         public IReadOnlyList<string> Databases { get; }
+
+        public IReadOnlyList<string> LinkedServers { get; }
 
         /// <summary>Fingerprint of the objects in the database; when it changes, the snapshot is stale.</summary>
         public string Version { get; }

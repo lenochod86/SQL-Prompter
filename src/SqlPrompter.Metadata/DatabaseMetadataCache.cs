@@ -245,11 +245,23 @@ namespace SqlPrompter.Metadata
             this.log = log;
         }
 
+        private readonly ConcurrentDictionary<string, LinkedServerCache> linkedServers =
+            new ConcurrentDictionary<string, LinkedServerCache>(StringComparer.Ordinal);
+
+        /// <summary>Linked servers reachable from this connection; the database of the connection does not matter.</summary>
+        public LinkedServerCache GetLinkedServers(ConnectionSettings settings) =>
+            linkedServers.GetOrAdd(settings.WithDatabase(string.Empty).CacheKey, _ => new LinkedServerCache(log));
+
         public DatabaseMetadataCache Get(ConnectionSettings settings) =>
             caches.GetOrAdd(settings.CacheKey, _ => new DatabaseMetadataCache(log));
 
         public void InvalidateAll()
         {
+            foreach (var linked in linkedServers.Values)
+            {
+                linked.Clear();
+            }
+
             foreach (var cache in caches.Values)
             {
                 cache.Invalidate();

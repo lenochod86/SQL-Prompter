@@ -166,7 +166,7 @@ namespace SqlPrompter.Core.Analysis
         public bool SoftSelection { get; internal set; }
 
         /// <summary>Copy of the context with another qualifier (e.g. without the database part) and without preferred keywords.</summary>
-        internal CaretContext WithQualifier(IReadOnlyList<string> qualifier) => new CaretContext(Kind, ReplaceStart, ReplaceLength, TypedPrefix)
+        internal CaretContext WithQualifier(IReadOnlyList<string> qualifier, bool inOtherDatabase = true) => new CaretContext(Kind, ReplaceStart, ReplaceLength, TypedPrefix)
         {
             QuoteIdentifiers = QuoteIdentifiers,
             Qualifier = qualifier,
@@ -174,7 +174,7 @@ namespace SqlPrompter.Core.Analysis
             QualifiedSource = QualifiedSource,
             SoftSelection = SoftSelection,
             AliasAllowed = AliasAllowed,
-            InOtherDatabase = true,
+            InOtherDatabase = inOtherDatabase,
         };
 
         public override string ToString() => Kind + " [" + string.Join(".", Qualifier) + "] '" + TypedPrefix + "'";
