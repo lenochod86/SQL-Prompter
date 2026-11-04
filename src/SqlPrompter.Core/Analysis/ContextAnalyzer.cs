@@ -285,7 +285,9 @@ namespace SqlPrompter.Core.Analysis
                 if (target == null)
                 {
                     // Qualifier unknown even as an alias: schema of a function, CTE of an outer statement …
-                    return Make(ContextKind.Name);
+                    var unknown = Make(ContextKind.Name);
+                    unknown.UnknownExpressionQualifier = qualifier.Count == 1;
+                    return unknown;
                 }
 
                 expression.QualifiedSource = target;

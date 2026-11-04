@@ -49,6 +49,7 @@ namespace SqlPrompter.Ssms
     {
         private const string DescriptionKey = "SqlPrompter.Description";
         internal const string FromEditKey = "SqlPrompter.FromEdit";
+        internal const string CaretBackKey = "SqlPrompter.CaretBack";
         internal const string DetailKey = "SqlPrompter.Detail";
         internal const string KeyKey = "SqlPrompter.Key";
         internal const string SnippetKey = "SqlPrompter.Snippet";
@@ -68,6 +69,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Column] = Icon(KnownMonikers.Column, "Column"),
             [SuggestionKind.Alias] = Icon(KnownMonikers.LocalVariable, "Alias"),
             [SuggestionKind.Function] = Icon(KnownMonikers.ScalarFunction, "Function"),
+            [SuggestionKind.ScalarFunction] = Icon(KnownMonikers.ScalarFunction, "Scalar function"),
             [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Data type"),
             [SuggestionKind.Database] = Icon(KnownMonikers.Database, "Database"),
             [SuggestionKind.LinkedServer] = Icon(KnownMonikers.LinkedServer, "Linked server"),
@@ -284,6 +286,11 @@ namespace SqlPrompter.Ssms
                 item.Properties.AddProperty(DescriptionKey, suggestion.Description);
             }
 
+            if (suggestion.CaretBack > 0)
+            {
+                item.Properties.AddProperty(CaretBackKey, suggestion.CaretBack);
+            }
+
             if (suggestion.FromClause != null && prepared.Context.FromInsertPosition >= 0)
             {
                 var position = prepared.BatchStart + prepared.Context.FromInsertPosition;
@@ -422,6 +429,22 @@ namespace SqlPrompter.Ssms
                     catch (Exception ex)
                     {
                         Log.Error("Adding the FROM clause failed", ex);
+                    }
+                }
+
+                // A function with parameters: the caret goes between its parentheses.
+                if (item.Properties.TryGetProperty(SqlCompletionSource.CaretBackKey, out int caretBack))
+                {
+                    try
+                    {
+                        var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                        buffer.Replace(span, item.InsertText);
+                        MoveCaret(session, buffer, span.Start.Position + item.InsertText.Length - caretBack);
+                        return new CommitResult(isHandled: true, CommitBehavior.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Placing the caret in the parentheses failed", ex);
                     }
                 }
 

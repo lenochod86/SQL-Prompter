@@ -8,14 +8,18 @@ namespace SqlPrompter.Core.Model
         View,
         TableFunction,
 
+        /// <summary>Scalar function; it is used in expressions, never as a table source.</summary>
+        ScalarFunction,
+
         /// <summary>Synonym; <see cref="DbObject.SynonymTarget"/> says what it points to.</summary>
         Synonym,
     }
 
     public sealed class DbObject
     {
-        public DbObject(int id, string schema, string name, DbObjectKind kind, bool isSystem, IReadOnlyList<string> synonymTarget = null)
+        public DbObject(int id, string schema, string name, DbObjectKind kind, bool isSystem, IReadOnlyList<string> synonymTarget = null, int parameterCount = 0)
         {
+            ParameterCount = parameterCount;
             Id = id;
             Schema = schema;
             Name = name;
@@ -38,6 +42,9 @@ namespace SqlPrompter.Core.Model
 
         /// <summary>For a synonym, the name parts of the base object (e.g. [dbo, Users]); otherwise null.</summary>
         public IReadOnlyList<string> SynonymTarget { get; }
+
+        /// <summary>Number of parameters of a function (the return value is not counted); 0 for other objects.</summary>
+        public int ParameterCount { get; }
 
         public override string ToString() => Schema + "." + Name;
     }

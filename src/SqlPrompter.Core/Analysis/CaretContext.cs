@@ -181,6 +181,12 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>For "alias.|", the source the qualifier refers to.</summary>
         public TableSource QualifiedSource { get; internal set; }
 
+        /// <summary>
+        /// In an expression after "name." where the name is no table source or alias: a schema whose scalar functions are offered
+        /// (the kind is <see cref="ContextKind.Name"/>, so everywhere else nothing is).
+        /// </summary>
+        public bool UnknownExpressionQualifier { get; internal set; }
+
         /// <summary>Keywords that take precedence at this position.</summary>
         public IReadOnlyList<string> PreferredKeywords { get; internal set; } = Array.Empty<string>();
 

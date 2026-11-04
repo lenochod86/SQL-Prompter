@@ -147,7 +147,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 - [ ] `INSERT`: full statement with the column list, optionally with `VALUES` and default values (#44)
 - [ ] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters (#44)
-- [ ] Functions with parentheses and parameters (#44)
+- [x] Functions with parentheses (the caret goes inside when they take parameters); parameter names come with parameter info (#44, #45)
 - [ ] Expanding `*` with Tab into a column list with aliases (#45)
 - [ ] Object definition panel next to the list (`CREATE` script, as in SQL Prompt) (#46)
 - [ ] Parameter info (#45)

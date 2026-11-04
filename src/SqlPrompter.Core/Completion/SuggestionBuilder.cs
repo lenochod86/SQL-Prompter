@@ -18,6 +18,9 @@ namespace SqlPrompter.Core.Completion
         Column,
         Alias,
         Function,
+
+        /// <summary>A scalar function of the database, inserted with its parentheses.</summary>
+        ScalarFunction,
         DataType,
 
         /// <summary>A snippet; <see cref="Suggestion.Tag"/> holds it and the editor expands it.</summary>
@@ -48,8 +51,9 @@ namespace SqlPrompter.Core.Completion
 
     public sealed class Suggestion
     {
-        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null, KeyKind key = KeyKind.None, object tag = null)
+        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null, KeyKind key = KeyKind.None, object tag = null, int caretBack = 0)
         {
+            CaretBack = caretBack;
             Kind = kind;
             DisplayText = displayText;
             InsertText = insertText;
@@ -64,6 +68,9 @@ namespace SqlPrompter.Core.Completion
         }
 
         public SuggestionKind Kind { get; }
+
+        /// <summary>How many characters before the end of the inserted text the caret goes, e.g. 1 to land inside the parentheses of a function.</summary>
+        public int CaretBack { get; }
 
         public string DisplayText { get; }
 
@@ -127,7 +134,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag);
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag, s.CaretBack);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -140,6 +147,10 @@ namespace SqlPrompter.Core.Completion
                     return ObjectSuggestions(context, metadata, script, options).ToList();
                 case ContextKind.Expression:
                     return ExpressionSuggestions(context, metadata, script, options).ToList();
+                case ContextKind.Name:
+                    return context.UnknownExpressionQualifier && metadata != null
+                        ? SchemaFunctionSuggestions(context, metadata).ToList()
+                        : (IReadOnlyList<Suggestion>)Array.Empty<Suggestion>();
                 case ContextKind.Variable:
                     return VariableSuggestions(context, script, 0).ToList();
                 case ContextKind.DataType:
@@ -256,7 +267,7 @@ namespace SqlPrompter.Core.Completion
             {
                 // An empty schema (db..) means the default one.
                 var schema = context.Qualifier[0].Length == 0 ? metadata.DefaultSchema : context.Qualifier[0];
-                foreach (var dbObject in metadata.Objects.Where(o => string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
+                foreach (var dbObject in metadata.Objects.Where(o => o.Kind != DbObjectKind.ScalarFunction && string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
                 {
                     yield return ObjectSuggestion(dbObject, SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject), null);
                 }
@@ -272,7 +283,7 @@ namespace SqlPrompter.Core.Completion
                 }
             }
 
-            foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem))
+            foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem && o.Kind != DbObjectKind.ScalarFunction))
             {
                 var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(dbObject.Schema, quote) + "." : string.Empty) +
                     SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject);
@@ -343,6 +354,28 @@ namespace SqlPrompter.Core.Completion
             return " " + asKeyword + " " + quoted;
         }
 
+        /// <summary>schema.| in an expression: the scalar functions of the schema.</summary>
+        private static IEnumerable<Suggestion> SchemaFunctionSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        {
+            var schema = context.Qualifier[0].Length == 0 ? metadata.DefaultSchema : context.Qualifier[0];
+            foreach (var function in metadata.Objects.Where(o => o.Kind == DbObjectKind.ScalarFunction && !o.IsSystem && string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
+            {
+                yield return ScalarFunctionSuggestion(function, SqlIdentifier.Quote(function.Name, context.QuoteIdentifiers), null);
+            }
+        }
+
+        /// <summary>A scalar function with its parentheses; the caret goes between them when the function has parameters.</summary>
+        private static Suggestion ScalarFunctionSuggestion(DbObject function, string insertName, string suffix) =>
+            new Suggestion(
+                SuggestionKind.ScalarFunction,
+                function.Name,
+                insertName + "()",
+                function.Name,
+                suffix,
+                "scalar function " + function + " (" + function.ParameterCount + (function.ParameterCount == 1 ? " parameter)" : " parameters)"),
+                3,
+                caretBack: function.ParameterCount > 0 ? 1 : 0);
+
         private static Suggestion ObjectSuggestion(DbObject dbObject, string insertText, string suffix)
         {
             SuggestionKind kind;
@@ -368,7 +401,16 @@ namespace SqlPrompter.Core.Completion
             }
 
             var target = dbObject.SynonymTarget != null ? " → " + string.Join(".", dbObject.SynonymTarget) : string.Empty;
-            return new Suggestion(kind, dbObject.Name, insertText, dbObject.Name, suffix, description + " " + dbObject + target, 0);
+            var isFunction = dbObject.Kind == DbObjectKind.TableFunction;
+            return new Suggestion(
+                kind,
+                dbObject.Name,
+                isFunction ? insertText + "()" : insertText,
+                dbObject.Name,
+                suffix,
+                description + " " + dbObject + target,
+                0,
+                caretBack: isFunction && dbObject.ParameterCount > 0 ? 1 : 0);
         }
 
         /// <summary>Columns of one table source and how to describe their owner.</summary>
@@ -500,6 +542,11 @@ namespace SqlPrompter.Core.Completion
             foreach (var function in FunctionSuggestions(context, 3))
             {
                 yield return function;
+            }
+
+            foreach (var function in metadata.Objects.Where(o => o.Kind == DbObjectKind.ScalarFunction && !o.IsSystem))
+            {
+                yield return ScalarFunctionSuggestion(function, SqlIdentifier.Quote(function.Schema, quote) + "." + SqlIdentifier.Quote(function.Name, quote), function.Schema);
             }
 
             foreach (var keyword in KeywordSuggestions(context, 4))
