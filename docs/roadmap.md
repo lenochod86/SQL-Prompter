@@ -118,7 +118,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] Import from the XML backup (`.sqlpromptsnippet`) (#31)
 - [x] Snippet suggestions in the list with their own icon and filter; expanding a shortcut with Tab (#32)
 - [ ] Placeholders: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$` (#32)
-- [ ] **Custom fields directly in the text:** (#33)
+- [x] **Custom fields directly in the text:** (#33)
   - highlighted and navigated with Tab;
   - a repeated field is updated everywhere at once;
   - Enter or Esc ends editing and the caret ends at `$CURSOR$`.

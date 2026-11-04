@@ -37,7 +37,7 @@ namespace SqlPrompter.Ssms
         internal MetadataService Metadata { get; set; }
 
         public IAsyncCompletionSource GetOrCreate(ITextView textView) =>
-            textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionSource(Metadata));
+            textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionSource(Metadata, textView));
     }
 
     /// <summary>
@@ -78,11 +78,13 @@ namespace SqlPrompter.Ssms
         };
 
         private readonly MetadataService service;
+        private readonly ITextView textView;
         private Prepared pending;
 
-        public SqlCompletionSource(MetadataService service)
+        public SqlCompletionSource(MetadataService service, ITextView textView)
         {
             this.service = service;
+            this.textView = textView;
         }
 
         public CompletionStartData InitializeCompletion(CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
@@ -143,6 +145,13 @@ namespace SqlPrompter.Ssms
             if (!SettingsService.Current.Behavior.SuggestionsEnabled || !IsTrigger(trigger))
             {
                 return CompletionStartData.DoesNotParticipateInCompletion;
+            }
+
+            if (SnippetSession.IsActive(textView))
+            {
+                // The text of a snippet field is being typed: no list, but ours still takes part so that the built-in one does not show.
+                pending = null;
+                return new CompletionStartData(CompletionParticipation.ProvidesItems, new SnapshotSpan(triggerLocation, 0));
             }
 
             var snapshot = triggerLocation.Snapshot;
