@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.ComponentModel.Design;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -12,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 5)]
+    [ProvideMenuResource("Menus.ctmenu", 6)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
@@ -29,6 +30,9 @@ namespace SqlPrompter.Ssms
         public const int ImportSnippetsId = 0x0104;
         public const int OpenSnippetsFolderId = 0x0105;
         public const int ReloadSnippetsId = 0x0106;
+        public const int SurroundWithSnippetId = 0x0107;
+        public const int NewSnippetFromSelectionId = 0x0108;
+        public const int ManageSnippetsId = 0x0109;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
@@ -47,6 +51,9 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => ImportSnippets(), new CommandID(CommandSet, ImportSnippetsId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenSnippetsFolder(), new CommandID(CommandSet, OpenSnippetsFolderId)));
                 commands.AddCommand(new MenuCommand((s, e) => SnippetService.Reload(), new CommandID(CommandSet, ReloadSnippetsId)));
+                commands.AddCommand(new MenuCommand((s, e) => SurroundSelection(), new CommandID(CommandSet, SurroundWithSnippetId)));
+                commands.AddCommand(new MenuCommand((s, e) => NewSnippetFromSelection(), new CommandID(CommandSet, NewSnippetFromSelectionId)));
+                commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
             }
 
             try
@@ -164,6 +171,76 @@ namespace SqlPrompter.Ssms
             {
                 Log.Error("Importing the snippets failed", ex);
                 ShowMessage("Importing the snippets failed: " + ex.Message);
+            }
+        }
+
+        private void SurroundSelection()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var view = ActiveEditor.GetView();
+                if (view == null || view.Selection.IsEmpty)
+                {
+                    ShowMessage("Select the text to wrap first.");
+                    return;
+                }
+
+                var candidates = SnippetService.Snippets.Where(SqlPrompter.Core.Snippets.SnippetText.UsesSelection).ToList();
+                if (candidates.Count == 0)
+                {
+                    ShowMessage("No snippet wraps a selection. Use $SELECTEDTEXT$ in the body of a snippet, e.g. ISNULL($SELECTEDTEXT$, 0).");
+                    return;
+                }
+
+                var picker = new SnippetPickerWindow("Surround selection with snippet", candidates);
+                ActiveEditor.SetOwner(picker);
+                if (picker.ShowDialog() == true && picker.Chosen != null)
+                {
+                    var span = view.Selection.SelectedSpans[0];
+                    SnippetInserter.Insert(view, span, picker.Chosen, span.GetText());
+                    view.VisualElement.Focus();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Surrounding the selection failed", ex);
+                ShowMessage("Surrounding the selection failed: " + ex.Message);
+            }
+        }
+
+        private void NewSnippetFromSelection()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var view = ActiveEditor.GetView();
+                var selected = view != null && !view.Selection.IsEmpty ? view.Selection.SelectedSpans[0].GetText() : string.Empty;
+                var draft = SqlPrompter.Core.Snippets.Snippet.Create(string.Empty, string.Empty, SqlPrompter.Core.Snippets.SnippetText.BodyFromSelection(selected));
+                var window = new SnippetManagerWindow(new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder), draft);
+                ActiveEditor.SetOwner(window);
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Creating a snippet from the selection failed", ex);
+                ShowMessage("Creating the snippet failed: " + ex.Message);
+            }
+        }
+
+        private void ManageSnippets()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var window = new SnippetManagerWindow(new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder), null);
+                ActiveEditor.SetOwner(window);
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening the snippet manager failed", ex);
+                ShowMessage("Opening the snippet manager failed: " + ex.Message);
             }
         }
 
