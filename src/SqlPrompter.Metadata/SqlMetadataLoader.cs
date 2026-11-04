@@ -40,11 +40,14 @@ SELECT DB_NAME(), SCHEMA_NAME();
 
 SELECT name FROM sys.schemas WHERE schema_id < 16384 ORDER BY name;
 
-SELECT o.object_id, s.name, o.name, o.type, o.is_ms_shipped, sn.base_object_name
+SELECT o.object_id, s.name, o.name, o.type, o.is_ms_shipped, sn.base_object_name,
+    CASE WHEN o.type IN ('IF', 'TF', 'FT', 'FN', 'FS')
+        THEN (SELECT COUNT(*) FROM sys.all_parameters AS p WHERE p.object_id = o.object_id AND p.parameter_id > 0)
+        ELSE 0 END
 FROM sys.all_objects AS o
 JOIN sys.schemas AS s ON s.schema_id = o.schema_id
 LEFT JOIN sys.synonyms AS sn ON sn.object_id = o.object_id
-WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT', 'SN');
+WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT', 'FN', 'FS', 'SN');
 
 -- Columns of user objects right away, of system objects on demand.
 SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable
@@ -123,7 +126,8 @@ FROM sys.objects;";
                             reader.GetString(2),
                             ToKind(reader.GetString(3).Trim()),
                             reader.GetBoolean(4),
-                            reader.IsDBNull(5) ? null : SqlIdentifier.SplitName(reader.GetString(5))));
+                            reader.IsDBNull(5) ? null : SqlIdentifier.SplitName(reader.GetString(5)),
+                            reader.IsDBNull(6) ? 0 : reader.GetInt32(6)));
                     }
 
                     await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
@@ -438,6 +442,9 @@ ORDER BY i.object_id, ic.key_ordinal;";
                 case "TF":
                 case "FT":
                     return DbObjectKind.TableFunction;
+                case "FN":
+                case "FS":
+                    return DbObjectKind.ScalarFunction;
                 default:
                     return DbObjectKind.Table;
             }

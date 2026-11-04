@@ -30,3 +30,11 @@ BEGIN
     SET NOCOUNT ON;
 END
 GO
+CREATE FUNCTION dbo.fnTax(@amount decimal(18,2), @rate decimal(5,2)) RETURNS decimal(18,2) AS
+BEGIN
+    RETURN @amount * @rate / 100;
+END
+GO
+CREATE FUNCTION dbo.fnCustomersByName(@name nvarchar(100)) RETURNS TABLE AS
+RETURN (SELECT IdCustomers, Name FROM dbo.Customers WHERE Name LIKE @name + '%');
+GO
