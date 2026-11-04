@@ -66,6 +66,7 @@ namespace SqlPrompter.Ssms
                 }
 
                 Apply(document, wanted);
+                ApplyStatusBar(window, wanted);
             }
             catch (Exception ex)
             {
@@ -113,6 +114,69 @@ namespace SqlPrompter.Ssms
             colorizedProperty.SetValue(document, true);
             brushProperty.SetValue(document, wanted);
             Log.Write("Tab color set to " + ((SolidColorBrush)wanted).Color + ".");
+        }
+
+        // The shell's own status bar (the bar at the bottom of the main window). SSMS's per-window bar with the connection state is a
+        // separate control that this does not touch.
+        private static WeakReference statusBar;
+        private static Brush statusBarOriginal;
+        private static bool statusBarColored;
+
+        private static void ApplyStatusBar(DependencyObject window, Brush wanted)
+        {
+            var panel = (statusBar?.Target as System.Windows.Controls.Panel) ?? FindStatusBar(window);
+            if (panel == null)
+            {
+                return;
+            }
+
+            if (statusBar == null || !ReferenceEquals(statusBar.Target, panel))
+            {
+                statusBar = new WeakReference(panel);
+                statusBarColored = false;
+            }
+
+            if (wanted == null)
+            {
+                if (statusBarColored)
+                {
+                    panel.Background = statusBarOriginal;
+                    statusBarColored = false;
+                }
+
+                return;
+            }
+
+            if (!statusBarColored)
+            {
+                statusBarOriginal = panel.Background;
+                statusBarColored = true;
+            }
+
+            if (!Equals(panel.Background, wanted))
+            {
+                panel.Background = wanted;
+            }
+        }
+
+        private static System.Windows.Controls.Panel FindStatusBar(DependencyObject root)
+        {
+            if (root is System.Windows.Controls.DockPanel panel && panel.Name == "StatusBarPanel")
+            {
+                return panel;
+            }
+
+            var count = root is Visual || root is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetChildrenCount(root) : 0;
+            for (var i = 0; i < count; i++)
+            {
+                var found = FindStatusBar(VisualTreeHelper.GetChild(root, i));
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+
+            return null;
         }
 
         private static object FindActiveDocumentView(DependencyObject root)
