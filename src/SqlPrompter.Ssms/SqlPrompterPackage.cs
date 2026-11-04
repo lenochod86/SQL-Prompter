@@ -42,6 +42,7 @@ namespace SqlPrompter.Ssms
             Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
             SnippetService.Start();
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+            TabColoring.Start();
             if (await GetServiceAsync(typeof(IMenuCommandService)) is OleMenuCommandService commands)
             {
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
