@@ -52,6 +52,11 @@ namespace SqlPrompter.Ssms
                     view.Caret.MoveTo(new SnapshotPoint(current, start + expanded.CursorOffset));
                 }
 
+                if (expanded.Fields.Count > 0 && view is Microsoft.VisualStudio.Text.Editor.IWpfTextView wpfView)
+                {
+                    SnippetSession.Start(wpfView, start, expanded);
+                }
+
                 Log.Write("Snippet \"" + snippet.Prefix + "\" expanded (" + expanded.Fields.Count + " fields).");
                 return true;
             }
