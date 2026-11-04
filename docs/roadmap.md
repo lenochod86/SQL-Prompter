@@ -117,13 +117,13 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] **Storage in the same JSON format as SQL Prompt** (`prefix`, `description`, `body`, `placeholders`). An existing snippet folder can be read directly or copied. (#31)
 - [x] Import from the XML backup (`.sqlpromptsnippet`) (#31)
 - [x] Snippet suggestions in the list with their own icon and filter; expanding a shortcut with Tab (#32)
-- [ ] Placeholders: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$` (#32)
+- [x] Placeholders: `$CURSOR$`, `$SELECTEDTEXT$`, `$SELECTIONSTART$`/`$SELECTIONEND$`, `$DATE(format)$`, `$USER$`, `$DBNAME$` (#32)
 - [x] **Custom fields directly in the text:** (#33)
   - highlighted and navigated with Tab;
   - a repeated field is updated everywhere at once;
   - Enter or Esc ends editing and the caret ends at `$CURSOR$`.
-- [ ] Snippets on a selection (`$SELECTEDTEXT$`, e.g. wrapping the selection in `ISNULL(…)`) from a selection actions menu (#34)
-- [ ] Snippet management: list, editing, new snippet from a selection (#34)
+- [x] Snippets on a selection (`$SELECTEDTEXT$`, e.g. wrapping the selection in `ISNULL(…)`) from a selection actions menu (#34)
+- [x] Snippet management: list, editing, new snippet from a selection (#34)
 
 ### Phase 4: Coloring by server and database (S to M, research first) (#35)
 
