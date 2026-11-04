@@ -19,6 +19,9 @@
       <Group guid="guidSqlPrompterCmdSet" id="MetadataGroup" priority="0x0100">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="SettingsGroup" priority="0x0200">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
@@ -29,6 +32,18 @@
         <Parent guid="guidSqlPrompterCmdSet" id="MetadataGroup" />
         <Strings>
           <ButtonText>Refresh Metadata</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidExportSettings" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
+        <Strings>
+          <ButtonText>Export Settings...</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidImportSettings" priority="0x0101" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
+        <Strings>
+          <ButtonText>Import Settings...</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
@@ -46,6 +61,9 @@
       <IDSymbol name="SqlPrompterMenu" value="0x1001" />
       <IDSymbol name="MetadataGroup" value="0x1010" />
       <IDSymbol name="DiagnosticsGroup" value="0x1011" />
+      <IDSymbol name="SettingsGroup" value="0x1012" />
+      <IDSymbol name="cmdidExportSettings" value="0x0102" />
+      <IDSymbol name="cmdidImportSettings" value="0x0103" />
       <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
       <IDSymbol name="cmdidOpenLog" value="0x0101" />
     </GuidSymbol>

@@ -109,7 +109,7 @@ namespace SqlPrompter.Ssms
                 // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
                 var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
                 RequestScriptColumns(prepared, script);
-                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script).Select(ToItem).ToImmutableArray();
+                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.Behavior.KeywordCase).Select(ToItem).ToImmutableArray();
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 return Task.FromResult(new CompletionContext(items, null, hint));
             }
@@ -128,7 +128,7 @@ namespace SqlPrompter.Ssms
         private CompletionStartData Initialize(CompletionTrigger trigger, SnapshotPoint triggerLocation)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            if (!IsTrigger(trigger))
+            if (!SettingsService.Current.Behavior.SuggestionsEnabled || !IsTrigger(trigger))
             {
                 return CompletionStartData.DoesNotParticipateInCompletion;
             }
@@ -290,18 +290,18 @@ namespace SqlPrompter.Ssms
     {
         private static readonly CommitResult CloseWithoutInserting = new CommitResult(isHandled: true, CommitBehavior.None);
 
-        // Replaced by the user's settings once the settings infrastructure exists (#9).
-        private readonly CommitKeys keys = CommitKeys.Default;
+        // Read on every use so that changed settings apply without restarting SSMS.
+        private static CommitKeys Keys => SettingsService.Current.Behavior.ToCommitKeys();
 
-        public IEnumerable<char> PotentialCommitCharacters => keys.PotentialCharacters;
+        public IEnumerable<char> PotentialCommitCharacters => Keys.PotentialCharacters;
 
         public bool ShouldCommitCompletion(IAsyncCompletionSession session, SnapshotPoint location, char typedChar, CancellationToken token) =>
-            keys.PotentialCharacters.Contains(typedChar);
+            Keys.PotentialCharacters.Contains(typedChar);
 
         public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token)
         {
             // Enter and Tab arrive as '\n' and '\t'; they always insert.
-            if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || keys.Commits(typedChar))
+            if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || Keys.Commits(typedChar))
             {
                 return CommitResult.Unhandled;
             }
