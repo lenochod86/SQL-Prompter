@@ -18,6 +18,7 @@ namespace SqlPrompter.Ssms
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
     [ProvideOptionPage(typeof(SnippetOptionsPage), "SQL Prompter", "Snippets", 0, 0, true)]
+    [ProvideOptionPage(typeof(ColoringOptionsPage), "SQL Prompter", "Coloring", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {

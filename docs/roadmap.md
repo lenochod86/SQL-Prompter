@@ -131,8 +131,8 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] Tab color (#37)
 - [x] Query window frame color (the border of the editor pane follows the tab accent) (#37)
 - [x] Status bar color (the shell status bar; SSMS own per-window bar is not touched) (#37)
-- [ ] Environments (name and color) and server + database → environment rules with wildcards (#38)
-- [ ] Import of SQL Prompt colors (#38)
+- [x] Environments (name and color) and server + database → environment rules with wildcards (#38)
+- [x] Import of SQL Prompt colors (#38)
 
 ### Phase 5: Navigation and execution (S to M, research first) (#39)
 
