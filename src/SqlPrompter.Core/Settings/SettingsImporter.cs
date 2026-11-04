@@ -47,12 +47,16 @@ namespace SqlPrompter.Core.Settings
         {
             XDocument ui;
             XDocument engine;
+            XDocument categories;
+            XDocument servers;
             try
             {
                 using (var archive = new ZipArchive(zip, ZipArchiveMode.Read))
                 {
                     ui = LoadEntry(archive, "UIOptions.xml");
                     engine = LoadEntry(archive, "EngineOptions.xml");
+                    categories = LoadEntry(archive, "ConnectionColoringCategories.xml");
+                    servers = LoadEntry(archive, "ConnectionColoringServers.xml");
                 }
             }
             catch (InvalidDataException ex)
@@ -64,9 +68,9 @@ namespace SqlPrompter.Core.Settings
                 throw new FormatException("An options file in the export is not valid XML.", ex);
             }
 
-            if (ui == null && engine == null)
+            if (ui == null && engine == null && categories == null && servers == null)
             {
-                throw new FormatException("The file is not a SQL Prompt settings export: UIOptions.xml and EngineOptions.xml are missing.");
+                throw new FormatException("The file is not a SQL Prompt settings export: the options files are missing.");
             }
 
             var settings = current.Clone();
@@ -110,6 +114,13 @@ namespace SqlPrompter.Core.Settings
                 applied.Add("Custom aliases: " + custom.Count);
             }
 
+            if (ReadColoring(categories, servers, out var environments, out var rules))
+            {
+                settings.Coloring.Environments = environments;
+                settings.Coloring.Rules = rules;
+                applied.Add("Coloring: " + environments.Count + " environments, " + rules.Count + " server rules");
+            }
+
             if (CountOf(engine, "IgnoredPrefixes") > 0)
             {
                 notes.Add("Ignored prefixes are not imported; add them in the options.");
@@ -127,6 +138,29 @@ namespace SqlPrompter.Core.Settings
             }
 
             return new SettingsImportResult(settings, applied, notes);
+        }
+
+        /// <summary>
+        /// SQL Prompt keeps the categories (name, #AARRGGBB) and the server rules (server, optional database, category) in two files.
+        /// The alpha channel is dropped; an empty database means every database.
+        /// </summary>
+        private static bool ReadColoring(XDocument categories, XDocument servers, out List<ColorEnvironment> environments, out List<ColorRule> rules)
+        {
+            environments = categories?.Root?.Descendants("value")
+                .Select(v => new ColorEnvironment { Name = v.Element("Category")?.Value?.Trim(), Color = ToRgb(v.Element("Color")?.Value) })
+                .Where(e => !string.IsNullOrEmpty(e.Name) && e.Color != null)
+                .ToList() ?? new List<ColorEnvironment>();
+            rules = servers?.Root?.Elements("server")
+                .Select(s => new ColorRule { Server = s.Element("name")?.Value?.Trim(), Database = s.Element("database")?.Value?.Trim() ?? string.Empty, Environment = s.Element("category")?.Value?.Trim() })
+                .Where(r => !string.IsNullOrEmpty(r.Server) && !string.IsNullOrEmpty(r.Environment))
+                .ToList() ?? new List<ColorRule>();
+            return environments.Count > 0 || rules.Count > 0;
+        }
+
+        private static string ToRgb(string argb)
+        {
+            var hex = (argb ?? string.Empty).Trim().TrimStart('#');
+            return hex.Length == 8 ? "#" + hex.Substring(2).ToUpperInvariant() : hex.Length == 6 ? "#" + hex.ToUpperInvariant() : null;
         }
 
         private static XDocument LoadEntry(ZipArchive archive, string suffix)

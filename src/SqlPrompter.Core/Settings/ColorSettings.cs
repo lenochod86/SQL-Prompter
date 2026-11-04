@@ -46,7 +46,7 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "environments")]
         public List<ColorEnvironment> Environments { get; set; }
 
-        /// <summary>The first rule that matches wins.</summary>
+        /// <summary>The first matching rule wins; rules with a database are tried before rules for a whole server.</summary>
         [DataMember(Name = "rules")]
         public List<ColorRule> Rules { get; set; }
 
