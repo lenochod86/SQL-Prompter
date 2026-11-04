@@ -104,12 +104,12 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 - [x] Metadata of primary and foreign keys, including multi-column keys (#28)
 - [x] After `JOIN`, tables linked by a foreign key to the tables in the query first, with an item for the whole clause `Table AS t ON t.IdX = x.IdX` (#28)
-- [ ] Complete conditions after `ON` (#29):
-  - [ ] by foreign keys
-  - [ ] by matching column names
+- [x] Complete conditions after `ON` (#29):
+  - [x] by foreign keys
+  - [x] by matching column names
   - [ ] optionally by matching types
-  - [ ] individual columns of multi-column keys
-- [ ] Option for the column order in the condition (new table left or right) (#29)
+  - [x] individual columns of multi-column keys
+- [x] Option for the column order in the condition (new table left or right) (#29)
 - [ ] Tests on a schema similar to real ones (convention `IdTable` ↔ `Table.IdTable`) (#29)
 
 ### Phase 3: Snippets (M) (#30)

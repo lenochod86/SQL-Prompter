@@ -70,6 +70,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.DataType] = Icon(KnownMonikers.Type, "Data type"),
             [SuggestionKind.Database] = Icon(KnownMonikers.Database, "Database"),
             [SuggestionKind.LinkedServer] = Icon(KnownMonikers.LinkedServer, "Linked server"),
+            [SuggestionKind.JoinCondition] = Icon(KnownMonikers.ForeignKeyRelationship, "Join condition"),
             [SuggestionKind.ScriptTable] = Icon(KnownMonikers.Table, "Table defined in the script"),
             [SuggestionKind.Variable] = Icon(KnownMonikers.LocalVariable, "Variable"),
         };

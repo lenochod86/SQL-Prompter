@@ -15,6 +15,7 @@ namespace SqlPrompter.Ssms
     [ProvideMenuResource("Menus.ctmenu", 4)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
+    [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {

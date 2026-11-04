@@ -98,6 +98,11 @@ namespace SqlPrompter.Core.Settings
             Take(engine, "QualifyObjectNames", "Qualify object names with schema", v => aliases.QualifyObjectNames = v);
             Take(engine, "QualifyColumnNamesWithAliases", "Qualify column names with aliases", v => aliases.QualifyColumnsWithAliases = v);
 
+            var joins = settings.Joins;
+            Take(engine, "IncludePartialFKJoinConditions", "Join conditions for single columns of multi-column keys", v => joins.IncludePartialKeyConditions = v);
+            Take(engine, "AlwaysIncludeNameMatchedJoinConditions", "Join conditions by matching column names", v => joins.NameMatchedConditions = v);
+            Take(engine, "FlipColumnsOnJoinCondition", "New table on the left in join conditions (SQL Prompt: flip columns)", v => joins.NewTableOnLeft = v);
+
             var custom = ReadCustomAliases(engine);
             if (custom != null)
             {

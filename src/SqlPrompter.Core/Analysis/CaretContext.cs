@@ -94,6 +94,9 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>0 = block containing the caret, 1 = enclosing query (correlated subquery) and so on.</summary>
         public int ScopeLevel { get; }
 
+        /// <summary>Index of the first token of the reference in the statement; orders the sources of a block by position.</summary>
+        internal int TokenIndex { get; set; } = -1;
+
         public string ObjectName => NameParts.Count > 0 ? NameParts[NameParts.Count - 1] : null;
 
         public string Schema => NameParts.Count > 1 ? NameParts[NameParts.Count - 2] : null;
@@ -145,6 +148,12 @@ namespace SqlPrompter.Core.Analysis
 
         /// <summary>The name follows JOIN, so tables related by a foreign key to the tables of the query can be offered first.</summary>
         public bool AfterJoin { get; internal set; }
+
+        /// <summary>
+        /// At the start of a condition after ON (or AND, OR following it): the table the JOIN introduces. Conditions that link it to the
+        /// tables before it in the query are offered.
+        /// </summary>
+        public TableSource JoinTarget { get; internal set; }
 
         /// <summary>The qualifier started with a database name that was removed from it (three-part name); the metadata is that database's.</summary>
         public bool InOtherDatabase { get; internal set; }
