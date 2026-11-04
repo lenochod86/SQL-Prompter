@@ -286,7 +286,7 @@ namespace SqlPrompter.Ssms
                 item.Properties.AddProperty(DescriptionKey, suggestion.Description);
             }
 
-            if (suggestion.CaretBack > 0)
+            if (suggestion.CaretBack > 0 || suggestion.InsertText.EndsWith("()", StringComparison.Ordinal))
             {
                 item.Properties.AddProperty(CaretBackKey, suggestion.CaretBack);
             }
@@ -432,15 +432,25 @@ namespace SqlPrompter.Ssms
                     }
                 }
 
-                // A function with parameters: the caret goes between its parentheses.
+                // A function: its parentheses come with it and the caret goes between them when it takes arguments. The typed character
+                // (Space, Enter, Tab) is swallowed so that it does not land inside the parentheses; when the name is already followed by
+                // "(" only the name is inserted.
                 if (item.Properties.TryGetProperty(SqlCompletionSource.CaretBackKey, out int caretBack))
                 {
                     try
                     {
                         var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
-                        buffer.Replace(span, item.InsertText);
-                        MoveCaret(session, buffer, span.Start.Position + item.InsertText.Length - caretBack);
-                        return new CommitResult(isHandled: true, CommitBehavior.None);
+                        var text = item.InsertText;
+                        var followed = span.End.Position < buffer.CurrentSnapshot.Length && buffer.CurrentSnapshot[span.End.Position] == '(';
+                        if (followed && text.EndsWith("()", StringComparison.Ordinal))
+                        {
+                            text = text.Substring(0, text.Length - 2);
+                            caretBack = 0;
+                        }
+
+                        buffer.Replace(span, text);
+                        MoveCaret(session, buffer, span.Start.Position + text.Length - caretBack);
+                        return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
                     }
                     catch (Exception ex)
                     {
