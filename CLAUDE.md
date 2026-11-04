@@ -69,6 +69,7 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
   - `needs-info`: the issue lacks a specification or material that Claude must supply (e.g. a precise scope or acceptance criteria).
   - `ready`: the issue is thought through and work on it can start. Remove it when the work starts.
   - An item can have more than one of these labels.
+- The assignee shows who is on the move. An issue or pull request labeled `needs-user`, `requires-testing` or `requires-review` is assigned to the user (`lenochod86`). Everything else is assigned to Claude (`claude-lenochod86`). When the label is added or removed, change the assignee too.
 - When the user answers in chat, add a short comment with the answer to the issue, so the decision stays in the history.
 
 ### Rules
