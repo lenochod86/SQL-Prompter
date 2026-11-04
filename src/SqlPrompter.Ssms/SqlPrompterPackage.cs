@@ -12,10 +12,11 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 4)]
+    [ProvideMenuResource("Menus.ctmenu", 5)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
+    [ProvideOptionPage(typeof(SnippetOptionsPage), "SQL Prompter", "Snippets", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {
@@ -25,6 +26,9 @@ namespace SqlPrompter.Ssms
         public const int OpenLogId = 0x0101;
         public const int ExportSettingsId = 0x0102;
         public const int ImportSettingsId = 0x0103;
+        public const int ImportSnippetsId = 0x0104;
+        public const int OpenSnippetsFolderId = 0x0105;
+        public const int ReloadSnippetsId = 0x0106;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
@@ -32,6 +36,7 @@ namespace SqlPrompter.Ssms
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
+            SnippetService.Start();
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             if (await GetServiceAsync(typeof(IMenuCommandService)) is OleMenuCommandService commands)
             {
@@ -39,6 +44,9 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
                 commands.AddCommand(new MenuCommand((s, e) => ExportSettings(), new CommandID(CommandSet, ExportSettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => ImportSettings(), new CommandID(CommandSet, ImportSettingsId)));
+                commands.AddCommand(new MenuCommand((s, e) => ImportSnippets(), new CommandID(CommandSet, ImportSnippetsId)));
+                commands.AddCommand(new MenuCommand((s, e) => OpenSnippetsFolder(), new CommandID(CommandSet, OpenSnippetsFolderId)));
+                commands.AddCommand(new MenuCommand((s, e) => SnippetService.Reload(), new CommandID(CommandSet, ReloadSnippetsId)));
             }
 
             try
@@ -117,6 +125,70 @@ namespace SqlPrompter.Ssms
                 Log.Error("Importing the settings failed", ex);
                 ShowMessage("Importing the settings failed: " + ex.Message);
             }
+        }
+
+        private void ImportSnippets()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                using (var dialog = new System.Windows.Forms.OpenFileDialog
+                {
+                    Title = "Import snippets (SQL Prompt .sqlpromptsnippet or snippet .json files)",
+                    Filter = "Snippet files (*.sqlpromptsnippet;*.json)|*.sqlpromptsnippet;*.json|All files (*.*)|*.*",
+                    Multiselect = true,
+                })
+                {
+                    if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                    {
+                        return;
+                    }
+
+                    var store = new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder);
+                    bool? replaceAnswer = null;
+                    var result = store.Import(
+                        dialog.FileNames,
+                        prefix => (replaceAnswer ?? (replaceAnswer = AskYesNo("A snippet with the prefix \"" + prefix + "\" exists already (there may be more). Replace snippets with the same prefix?"))).Value);
+                    var text = result.Imported + " snippets imported into " + store.Folder + (result.Replaced > 0 ? " (" + result.Replaced + " replaced)" : string.Empty) +
+                        (result.Skipped > 0 ? ", " + result.Skipped + " skipped because their prefix exists" : string.Empty) + ".";
+                    if (result.Errors.Count > 0)
+                    {
+                        text += "\n\nNot imported:\n- " + string.Join("\n- ", result.Errors);
+                    }
+
+                    SnippetService.Reload();
+                    ShowMessage(text);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Importing the snippets failed", ex);
+                ShowMessage("Importing the snippets failed: " + ex.Message);
+            }
+        }
+
+        private void OpenSnippetsFolder()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var folder = SnippetService.Folder;
+                System.IO.Directory.CreateDirectory(folder);
+                System.Diagnostics.Process.Start("explorer.exe", "\"" + folder + "\"");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening the snippet folder failed", ex);
+            }
+        }
+
+        private bool AskYesNo(string text)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            return VsShellUtilities.ShowMessageBox(
+                this, text, "SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_QUERY,
+                Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_YESNO,
+                Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_SECOND) == 6;
         }
 
         private void ShowMessage(string text)
