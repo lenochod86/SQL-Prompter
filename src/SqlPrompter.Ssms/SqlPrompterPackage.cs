@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 6)]
+    [ProvideMenuResource("Menus.ctmenu", 7)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
@@ -34,6 +34,7 @@ namespace SqlPrompter.Ssms
         public const int SurroundWithSnippetId = 0x0107;
         public const int NewSnippetFromSelectionId = 0x0108;
         public const int ManageSnippetsId = 0x0109;
+        public const int GoToDefinitionId = 0x010B;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
@@ -44,6 +45,7 @@ namespace SqlPrompter.Ssms
             SnippetService.Start();
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             TabColoring.Start();
+            DefaultKeyBindings.Apply();
             if (await GetServiceAsync(typeof(IMenuCommandService)) is OleMenuCommandService commands)
             {
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
@@ -56,6 +58,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => SurroundSelection(), new CommandID(CommandSet, SurroundWithSnippetId)));
                 commands.AddCommand(new MenuCommand((s, e) => NewSnippetFromSelection(), new CommandID(CommandSet, NewSnippetFromSelectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
+                commands.AddCommand(new MenuCommand((s, e) => GoToDefinitionHandler.Run(ActiveEditor.GetView()), new CommandID(CommandSet, GoToDefinitionId)));
             }
 
             try

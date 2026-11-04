@@ -31,6 +31,42 @@ namespace SqlPrompter.Core.Analysis
             "LEFT", "RIGHT", "FULL", "INNER", "CROSS", "OUTER",
         };
 
+        /// <summary>The table sources visible at a position of the text (the statement's own and, for subqueries, the outer ones), whatever the context there is.</summary>
+        public static IReadOnlyList<TableSource> SourcesAt(string text, int position)
+        {
+            if (text == null || position < 0 || position > text.Length)
+            {
+                return Array.Empty<TableSource>();
+            }
+
+            var tokens = Lexer.Tokenize(text).Where(t => t.Kind != TokenKind.Comment).ToList();
+            var index = Math.Min(CountBefore(tokens, position), Math.Max(0, tokens.Count - 1));
+            if (tokens.Count == 0)
+            {
+                return Array.Empty<TableSource>();
+            }
+
+            var bounds = StatementSplitter.Split(tokens);
+            var statementStart = 0;
+            var statementEnd = tokens.Count;
+            for (var b = 0; b < bounds.Count; b++)
+            {
+                if (bounds[b] <= index)
+                {
+                    statementStart = bounds[b];
+                    statementEnd = b + 1 < bounds.Count ? bounds[b + 1] : tokens.Count;
+                }
+            }
+
+            if (statementEnd <= index)
+            {
+                statementEnd = tokens.Count;
+            }
+
+            var structure = new Structure(tokens, statementStart, statementEnd);
+            return CollectSources(structure, structure.ScopesAt(index));
+        }
+
         public static CaretContext Analyze(string text, int caret)
         {
             if (text == null || caret < 0 || caret > text.Length)

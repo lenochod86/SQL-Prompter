@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.Data.Common;
+using System.Linq;
 using System.Reflection;
 using Microsoft.VisualStudio.Shell;
 using SqlPrompter.Metadata;
@@ -71,6 +72,58 @@ namespace SqlPrompter.Ssms
                 authentication == AuthenticationKind.SqlPassword ? Read("Password") : null,
                 options?["ENCRYPT_CONNECTION"],
                 options?["TRUST_SERVER_CERTIFICATE"]);
+        }
+
+        /// <summary>
+        /// Opens a new query window connected like the active one but to <paramref name="database"/> and puts <paramref name="text"/> into it
+        /// (verified in SSMS 22.11, see docs/architecture.md). Returns false when there is no connected window to copy from.
+        /// </summary>
+        public static bool OpenNewWindow(string database, string text)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var factoryType = scriptFactoryType ?? (scriptFactoryType = AssemblyTypes.FindLoaded(ScriptFactoryTypeName));
+            var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            var active = factory?.GetType().GetProperty("CurrentlyActiveWndConnectionInfo")?.GetValue(factory);
+            var info = active?.GetType().GetProperty("UIConnectionInfo")?.GetValue(active);
+            if (info == null)
+            {
+                return false;
+            }
+
+            var infoType = info.GetType();
+            var clone = Activator.CreateInstance(infoType);
+            foreach (var property in infoType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.CanRead && property.CanWrite && property.GetIndexParameters().Length == 0 && property.Name != "AdvancedOptions")
+                {
+                    property.SetValue(clone, property.GetValue(info));
+                }
+            }
+
+            var options = (NameValueCollection)infoType.GetProperty("AdvancedOptions").GetValue(info);
+            var cloneOptions = (NameValueCollection)infoType.GetProperty("AdvancedOptions").GetValue(clone);
+            foreach (var key in options.AllKeys)
+            {
+                cloneOptions[key] = options[key];
+            }
+
+            if (!string.IsNullOrEmpty(database))
+            {
+                cloneOptions["DATABASE"] = database;
+            }
+
+            var create = factory.GetType().GetMethods().FirstOrDefault(m =>
+                m.Name == "CreateNewBlankScript" && m.GetParameters().Length == 3 && m.GetParameters()[1].ParameterType == infoType);
+            if (create == null)
+            {
+                return false;
+            }
+
+            var scriptType = Enum.Parse(create.GetParameters()[0].ParameterType, "Sql");
+            create.Invoke(factory, new[] { scriptType, clone, null });
+            var view = ActiveEditor.GetView();
+            view?.TextBuffer.Insert(0, text ?? string.Empty);
+            return view != null;
         }
     }
 

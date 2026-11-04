@@ -25,6 +25,9 @@
       <Group guid="guidSqlPrompterCmdSet" id="SnippetsGroup" priority="0x0300">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="NavigationGroup" priority="0x0400">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
@@ -85,6 +88,12 @@
           <ButtonText>Reload Snippets</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidGoToDefinition" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
+        <Strings>
+          <ButtonText>Go To Definition</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -93,7 +102,6 @@
       </Button>
     </Buttons>
   </Commands>
-
   <Symbols>
     <GuidSymbol name="guidSqlPrompterPackage" value="{a3a4db19-c58e-4eac-8a84-ba61357b9b01}" />
     <GuidSymbol name="guidSqlPrompterCmdSet" value="{15e19ce9-b3c9-47dd-97f9-49fe13869730}">
@@ -102,6 +110,8 @@
       <IDSymbol name="DiagnosticsGroup" value="0x1011" />
       <IDSymbol name="SettingsGroup" value="0x1012" />
       <IDSymbol name="SnippetsGroup" value="0x1013" />
+      <IDSymbol name="NavigationGroup" value="0x1014" />
+      <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidImportSnippets" value="0x0104" />
       <IDSymbol name="cmdidOpenSnippetsFolder" value="0x0105" />
       <IDSymbol name="cmdidReloadSnippets" value="0x0106" />
