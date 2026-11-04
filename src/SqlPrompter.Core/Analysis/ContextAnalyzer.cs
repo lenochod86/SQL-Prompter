@@ -143,6 +143,19 @@ namespace SqlPrompter.Core.Analysis
 
                 var objectName = Make(ContextKind.ObjectName);
                 objectName.PreferredKeywords = qualifier.Count == 0 ? objectKeywords ?? Array.Empty<string>() : Array.Empty<string>();
+
+                // Not for INSERT INTO, UPDATE, DELETE FROM … and not when an alias is already typed after the name.
+                var tableSource = commaInFrom || anchor.IsWord("JOIN") || anchor.IsWord("APPLY") ||
+                    (anchor.IsWord("FROM") && !tokens[statementStart].IsWord("DELETE"));
+                var next = caretIndex + (word != null ? 1 : 0);
+                var aliasFollows = next < statementEnd && (tokens[next].Kind == TokenKind.QuotedIdentifier ||
+                    (tokens[next].Kind == TokenKind.Word && !Keywords.CannotBeAlias(tokens[next].Text)) || tokens[next].IsWord("AS"));
+                if (tableSource && !aliasFollows)
+                {
+                    objectName.AliasAllowed = true;
+                    objectName.Sources = CollectSources(structure, scopes);
+                }
+
                 return objectName;
             }
 

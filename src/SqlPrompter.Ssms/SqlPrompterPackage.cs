@@ -14,6 +14,7 @@ namespace SqlPrompter.Ssms
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
     [ProvideMenuResource("Menus.ctmenu", 4)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
+    [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {

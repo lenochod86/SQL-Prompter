@@ -71,14 +71,16 @@ namespace SqlPrompter.Core.Completion
     public static class SuggestionBuilder
     {
         /// <param name="script">Definitions in the script (CTEs, temporary tables, variables); optional.</param>
-        /// <param name="keywordCase">Casing of keywords, built-in functions and data types.</param>
+        /// <param name="options">Casing, aliases and qualification; defaults if null.</param>
         public static IReadOnlyList<Suggestion> Build(
             CaretContext context,
             IDatabaseMetadata metadata,
             ScriptModel script = null,
-            KeywordCase keywordCase = KeywordCase.MatchTyped)
+            SuggestionOptions options = null)
         {
-            var suggestions = BuildCore(context, metadata, script ?? ScriptModel.Empty);
+            options = options ?? SuggestionOptions.Default;
+            var suggestions = BuildCore(context, metadata, script ?? ScriptModel.Empty, options);
+            var keywordCase = options.KeywordCase;
             return keywordCase == KeywordCase.MatchTyped ? suggestions : suggestions.Select(s => ForceCase(s, keywordCase)).ToList();
         }
 
@@ -93,16 +95,16 @@ namespace SqlPrompter.Core.Completion
             return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group);
         }
 
-        private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
+        private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
                     return KeywordSuggestions(context, 0).ToList();
                 case ContextKind.ObjectName:
-                    return ObjectSuggestions(context, metadata, script).ToList();
+                    return ObjectSuggestions(context, metadata, script, options).ToList();
                 case ContextKind.Expression:
-                    return ExpressionSuggestions(context, metadata, script).ToList();
+                    return ExpressionSuggestions(context, metadata, script, options).ToList();
                 case ContextKind.Variable:
                     return VariableSuggestions(context, script, 0).ToList();
                 case ContextKind.DataType:
@@ -157,21 +159,22 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        private static IEnumerable<Suggestion> ScriptTableSuggestions(CaretContext context, ScriptModel script)
+        private static IEnumerable<Suggestion> ScriptTableSuggestions(CaretContext context, ScriptModel script, SuggestionOptions options)
         {
             var quote = context.QuoteIdentifiers;
             foreach (var table in script.Tables.GroupBy(t => t.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()))
             {
                 var insert = table.Kind == ScriptTableKind.Cte ? SqlIdentifier.Quote(table.Name, quote) : table.Name;
+                insert += AliasText(context, options, table.Name);
                 yield return new Suggestion(SuggestionKind.ScriptTable, table.Name, insert, table.Name, null, table.Description, 0);
             }
         }
 
-        private static IEnumerable<Suggestion> ObjectSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
+        private static IEnumerable<Suggestion> ObjectSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             if (context.Qualifier.Count == 0)
             {
-                foreach (var suggestion in ScriptTableSuggestions(context, script))
+                foreach (var suggestion in ScriptTableSuggestions(context, script, options))
                 {
                     yield return suggestion;
                 }
@@ -188,7 +191,7 @@ namespace SqlPrompter.Core.Completion
                 var schema = context.Qualifier[0];
                 foreach (var dbObject in metadata.Objects.Where(o => string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
                 {
-                    yield return ObjectSuggestion(dbObject, SqlIdentifier.Quote(dbObject.Name, quote), null);
+                    yield return ObjectSuggestion(dbObject, SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject), null);
                 }
 
                 yield break;
@@ -196,7 +199,8 @@ namespace SqlPrompter.Core.Completion
 
             foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem))
             {
-                var insert = SqlIdentifier.Quote(dbObject.Schema, quote) + "." + SqlIdentifier.Quote(dbObject.Name, quote);
+                var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(dbObject.Schema, quote) + "." : string.Empty) +
+                    SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject);
                 yield return ObjectSuggestion(dbObject, insert, dbObject.Schema);
             }
 
@@ -210,6 +214,42 @@ namespace SqlPrompter.Core.Completion
                 var text = Keywords.ApplyCase(keyword, context.TypedPrefix);
                 yield return new Suggestion(SuggestionKind.Keyword, text, text, text, null, null, 2);
             }
+        }
+
+        /// <summary>The alias after a table or view; table-valued functions need their parameters first, so they get none.</summary>
+        private static string ObjectAlias(CaretContext context, SuggestionOptions options, DbObject dbObject) =>
+            dbObject.Kind == DbObjectKind.TableFunction ? string.Empty : AliasText(context, options, dbObject.Name);
+
+        /// <summary>" AS alias" or " alias" where a table source is inserted and no alias follows; otherwise empty.</summary>
+        private static string AliasText(CaretContext context, SuggestionOptions options, string objectName)
+        {
+            if (!context.AliasAllowed || !options.Aliases.AddAliases)
+            {
+                return string.Empty;
+            }
+
+            var alias = AliasGenerator.Generate(objectName, context.Sources.Select(s => s.ReferenceName).Where(n => n != null), options.Aliases);
+            var quoted = SqlIdentifier.Quote(alias, context.QuoteIdentifiers);
+            if (!options.Aliases.IncludeAs)
+            {
+                return " " + quoted;
+            }
+
+            string asKeyword;
+            switch (options.KeywordCase)
+            {
+                case KeywordCase.Lower:
+                    asKeyword = "as";
+                    break;
+                case KeywordCase.Upper:
+                    asKeyword = "AS";
+                    break;
+                default:
+                    asKeyword = Keywords.ApplyCase("AS", context.TypedPrefix);
+                    break;
+            }
+
+            return " " + asKeyword + " " + quoted;
         }
 
         private static Suggestion ObjectSuggestion(DbObject dbObject, string insertText, string suffix)
@@ -267,7 +307,7 @@ namespace SqlPrompter.Core.Completion
             return columns == null ? null : new SourceColumns(source, columns, dbObject.ToString());
         }
 
-        private static IEnumerable<Suggestion> ExpressionSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script)
+        private static IEnumerable<Suggestion> ExpressionSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             var quote = context.QuoteIdentifiers;
             if (context.QualifiedSource != null)
@@ -302,7 +342,7 @@ namespace SqlPrompter.Core.Completion
                 foreach (var column in x.Columns)
                 {
                     var name = SqlIdentifier.Quote(column.Name, quote);
-                    var qualify = !inner || ambiguous.Contains(column.Name);
+                    var qualify = !inner || ambiguous.Contains(column.Name) || options.Aliases.QualifyColumnsWithAliases;
                     var insert = qualify ? SqlIdentifier.Quote(reference, quote) + "." + name : name;
                     yield return ColumnSuggestion(column, insert, reference, x.Owner, inner ? 0 : 2);
                 }

@@ -137,6 +137,11 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>Table sources visible from the caret, nearest block first.</summary>
         public IReadOnlyList<TableSource> Sources { get; internal set; } = Array.Empty<TableSource>();
 
+        /// <summary>
+        /// A table is being chosen for FROM, JOIN or APPLY and nothing follows it, so an alias can be inserted with it.
+        /// </summary>
+        public bool AliasAllowed { get; internal set; }
+
         /// <summary>For "alias.|", the source the qualifier refers to.</summary>
         public TableSource QualifiedSource { get; internal set; }
 

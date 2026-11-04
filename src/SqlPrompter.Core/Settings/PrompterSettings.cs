@@ -23,7 +23,13 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "behavior")]
         public BehaviorSettings Behavior { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone() };
+        [DataMember(Name = "aliases")]
+        public AliasSettings Aliases { get; set; }
+
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone() };
+
+        public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
+            new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases);
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context) => SetDefaults();
@@ -33,12 +39,14 @@ namespace SqlPrompter.Core.Settings
         {
             // "behavior": null in the file.
             Behavior = Behavior ?? new BehaviorSettings();
+            Aliases = Aliases ?? new AliasSettings();
         }
 
         private void SetDefaults()
         {
             Version = CurrentVersion;
             Behavior = new BehaviorSettings();
+            Aliases = new AliasSettings();
         }
     }
 

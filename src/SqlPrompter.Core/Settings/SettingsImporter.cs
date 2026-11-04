@@ -28,8 +28,8 @@ namespace SqlPrompter.Core.Settings
 
     /// <summary>
     /// Imports a settings file: our own JSON, or a SQL Prompt export (<c>.settings</c>, a ZIP with XML files).
-    /// From SQL Prompt, only what exists here is taken: whether suggestions are on and the commit keys.
-    /// Aliases, qualification and the rest follow with their own features.
+    /// From SQL Prompt, only what exists here is taken: whether suggestions are on, the commit keys and the alias and qualification options.
+    /// The rest follows with its own features.
     /// </summary>
     public static class SettingsImporter
     {
@@ -46,20 +46,13 @@ namespace SqlPrompter.Core.Settings
         public static SettingsImportResult ImportSqlPrompt(Stream zip, PrompterSettings current)
         {
             XDocument ui;
+            XDocument engine;
             try
             {
                 using (var archive = new ZipArchive(zip, ZipArchiveMode.Read))
                 {
-                    var entry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith("UIOptions.xml", StringComparison.OrdinalIgnoreCase));
-                    if (entry == null)
-                    {
-                        throw new FormatException("The file is not a SQL Prompt settings export: UIOptions.xml is missing.");
-                    }
-
-                    using (var reader = entry.Open())
-                    {
-                        ui = XDocument.Load(reader);
-                    }
+                    ui = LoadEntry(archive, "UIOptions.xml");
+                    engine = LoadEntry(archive, "EngineOptions.xml");
                 }
             }
             catch (InvalidDataException ex)
@@ -68,30 +61,54 @@ namespace SqlPrompter.Core.Settings
             }
             catch (System.Xml.XmlException ex)
             {
-                throw new FormatException("UIOptions.xml in the export is not valid XML.", ex);
+                throw new FormatException("An options file in the export is not valid XML.", ex);
+            }
+
+            if (ui == null && engine == null)
+            {
+                throw new FormatException("The file is not a SQL Prompt settings export: UIOptions.xml and EngineOptions.xml are missing.");
             }
 
             var settings = current.Clone();
             var behavior = settings.Behavior;
+            var aliases = settings.Aliases;
             var applied = new List<string>();
             var notes = new List<string>();
 
-            void Take(string element, string description, Action<bool> set)
+            void Take(XDocument document, string element, string description, Action<bool> set)
             {
-                if (TryGetBool(ui, element, out var value))
+                if (TryGetBool(document, element, out var value))
                 {
                     set(value);
                     applied.Add(description + ": " + (value ? "on" : "off"));
                 }
             }
 
-            Take("SuggestionsEnabledOnStartUpSSMS", "Suggestions enabled", v => behavior.SuggestionsEnabled = v);
-            Take("CandidateListCompleteSpace", "Commit on Space", v => behavior.CommitOnSpace = v);
-            Take("CandidateListCompleteDot", "Commit on dot", v => behavior.CommitOnDot = v);
-            Take("CandidateListCompleteComma", "Commit on comma", v => behavior.CommitOnComma = v);
-            Take("CandidateListCompleteParentheses", "Commit on parentheses", v => behavior.CommitOnParentheses = v);
-            Take("CandidateListCompleteSemicolon", "Commit on semicolon", v => behavior.CommitOnSemicolon = v);
-            Take("CandidateListCompleteSquareBrackets", "Commit on ]", v => behavior.CommitOnClosingBracket = v);
+            Take(ui, "SuggestionsEnabledOnStartUpSSMS", "Suggestions enabled", v => behavior.SuggestionsEnabled = v);
+            Take(ui, "CandidateListCompleteSpace", "Commit on Space", v => behavior.CommitOnSpace = v);
+            Take(ui, "CandidateListCompleteDot", "Commit on dot", v => behavior.CommitOnDot = v);
+            Take(ui, "CandidateListCompleteComma", "Commit on comma", v => behavior.CommitOnComma = v);
+            Take(ui, "CandidateListCompleteParentheses", "Commit on parentheses", v => behavior.CommitOnParentheses = v);
+            Take(ui, "CandidateListCompleteSemicolon", "Commit on semicolon", v => behavior.CommitOnSemicolon = v);
+            Take(ui, "CandidateListCompleteSquareBrackets", "Commit on ]", v => behavior.CommitOnClosingBracket = v);
+
+            Take(engine, "AliasTableViewNames", "Add aliases to tables and views", v => aliases.AddAliases = v);
+            Take(engine, "IncludeAsInAliasDefinition", "Include AS in alias definitions", v => aliases.IncludeAs = v);
+            Take(engine, "CapitaliseGeneratedAliases", "Capitalise generated aliases", v => aliases.CapitaliseGeneratedAliases = v);
+            Take(engine, "QualifyObjectNames", "Qualify object names with schema", v => aliases.QualifyObjectNames = v);
+            Take(engine, "QualifyColumnNamesWithAliases", "Qualify column names with aliases", v => aliases.QualifyColumnsWithAliases = v);
+
+            var custom = ReadCustomAliases(engine);
+            if (custom != null)
+            {
+                aliases.CustomAliases = custom;
+                applied.Add("Custom aliases: " + custom.Count);
+            }
+
+            if (CountOf(engine, "IgnoredPrefixes") > 0)
+            {
+                notes.Add("Ignored prefixes are not imported; add them in the options.");
+            }
 
             if ((TryGetBool(ui, "CandidateListCompleteEnter", out var enter) && !enter) ||
                 (TryGetBool(ui, "CandidateListCompleteTab", out var tab) && !tab))
@@ -107,12 +124,66 @@ namespace SqlPrompter.Core.Settings
             return new SettingsImportResult(settings, applied, notes);
         }
 
+        private static XDocument LoadEntry(ZipArchive archive, string suffix)
+        {
+            var entry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+            {
+                return null;
+            }
+
+            using (var reader = entry.Open())
+            {
+                return XDocument.Load(reader);
+            }
+        }
+
+        /// <summary>The element holds escaped XML: &lt;UserDefinedAliases&gt;&lt;UserDefinedAlias&gt;&lt;ObjectName&gt;…</summary>
+        private static List<AliasRule> ReadCustomAliases(XDocument engine)
+        {
+            var text = engine?.Root?.Element("UserDefinedAliases")?.Value;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            try
+            {
+                return XDocument.Parse(text).Descendants("UserDefinedAlias")
+                    .Select(e => new AliasRule { Name = e.Element("ObjectName")?.Value?.Trim(), Alias = e.Element("Alias")?.Value?.Trim() })
+                    .Where(r => !string.IsNullOrEmpty(r.Name) && !string.IsNullOrEmpty(r.Alias))
+                    .ToList();
+            }
+            catch (System.Xml.XmlException)
+            {
+                return null;
+            }
+        }
+
+        private static int CountOf(XDocument engine, string element)
+        {
+            var text = engine?.Root?.Element(element)?.Value;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return 0;
+            }
+
+            try
+            {
+                return int.TryParse(XDocument.Parse(text).Descendants("Count").FirstOrDefault()?.Value, out var count) ? count : 0;
+            }
+            catch (System.Xml.XmlException)
+            {
+                return 0;
+            }
+        }
+
         private static bool IsZip(byte[] bytes) => bytes.Length > 3 && bytes[0] == 'P' && bytes[1] == 'K';
 
         private static bool TryGetBool(XDocument document, string element, out bool value)
         {
             value = false;
-            var text = document.Root?.Element(element)?.Value?.Trim();
+            var text = document?.Root?.Element(element)?.Value?.Trim();
             return text != null && bool.TryParse(text, out value);
         }
     }

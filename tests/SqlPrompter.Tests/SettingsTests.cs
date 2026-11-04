@@ -198,8 +198,8 @@ namespace SqlPrompter.Tests
             var context = Analyze("SELECT * FROM dbo.T t |");
             var typed = SuggestionBuilder.Build(Analyze("sel|"), null);
 
-            var upper = SuggestionBuilder.Build(Analyze("sel|"), null, null, KeywordCase.Upper);
-            var lower = SuggestionBuilder.Build(Analyze("SEL|"), null, null, KeywordCase.Lower);
+            var upper = SuggestionBuilder.Build(Analyze("sel|"), null, null, new SuggestionOptions(KeywordCase.Upper, null));
+            var lower = SuggestionBuilder.Build(Analyze("SEL|"), null, null, new SuggestionOptions(KeywordCase.Lower, null));
 
             Assert.Contains(typed, i => i.InsertText == "select");
             Assert.Contains(upper, i => i.InsertText == "SELECT");
