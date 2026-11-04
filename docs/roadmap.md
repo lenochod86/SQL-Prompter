@@ -68,11 +68,12 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 - [x] Commit keys like SQL Prompt: Enter, Space and Tab commit; dot, comma, parentheses, semicolon and `]` do not commit, they close the list and are typed (a dot then opens the columns) (#6)
 - [ ] Configurable commit keys (#9)
+- [ ] Make the SQL Prompter list recognizable at a glance (own icon or marker, like SQL Prompt's list); today it is hard to tell it from the built-in one while testing (#20)
 - [ ] Verify in SSMS: empty list for variables, SQL Prompter filter, soft selection while typing an alias (#7)
 - [ ] Verify performance on a large database (#7)
 - [ ] Verify Windows authentication (#7)
 - [x] Refresh metadata after DDL executed in the window (`CREATE`, `ALTER`, `DROP`) (#8)
-- [ ] CI checks: VSIX and menu version bumps, one build per push, warnings as errors, Dependabot (#17)
+- [x] CI checks: VSIX and menu version bumps, one build per push, warnings as errors, Dependabot (#17)
 
 ### Phase 1: Script knowledge and aliases (M)
 
