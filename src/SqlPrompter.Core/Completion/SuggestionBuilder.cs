@@ -20,6 +20,9 @@ namespace SqlPrompter.Core.Completion
         Function,
         DataType,
 
+        /// <summary>A whole join condition such as o.IdUser = u.IdUser, offered after ON.</summary>
+        JoinCondition,
+
         /// <summary>Linked server, for four-part names.</summary>
         LinkedServer,
 
@@ -87,8 +90,8 @@ namespace SqlPrompter.Core.Completion
         /// <summary>For a column: whether it is part of the primary key or of a foreign key (shown as a key icon).</summary>
         public KeyKind Key { get; }
 
-        /// <summary>Sort key: group, then text.</summary>
-        public string SortText => Group.ToString("D2") + DisplayText;
+        /// <summary>Sort key: group (negative groups first), then text.</summary>
+        public string SortText => (Group + 100).ToString("D3") + DisplayText;
 
         public override string ToString() => Kind + " " + DisplayText + " → " + InsertText;
     }
@@ -434,6 +437,14 @@ namespace SqlPrompter.Core.Completion
                 var target = source.Kind == TableSourceKind.Derived ? "derived table" : string.Join(".", source.NameParts);
                 yield return new Suggestion(SuggestionKind.Alias, source.ReferenceName, SqlIdentifier.Quote(source.ReferenceName, quote),
                     source.ReferenceName, source.Alias != null ? target : null, (source.Alias != null ? "alias " : "source ") + target, 1);
+            }
+
+            if (context.JoinTarget != null)
+            {
+                foreach (var condition in JoinSuggestions.Conditions(context, metadata, options))
+                {
+                    yield return condition;
+                }
             }
 
             if (context.SelectWithoutFrom)

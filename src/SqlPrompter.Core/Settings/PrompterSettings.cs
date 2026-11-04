@@ -26,10 +26,13 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "aliases")]
         public AliasSettings Aliases { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone() };
+        [DataMember(Name = "joins")]
+        public JoinSettings Joins { get; set; }
+
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone() };
 
         public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
-            new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases);
+            new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins);
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context) => SetDefaults();
@@ -40,6 +43,7 @@ namespace SqlPrompter.Core.Settings
             // "behavior": null in the file.
             Behavior = Behavior ?? new BehaviorSettings();
             Aliases = Aliases ?? new AliasSettings();
+            Joins = Joins ?? new JoinSettings();
         }
 
         private void SetDefaults()
@@ -47,6 +51,7 @@ namespace SqlPrompter.Core.Settings
             Version = CurrentVersion;
             Behavior = new BehaviorSettings();
             Aliases = new AliasSettings();
+            Joins = new JoinSettings();
         }
     }
 

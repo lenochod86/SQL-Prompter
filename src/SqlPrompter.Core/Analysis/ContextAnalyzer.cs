@@ -237,6 +237,12 @@ namespace SqlPrompter.Core.Analysis
                 expression.FromInsertPosition = SelectListEnd(structure, tokens, nameStart, block, caret);
             }
 
+            if (qualifier.Count == 0 && clauseState.Clause == Clause.On && anchorAtBlockLevel &&
+                (anchor.IsWord("ON") || anchor.IsWord("AND") || anchor.IsWord("OR")))
+            {
+                expression.JoinTarget = FindJoinTarget(structure, anchorIndex, block, sources);
+            }
+
             if (qualifier.Count > 0)
             {
                 var target = FindQualifiedSource(sources, qualifier);
@@ -251,6 +257,35 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return expression;
+        }
+
+        /// <summary>The table introduced by the JOIN whose ON condition contains the anchor token; null if it cannot be found.</summary>
+        private static TableSource FindJoinTarget(Structure s, int anchorIndex, Scope block, IReadOnlyList<TableSource> sources)
+        {
+            var sawOn = false;
+            for (var i = anchorIndex; i >= block.Start; i--)
+            {
+                if (s.Depth[i] != block.Depth)
+                {
+                    continue;
+                }
+
+                var upper = s.Tokens[i].Upper;
+                if (upper == "ON")
+                {
+                    sawOn = true;
+                }
+                else if (sawOn && (upper == "JOIN" || upper == "APPLY"))
+                {
+                    return sources.FirstOrDefault(src => src.ScopeLevel == 0 && src.TokenIndex == i + 1);
+                }
+                else if (upper == "JOIN" || upper == "APPLY" || upper == "FROM" || upper == "WHERE")
+                {
+                    return null;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>AS inside CAST(…) or TRY_CAST(…), followed by a data type.</summary>
@@ -710,7 +745,7 @@ namespace SqlPrompter.Core.Analysis
                 i = Math.Min(to, s.Match[i] + 1);
             }
 
-            sources.Add(new TableSource(kind, parts, alias, level, bodyStart, bodyEnd, columnNames));
+            sources.Add(new TableSource(kind, parts, alias, level, bodyStart, bodyEnd, columnNames) { TokenIndex = start });
             return i;
         }
 
