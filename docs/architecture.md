@@ -251,3 +251,7 @@ A WPF `Popup` is hosted in its own top-level window that is topmost, so the comp
 ### Query history records the tab name (#129)
 
 Each run stores the file name of the active document (`Path.GetFileName(document.FullName)`), e.g. `SQLQuery2.sql` for a new query window or the file name of a saved script. Verified in SSMS 22: a run of `SELECT 4242 AS HistTab` was stored with `"tab":"SQLQuery2.sql"`. Entries from before have no tab and show an empty cell.
+
+### Toolbar button for the query history (#130)
+
+The vsct places the command `cmdidQueryHistory` (with the `History` image moniker from `KnownImageIds.vsct`) in a group on the Standard toolbar (`guidSHLMainMenu` / `IDM_VS_TOOL_STANDARD`, the toolbar that holds New Query) through a `CommandPlacement`, in addition to its place in the SQL Prompter menu. Verified in SSMS 22: the clock icon appears next to the toolbar buttons and a click opens the history window. No default keyboard shortcut was added (open question for the user).

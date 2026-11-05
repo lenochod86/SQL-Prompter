@@ -2,6 +2,7 @@
 <CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <Extern href="stdidcmd.h" />
   <Extern href="vsshlids.h" />
+  <Extern href="KnownImageIds.vsct" />
 
   <Commands package="guidSqlPrompterPackage">
     <Menus>
@@ -16,6 +17,10 @@
     </Menus>
 
     <Groups>
+      <!-- A group on the Standard toolbar (it holds New Query); the query history button sits in it. -->
+      <Group guid="guidSqlPrompterCmdSet" id="ToolbarGroup" priority="0x0900">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_TOOL_STANDARD" />
+      </Group>
       <Group guid="guidSqlPrompterCmdSet" id="MetadataGroup" priority="0x0100">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
@@ -117,8 +122,11 @@
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidQueryHistory" priority="0x0103" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
+        <Icon guid="ImageCatalogGuid" id="History" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
         <Strings>
           <ButtonText>Query History...</ButtonText>
+          <ToolTipText>Open the query history</ToolTipText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidParameterInfo" priority="0x0102" type="Button">
@@ -225,6 +233,11 @@
       </Button>
     </Buttons>
   </Commands>
+  <CommandPlacements>
+    <CommandPlacement guid="guidSqlPrompterCmdSet" id="cmdidQueryHistory" priority="0x0100">
+      <Parent guid="guidSqlPrompterCmdSet" id="ToolbarGroup" />
+    </CommandPlacement>
+  </CommandPlacements>
   <Symbols>
     <GuidSymbol name="guidSqlPrompterPackage" value="{a3a4db19-c58e-4eac-8a84-ba61357b9b01}" />
     <GuidSymbol name="guidSqlPrompterCmdSet" value="{15e19ce9-b3c9-47dd-97f9-49fe13869730}">
@@ -237,6 +250,7 @@
       <IDSymbol name="EditingGroup" value="0x1015" />
       <IDSymbol name="RefactoringGroup" value="0x1016" />
       <IDSymbol name="FormattingGroup" value="0x1017" />
+      <IDSymbol name="ToolbarGroup" value="0x1018" />
       <IDSymbol name="cmdidFormatDocument" value="0x011A" />
       <IDSymbol name="cmdidFormatSelection" value="0x011B" />
       <IDSymbol name="cmdidAddNPrefix" value="0x011C" />
