@@ -131,6 +131,12 @@ namespace SqlPrompter.Core.Completion
         /// <summary>Sort key: group (negative groups first), then text.</summary>
         public string SortText => (Group + 100).ToString("D3") + DisplayText;
 
+        /// <summary>Sort key with the usage of the item: within a group the items chosen more often come first.</summary>
+        public string RankedSortText(int usageCount) => (Group + 100).ToString("D3") + UsageStatistics.SortPrefix(usageCount) + DisplayText;
+
+        /// <summary>Identifies the item for the usage statistics: its kind, its text and where it belongs (schema, alias).</summary>
+        public string UsageKey => Kind + "|" + DisplayText + "|" + Suffix;
+
         public override string ToString() => Kind + " " + DisplayText + " → " + InsertText;
     }
 

@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 9)]
+    [ProvideMenuResource("Menus.ctmenu", 10)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
@@ -38,6 +38,7 @@ namespace SqlPrompter.Ssms
         public const int GoToDefinitionId = 0x010B;
         public const int RunStatementId = 0x010C;
         public const int ParameterInfoId = 0x010D;
+        public const int ResetUsageId = 0x010E;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
@@ -46,6 +47,7 @@ namespace SqlPrompter.Ssms
         {
             Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
             SnippetService.Start();
+            UsageService.Start();
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             TabColoring.Start();
             DefaultKeyBindings.Apply();
@@ -53,6 +55,7 @@ namespace SqlPrompter.Ssms
             {
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
+                commands.AddCommand(new MenuCommand((s, e) => ResetUsage(), new CommandID(CommandSet, ResetUsageId)));
                 commands.AddCommand(new MenuCommand((s, e) => ExportSettings(), new CommandID(CommandSet, ExportSettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => ImportSettings(), new CommandID(CommandSet, ImportSettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => ImportSnippets(), new CommandID(CommandSet, ImportSnippetsId)));
@@ -285,6 +288,17 @@ namespace SqlPrompter.Ssms
                 this, text, "SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_INFO,
                 Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_OK,
                 Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+        }
+
+        private void ResetUsage()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (VsShellUtilities.ShowMessageBox(this, "Forget which suggestions you chose how often? The list goes back to its plain order.", "SQL Prompter",
+                    Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_QUERY, Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_YESNO,
+                    Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_SECOND) == 6)
+            {
+                UsageService.Reset();
+            }
         }
 
         private void OpenLog()

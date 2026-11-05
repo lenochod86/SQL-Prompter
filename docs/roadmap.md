@@ -151,7 +151,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] Expanding `*` with Tab into a column list with aliases (#45)
 - [x] Object definition panel next to the list (`CREATE` script, as in SQL Prompt) (#46)
 - [x] Parameter info (#45)
-- [ ] Ranking by usage (statistics stay local, nothing is sent anywhere) (#47)
+- [x] Ranking by usage (statistics stay local, nothing is sent anywhere) (#47)
 
 ### Phase 7: Tools (M to L) (#48)
 

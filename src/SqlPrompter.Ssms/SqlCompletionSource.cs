@@ -51,6 +51,7 @@ namespace SqlPrompter.Ssms
         internal const string FromEditKey = "SqlPrompter.FromEdit";
         internal const string CaretBackKey = "SqlPrompter.CaretBack";
         internal const string BlockKey = "SqlPrompter.Block";
+        internal const string UsageKeyKey = "SqlPrompter.UsageKey";
         internal const string DefinitionKey = "SqlPrompter.Definition";
         internal const string BeforeLineKey = "SqlPrompter.BeforeLine";
         internal const string DetailKey = "SqlPrompter.Detail";
@@ -266,6 +267,8 @@ namespace SqlPrompter.Ssms
 
         private CompletionItem ToItem(Suggestion suggestion, Prepared prepared)
         {
+            var rank = SettingsService.Current.Behavior.RankByUsage;
+            var usageKey = (prepared.Metadata?.DatabaseName ?? string.Empty) + "|" + suggestion.UsageKey;
             var item = new CompletionItem(
                 suggestion.DisplayText,
                 this,
@@ -273,9 +276,10 @@ namespace SqlPrompter.Ssms
                 Filters,
                 SettingsService.Current.Behavior.MarkItems ? suggestion.MarkedSuffix : suggestion.Suffix ?? string.Empty,
                 suggestion.InsertText,
-                suggestion.SortText,
+                rank ? suggestion.RankedSortText(UsageService.Statistics.CountOf(usageKey)) : suggestion.SortText,
                 suggestion.FilterText,
                 ImmutableArray<ImageElement>.Empty);
+            item.Properties.AddProperty(UsageKeyKey, usageKey);
             if (suggestion.Tag is SqlPrompter.Core.Snippets.Snippet snippet)
             {
                 item.Properties.AddProperty(SnippetKey, snippet);
@@ -435,6 +439,11 @@ namespace SqlPrompter.Ssms
             // Enter and Tab arrive as '\n' and '\t'; they always insert.
             if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || Keys.Commits(typedChar))
             {
+                if (item.Properties.TryGetProperty(SqlCompletionSource.UsageKeyKey, out string chosenKey) && SettingsService.Current.Behavior.RankByUsage)
+                {
+                    UsageService.Record(chosenKey);
+                }
+
                 // A snippet is expanded instead of inserting its prefix; the typed character (Tab, Enter, Space) is swallowed.
                 if (item.Properties.TryGetProperty(SqlCompletionSource.SnippetKey, out SqlPrompter.Core.Snippets.Snippet snippetToExpand) &&
                     SnippetInserter.TryInsert(session, buffer, snippetToExpand))
