@@ -14,6 +14,7 @@ namespace SqlPrompter.Tests
             Snippet.Create("addcol", "Add column", "ALTER TABLE t ADD c INT"),
             Snippet.Create("st", "Select top", "SELECT TOP 100 *\nFROM "),
             Snippet.Create("cnt", "", "SELECT COUNT(*)"),
+            Snippet.Create("ij", "Inner join", "INNER JOIN "),
         };
 
         private static SuggestionOptions Options() => SuggestionOptions.Default.WithSnippets(Snippets);
@@ -43,6 +44,18 @@ namespace SqlPrompter.Tests
         public void ThePrefixMayBeInTheMiddleOfTheTypedWord()
         {
             Assert.Equal(new[] { "cnt" }, SuggestionBuilder.Build(Analyze("cn|"), null, null, Options()).Where(i => i.Kind == SuggestionKind.Snippet).Select(i => i.DisplayText).ToArray());
+        }
+
+        [Theory]
+        [InlineData("SELECT * FROM dbo.Users AS u ij|")]
+        [InlineData("SELECT *\r\nFROM dbo.Users AS u\r\nst|")]
+        [InlineData("SELECT * FROM dbo.Users u st|")]
+        public void SnippetsAreOfferedAfterTheFromClause(string sql)
+        {
+            var context = Analyze(sql);
+            var items = SuggestionBuilder.Build(context, SampleDatabase(), null, Options());
+
+            Assert.True(items.Any(i => i.Kind == SuggestionKind.Snippet), context.Kind + " " + context.TypedPrefix);
         }
 
         [Fact]
