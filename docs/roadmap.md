@@ -173,7 +173,7 @@ The user uses almost all of them. Agreed order (decision 16): #52 editor helpers
 - [x] Selection actions: add commas, add quotes and commas (#52)
 - [x] Highlighting matching objects in the script (#52)
 - [x] Auto-closing `'` and `[` (#52)
-- [ ] Script as INSERT from the results grid (not yet known whether SSMS 22 allows it) (#53)
+- [x] Script as INSERT from the results grid (#53): menu *Script Results Grid Selection As INSERT*; verified in SSMS 22.11
 
 ### Phase 8: Formatting (L) (#54)
 

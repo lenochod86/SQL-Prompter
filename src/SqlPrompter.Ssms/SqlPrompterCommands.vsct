@@ -133,6 +133,12 @@
           <ButtonText>Add Quotes And Commas To Selected Lines</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidScriptGridAsInsert" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Script Results Grid Selection As INSERT</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -153,6 +159,7 @@
       <IDSymbol name="EditingGroup" value="0x1015" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
+      <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />
       <IDSymbol name="cmdidAddQuotesAndCommas" value="0x0110" />
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
