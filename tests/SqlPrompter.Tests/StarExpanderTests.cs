@@ -24,6 +24,18 @@ namespace SqlPrompter.Tests
                 Expand("SELECT *| FROM dbo.Users u", new EditorLayout { NewLine = "\n", LinePrefix = "SELECT " }));
         }
 
+        [Theory]
+        [InlineData(true, true, "SELECT\tu.Id\n\t  , u.Name\n\t  , u.Email FROM dbo.Users u")]
+        [InlineData(true, false, "SELECT  u.Id\n      , u.Name\n      , u.Email FROM dbo.Users u")]
+        [InlineData(false, true, "SELECT\tu.Id,\n\t\tu.Name,\n\t\tu.Email FROM dbo.Users u")]
+        [InlineData(false, false, "SELECT  u.Id,\n        u.Name,\n        u.Email FROM dbo.Users u")]
+        public void ExpansionFollowsTheFormattingStyle(bool commaBefore, bool tabs, string expected)
+        {
+            var style = new SqlPrompter.Core.Formatting.FormatStyle { CommaBeforeItems = commaBefore, UseTabs = tabs, TabWidth = 4 };
+            var layout = new EditorLayout { NewLine = "\n", LinePrefix = tabs ? "SELECT\t" : "SELECT  ", Style = style };
+
+            Assert.Equal(expected, Expand(layout.LinePrefix + "*| FROM dbo.Users u", layout));
+        }
         [Fact]
         public void TableWithoutAliasGetsNoAliasInASingleTableQuery()
         {
