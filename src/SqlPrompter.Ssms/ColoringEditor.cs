@@ -66,6 +66,18 @@ namespace SqlPrompter.Ssms
             layout.Controls.Add(problems, 0, 7);
             Controls.Add(layout);
 
+            // The page is hosted in the legacy Options dialog of SSMS 22: stale paint of a child (a bar over the grids) was seen after the first
+            // layout, so everything is double buffered and repainted when the page is shown, resized or scaled (#137).
+            foreach (var control in new Control[] { this, layout, environments, rules })
+            {
+                EnableDoubleBuffer(control);
+            }
+
+            VisibleChanged += (s, e) => Repaint();
+            SizeChanged += (s, e) => Repaint();
+            DpiChangedAfterParent += (s, e) => Repaint();
+            HandleCreated += (s, e) => BeginInvoke(new Action(Repaint));
+
             enabled.CheckedChanged += (s, e) => Revalidate();
             environments.UserDeletedRow += (s, e) => { RefreshEnvironmentChoices(); Revalidate(); };
         }
@@ -282,6 +294,16 @@ namespace SqlPrompter.Ssms
             var light = (r * 299 + g * 587 + b * 114) / 1000 > 140;
             cell.Style.ForeColor = light ? Color.Black : Color.White;
             cell.Style.SelectionForeColor = cell.Style.ForeColor;
+        }
+
+        private static void EnableDoubleBuffer(Control control) =>
+            typeof(Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.SetValue(control, true, null);
+
+        private void Repaint()
+        {
+            PerformLayout();
+            Invalidate(true);
+            Update();
         }
 
         private static DataGridView NewGrid() => new DataGridView
