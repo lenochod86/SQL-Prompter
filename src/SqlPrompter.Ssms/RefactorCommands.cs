@@ -34,21 +34,7 @@ namespace SqlPrompter.Ssms
                     return;
                 }
 
-                var prefix = 0;
-                var limit = Math.Min(original.Length, changed.Length);
-                while (prefix < limit && original[prefix] == changed[prefix])
-                {
-                    prefix++;
-                }
-
-                var suffix = 0;
-                while (suffix < limit - prefix && original[original.Length - 1 - suffix] == changed[changed.Length - 1 - suffix])
-                {
-                    suffix++;
-                }
-
-                var replaced = new Span(span.Start.Position + prefix, original.Length - prefix - suffix);
-                view.TextBuffer.Replace(replaced, changed.Substring(prefix, changed.Length - prefix - suffix));
+                ReplaceDifference(view, span.Start.Position, original, changed);
                 Log.Write("Refactoring: " + what + ".");
                 SetStatus("SQL Prompter: " + what + " done.");
             }
@@ -56,6 +42,71 @@ namespace SqlPrompter.Ssms
             {
                 Log.Error("Refactoring (" + what + ") failed", ex);
             }
+        }
+
+        /// <summary>Expands every select-list star of the selection (or of the whole script) with the metadata of the active window.</summary>
+        public static void ExpandStars(ITextView view)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (view == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var snapshot = view.TextBuffer.CurrentSnapshot;
+                var selection = view.Selection.IsEmpty
+                    ? new SnapshotSpan(snapshot, 0, snapshot.Length)
+                    : view.Selection.StreamSelectionSpan.SnapshotSpan;
+                var cache = MetadataService.Current?.CacheForActiveWindow(out _, SqlBatch.FindUsedDatabase(snapshot, selection.Start.Position));
+                var metadata = cache?.Current;
+                if (metadata == null)
+                {
+                    SetStatus("SQL Prompter: the metadata of the database is not loaded yet.");
+                    return;
+                }
+
+                var original = snapshot.GetText();
+                var options = SettingsService.Current.ToSuggestionOptions();
+                var changed = SqlPrompter.Core.Completion.StarExpanderAll.Expand(
+                    original, selection.Start.Position, selection.End.Position, metadata, options, out var expanded, out var skipped);
+                if (changed == original)
+                {
+                    SetStatus(skipped > 0
+                        ? "SQL Prompter: " + skipped + " * could not be expanded (unknown tables)."
+                        : "SQL Prompter: no * to expand.");
+                    return;
+                }
+
+                ReplaceDifference(view, 0, original, changed);
+                SetStatus("SQL Prompter: expanded " + expanded + " * " + (skipped > 0 ? "(" + skipped + " could not be expanded)." : "."));
+                Log.Write("Refactoring: expanded " + expanded + " stars, skipped " + skipped + ".");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Expanding the stars failed", ex);
+            }
+        }
+
+        /// <summary>Replaces only the middle that differs between the two texts; <paramref name="offset"/> is where the original starts in the buffer.</summary>
+        private static void ReplaceDifference(ITextView view, int offset, string original, string changed)
+        {
+            var prefix = 0;
+            var limit = Math.Min(original.Length, changed.Length);
+            while (prefix < limit && original[prefix] == changed[prefix])
+            {
+                prefix++;
+            }
+
+            var suffix = 0;
+            while (suffix < limit - prefix && original[original.Length - 1 - suffix] == changed[changed.Length - 1 - suffix])
+            {
+                suffix++;
+            }
+
+            var replaced = new Span(offset + prefix, original.Length - prefix - suffix);
+            view.TextBuffer.Replace(replaced, changed.Substring(prefix, changed.Length - prefix - suffix));
         }
 
         private static void SetStatus(string text)
