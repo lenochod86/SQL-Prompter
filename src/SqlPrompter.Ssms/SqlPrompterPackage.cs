@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 17)]
+    [ProvideMenuResource("Menus.ctmenu", 18)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
@@ -21,6 +21,7 @@ namespace SqlPrompter.Ssms
     [ProvideOptionPage(typeof(SnippetOptionsPage), "SQL Prompter", "Snippets", 0, 0, true)]
     [ProvideOptionPage(typeof(ColoringOptionsPage), "SQL Prompter", "Coloring", 0, 0, true)]
     [ProvideOptionPage(typeof(AnalysisOptionsPage), "SQL Prompter", "Code Analysis", 0, 0, true)]
+    [ProvideOptionPage(typeof(FormattingOptionsPage), "SQL Prompter", "Formatting", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {
@@ -30,6 +31,7 @@ namespace SqlPrompter.Ssms
         public const int OpenLogId = 0x0101;
         public const int ExportSettingsId = 0x0102;
         public const int ImportSettingsId = 0x0103;
+        public const int ImportFormatStyleId = 0x0119;
         public const int ImportSnippetsId = 0x0104;
         public const int OpenSnippetsFolderId = 0x0105;
         public const int ReloadSnippetsId = 0x0106;
@@ -72,6 +74,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => ResetUsage(), new CommandID(CommandSet, ResetUsageId)));
                 commands.AddCommand(new MenuCommand((s, e) => ExportSettings(), new CommandID(CommandSet, ExportSettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => ImportSettings(), new CommandID(CommandSet, ImportSettingsId)));
+                commands.AddCommand(new MenuCommand((s, e) => ImportFormatStyle(), new CommandID(CommandSet, ImportFormatStyleId)));
                 commands.AddCommand(new MenuCommand((s, e) => ImportSnippets(), new CommandID(CommandSet, ImportSnippetsId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenSnippetsFolder(), new CommandID(CommandSet, OpenSnippetsFolderId)));
                 commands.AddCommand(new MenuCommand((s, e) => SnippetService.Reload(), new CommandID(CommandSet, ReloadSnippetsId)));
@@ -170,6 +173,43 @@ namespace SqlPrompter.Ssms
             {
                 Log.Error("Importing the settings failed", ex);
                 ShowMessage("Importing the settings failed: " + ex.Message);
+            }
+        }
+
+        private void ImportFormatStyle()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                using (var dialog = new System.Windows.Forms.OpenFileDialog
+                {
+                    Title = "Import a SQL Prompt formatting style (.json)",
+                    Filter = "SQL Prompt styles (*.json)|*.json|All files (*.*)|*.*",
+                })
+                {
+                    if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                    {
+                        return;
+                    }
+
+                    var json = System.IO.File.ReadAllText(dialog.FileName, System.Text.Encoding.UTF8);
+                    var result = SqlPrompter.Core.Formatting.SqlPromptStyleImporter.Import(json, SettingsService.Current.Formatting);
+                    var settings = SettingsService.Current.Clone();
+                    settings.Formatting = result.Style;
+                    SettingsService.Update(settings);
+                    var text = "Imported:\n- " + (result.Applied.Count == 0 ? "(nothing)" : string.Join("\n- ", result.Applied));
+                    if (result.Notes.Count > 0)
+                    {
+                        text += "\n\nNot applied (the formatter has no such option):\n- " + string.Join("\n- ", result.Notes);
+                    }
+
+                    ShowMessage(text);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Importing the formatting style failed", ex);
+                ShowMessage("Importing the formatting style failed: " + ex.Message);
             }
         }
 

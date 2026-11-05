@@ -180,7 +180,7 @@ The user uses almost all of them. Agreed order (decision 16): #52 editor helpers
 Wanted, but not a priority, so it comes last.
 
 - [ ] Formatter over tokens with structure from ScriptDOM; keeps comments and refuses a change that would alter the meaning (#55)
-- [ ] Options following the SQL Prompt style and import of a `.json` style (the user's style is the main test case) (#56)
+- [x] Options following the SQL Prompt style and import of a `.json` style (#56): options page, menu *Import Formatting Style...*; verified in SSMS 22.11 with the user's style; options the engine lacks (alignment, parenthesis styles, CTE, JOIN, INSERT, CASE) are reported as not applied
 - [ ] Formatting actions: `N` prefix for strings, semicolons, removing unnecessary brackets, adding or removing `AS`, casing, optionally qualification and expanding `*` (#57)
 - [ ] Formatting the document or the selection (#57)
 - [ ] Upper case while typing (#57)
