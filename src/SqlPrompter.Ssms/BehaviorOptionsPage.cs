@@ -49,6 +49,15 @@ namespace SqlPrompter.Ssms
             set => values.AutoClose = value;
         }
 
+        [Category("Suggestions")]
+        [DisplayName("Show suggestions after a comma")]
+        [Description("The list opens after a comma and the space that follows it (next column, next item), except in VALUES lists, lists of literals and DECLARE.")]
+        public bool SuggestAfterComma
+        {
+            get => values.SuggestAfterComma;
+            set => values.SuggestAfterComma = value;
+        }
+
         [Category("Editing")]
         [DisplayName("Highlight matching names")]
         [Description("Highlights the other places of the script where the name under the caret appears (compared by name, ignoring case and brackets).")]

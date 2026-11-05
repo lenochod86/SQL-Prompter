@@ -125,6 +125,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "autoClose")]
         public bool AutoClose { get; set; }
 
+        /// <summary>The list opens by itself after a comma (and the space after it) where the next item is a name or an expression.</summary>
+        [DataMember(Name = "suggestAfterComma")]
+        public bool SuggestAfterComma { get; set; }
+
         /// <summary>The other places of the name under the caret are highlighted.</summary>
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
@@ -181,6 +185,7 @@ namespace SqlPrompter.Core.Settings
             MarkItems = true;
             RankByUsage = true;
             AutoClose = true;
+            SuggestAfterComma = true;
             HighlightMatches = true;
             KeepHistory = true;
             HistoryDays = 0;
