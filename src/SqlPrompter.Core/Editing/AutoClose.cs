@@ -15,14 +15,14 @@ namespace SqlPrompter.Core.Editing
     }
 
     /// <summary>
-    /// Auto-closing of <c>'</c> and <c>[</c>. It decides from the text before the character is typed; the same lexer as the completion tells
+    /// Auto-closing of <c>'</c>, <c>[</c> and <c>(</c>. It decides from the text before the character is typed; the same lexer as the completion tells
     /// strings, comments and bracketed names apart, so nothing is closed inside them.
     /// </summary>
     public static class AutoClose
     {
         public static AutoCloseAction Decide(string text, int caret, char typed)
         {
-            if (text == null || caret < 0 || caret > text.Length || (typed != '\'' && typed != '[' && typed != ']'))
+            if (text == null || caret < 0 || caret > text.Length || (typed != '\'' && typed != '[' && typed != ']' && typed != '(' && typed != ')'))
             {
                 return AutoCloseAction.None;
             }
@@ -30,6 +30,18 @@ namespace SqlPrompter.Core.Editing
             var next = caret < text.Length ? text[caret] : '\0';
             var previous = caret > 0 ? text[caret - 1] : '\0';
             var inside = TokenAround(text, caret);
+
+            if (typed == ')')
+            {
+                // Step over a closing parenthesis only when the parentheses of the text are balanced (otherwise it is a deliberate one).
+                return next == ')' && inside == null && IsBalanced(text) ? AutoCloseAction.Overtype : AutoCloseAction.None;
+            }
+
+            if (typed == '(')
+            {
+                // In front of a word the parenthesis is just typed; after a word (a function call) the pair is inserted.
+                return inside != null || IsWordCharacter(next) ? AutoCloseAction.None : AutoCloseAction.InsertPair;
+            }
 
             if (typed == ']')
             {
@@ -71,6 +83,51 @@ namespace SqlPrompter.Core.Editing
             }
 
             return AutoCloseAction.InsertPair;
+        }
+
+        /// <summary>True when Backspace right after an opening character removes the empty pair <c>()</c>, <c>[]</c> or <c>''</c> around the caret.</summary>
+        public static bool DeletesPair(string text, int caret)
+        {
+            if (text == null || caret < 1 || caret >= text.Length)
+            {
+                return false;
+            }
+
+            var open = text[caret - 1];
+            var close = text[caret];
+            if (!((open == '(' && close == ')') || (open == '[' && close == ']') || (open == '\'' && close == '\'')))
+            {
+                return false;
+            }
+
+            var inside = TokenAround(text, caret);
+            switch (open)
+            {
+                case '(':
+                    return inside == null;
+                case '[':
+                    return inside != null && inside.Kind == TokenKind.QuotedIdentifier && inside.Text == "[]";
+                default:
+                    return inside != null && inside.Kind == TokenKind.String && inside.Text == "''";
+            }
+        }
+
+        private static bool IsBalanced(string text)
+        {
+            var depth = 0;
+            foreach (var token in Lexer.Tokenize(text))
+            {
+                if (token.Kind == TokenKind.OpenParen)
+                {
+                    depth++;
+                }
+                else if (token.Kind == TokenKind.CloseParen)
+                {
+                    depth--;
+                }
+            }
+
+            return depth == 0;
         }
 
         /// <summary>The string, comment or bracketed name the caret is inside of (a caret at the very end counts for an unfinished one).</summary>

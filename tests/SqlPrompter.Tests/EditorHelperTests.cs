@@ -64,6 +64,37 @@ namespace SqlPrompter.Tests
             Assert.Equal(expected, Decide(text, typed));
 
         [Theory]
+        [InlineData("SELECT COUNT|", '(', AutoCloseAction.InsertPair)]
+        [InlineData("SELECT |", '(', AutoCloseAction.InsertPair)]
+        [InlineData("SELECT |a", '(', AutoCloseAction.None)]
+        [InlineData("SELECT 'a|'", '(', AutoCloseAction.None)]
+        [InlineData("-- a|", '(', AutoCloseAction.None)]
+        [InlineData("/* a| */", '(', AutoCloseAction.None)]
+        [InlineData("SELECT [a|]", '(', AutoCloseAction.None)]
+        [InlineData("SELECT COUNT(*|)", ')', AutoCloseAction.Overtype)]
+        [InlineData("SELECT COUNT(|)", ')', AutoCloseAction.Overtype)]
+        [InlineData("SELECT (a + (b|)", ')', AutoCloseAction.None)]
+        [InlineData("SELECT a|", ')', AutoCloseAction.None)]
+        [InlineData("SELECT ')|'", ')', AutoCloseAction.None)]
+        public void ParenthesesArePairedAndSteppedOver(string text, char typed, AutoCloseAction expected) =>
+            Assert.Equal(expected, Decide(text, typed));
+
+        [Theory]
+        [InlineData("SELECT COUNT(|)", true)]
+        [InlineData("SELECT [|]", true)]
+        [InlineData("SELECT '|'", true)]
+        [InlineData("SELECT (|a)", false)]
+        [InlineData("SELECT (a|)", false)]
+        [InlineData("SELECT ')|'", false)]
+        [InlineData("SELECT '(|)'", false)]
+        [InlineData("SELECT ()|", false)]
+        [InlineData("SELECT '' |''", false)]
+        public void BackspaceRemovesAnEmptyPair(string marked, bool expected)
+        {
+            var caret = marked.IndexOf('|');
+            Assert.Equal(expected, AutoClose.DeletesPair(marked.Remove(caret, 1), caret));
+        }
+        [Theory]
         [InlineData("SELECT * FROM |", '[', AutoCloseAction.InsertPair)]
         [InlineData("SELECT * FROM dbo.|", '[', AutoCloseAction.InsertPair)]
         [InlineData("SELECT * FROM |abc", '[', AutoCloseAction.None)]
@@ -78,7 +109,7 @@ namespace SqlPrompter.Tests
             Assert.Equal(expected, Decide(text, typed));
 
         [Fact]
-        public void OtherCharactersAreNeverClosed() => Assert.Equal(AutoCloseAction.None, Decide("SELECT |", '('));
+        public void OtherCharactersAreNeverClosed() => Assert.Equal(AutoCloseAction.None, Decide("SELECT |", '{'));
 
         [Fact]
         public void AllAppearancesOfANameAreFoundIgnoringCaseAndBrackets() =>

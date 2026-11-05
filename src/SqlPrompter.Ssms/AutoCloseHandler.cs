@@ -11,7 +11,7 @@ using SqlPrompter.Core.Editing;
 namespace SqlPrompter.Ssms
 {
     /// <summary>
-    /// Auto-closing of <c>'</c> and <c>[</c>. The decision is made by <see cref="AutoClose"/> from the text before the character is typed.
+    /// Auto-closing of <c>'</c>, <c>[</c> and <c>(</c>. The decision is made by <see cref="AutoClose"/> from the text before the character is typed.
     /// A closing partner is inserted after the editor has typed the character; a closing character that is already after the caret is
     /// stepped over instead of typed.
     /// </summary>
@@ -29,7 +29,7 @@ namespace SqlPrompter.Ssms
         public bool ExecuteCommand(TypeCharCommandArgs args, CommandExecutionContext executionContext)
         {
             var typed = args.TypedChar;
-            if ((typed != '\'' && typed != '[' && typed != ']') || !SettingsService.Current.Behavior.AutoClose)
+            if ((typed != '\'' && typed != '[' && typed != ']' && typed != '(' && typed != ')') || !SettingsService.Current.Behavior.AutoClose)
             {
                 return false;
             }
@@ -54,8 +54,9 @@ namespace SqlPrompter.Ssms
                 {
                     // The editor types the character in its own handler, which runs after this one: add the closing partner once the
                     // very next change of the buffer (that character) has happened.
-                    var closing = typed == '[' ? ']' : '\'';
+                    var closing = typed == '[' ? ']' : typed == '(' ? ')' : '\'';
                     var position = caret.Position;
+                    var nextWas = position < caret.Snapshot.Length ? caret.Snapshot[position] : '\0';
                     var buffer = view.TextBuffer;
                     var expected = caret.Snapshot.Version.VersionNumber + 1;
                     EventHandler handler = null;
@@ -71,7 +72,7 @@ namespace SqlPrompter.Ssms
                         {
                             await System.Threading.Tasks.Task.Yield();
                             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                            InsertClosing(view, position, typed, closing);
+                            InsertClosing(view, position, typed, closing, nextWas);
                         }).Task.FileAndForget("SqlPrompter/AutoClose");
 #pragma warning restore VSSDK007
                     };
@@ -86,7 +87,7 @@ namespace SqlPrompter.Ssms
             return false;
         }
 
-        private static void InsertClosing(ITextView view, int typedAt, char opening, char closing)
+        private static void InsertClosing(ITextView view, int typedAt, char opening, char closing, char nextWas)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             try
@@ -96,6 +97,12 @@ namespace SqlPrompter.Ssms
 
                 // Only when the character really was typed and the caret is right behind it (nothing else happened in the meantime).
                 if (after > snapshot.Length || snapshot[typedAt] != opening || view.Caret.Position.BufferPosition.Position != after)
+                {
+                    return;
+                }
+
+                // SSMS may close a parenthesis by itself (an option of its editor): then the closing one is already there.
+                if (opening == '(' && after < snapshot.Length && snapshot[after] == ')' && nextWas != ')')
                 {
                     return;
                 }

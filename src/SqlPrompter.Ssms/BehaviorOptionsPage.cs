@@ -41,8 +41,8 @@ namespace SqlPrompter.Ssms
         }
 
         [Category("Editing")]
-        [DisplayName("Auto-close quotes and brackets")]
-        [Description("Typing ' or [ also inserts the closing character; typing it again steps over it. Nothing is closed inside strings, comments and bracketed names.")]
+        [DisplayName("Auto-close quotes, brackets and parentheses")]
+        [Description("Typing ' [ or ( also inserts the closing character; typing it again steps over it, and Backspace between an empty pair removes both. Nothing is closed inside strings, comments and bracketed names.")]
         public bool AutoClose
         {
             get => values.AutoClose;
