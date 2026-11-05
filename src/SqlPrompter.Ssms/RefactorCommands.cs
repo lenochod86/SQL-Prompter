@@ -156,6 +156,54 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>Formats the whole script, or the selection, with the formatting style of the options.</summary>
+        public static void FormatScript(ITextView view, bool wholeDocument)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (view == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var snapshot = view.TextBuffer.CurrentSnapshot;
+                if (!wholeDocument && view.Selection.IsEmpty)
+                {
+                    SetStatus("SQL Prompter: select the text to format first.");
+                    return;
+                }
+
+                var span = wholeDocument || view.Selection.IsEmpty
+                    ? new SnapshotSpan(snapshot, 0, snapshot.Length)
+                    : view.Selection.StreamSelectionSpan.SnapshotSpan;
+                var original = span.GetText();
+                var newLine = snapshot.LineCount > 1 && snapshot.GetLineFromLineNumber(0).LineBreakLength > 0
+                    ? snapshot.GetLineFromLineNumber(0).GetLineBreakText()
+                    : "\r\n";
+                var result = SqlPrompter.Core.Formatting.SqlFormatter.Format(original, SettingsService.Current.Formatting, newLine);
+
+                // A trailing line break of the original stays; the formatter writes none.
+                var changed = result.Text;
+                var trailing = original.Substring(original.TrimEnd().Length);
+                changed = changed.TrimEnd() + trailing;
+                if (changed == original)
+                {
+                    SetStatus("SQL Prompter: already formatted.");
+                    return;
+                }
+
+                ReplaceDifference(view, span.Start.Position, original, changed);
+                var kept = result.Kept > 0 ? " (" + result.Kept + " statements kept as written: comments inside or not safe to change)" : string.Empty;
+                SetStatus("SQL Prompter: formatted " + result.Formatted + " statements" + kept + ".");
+                Log.Write("Formatted " + result.Formatted + " statements, kept " + result.Kept + ".");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Formatting failed", ex);
+            }
+        }
+
         /// <summary>Replaces only the middle that differs between the two texts; <paramref name="offset"/> is where the original starts in the buffer.</summary>
         private static void ReplaceDifference(ITextView view, int offset, string original, string changed)
         {

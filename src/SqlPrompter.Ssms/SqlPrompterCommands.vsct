@@ -31,6 +31,9 @@
       <Group guid="guidSqlPrompterCmdSet" id="EditingGroup" priority="0x0500">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="FormattingGroup" priority="0x0540">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
       <Group guid="guidSqlPrompterCmdSet" id="RefactoringGroup" priority="0x0550">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
@@ -148,6 +151,36 @@
           <ButtonText>Script Results Grid Selection As INSERT</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidFormatDocument" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+        <Strings>
+          <ButtonText>Format Document</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidFormatSelection" priority="0x0101" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+        <Strings>
+          <ButtonText>Format Selection</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddNPrefix" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+        <Strings>
+          <ButtonText>Add N Prefix To Strings</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddAs" priority="0x0103" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+        <Strings>
+          <ButtonText>Add AS To Aliases</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRemoveAs" priority="0x0104" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+        <Strings>
+          <ButtonText>Remove AS From Aliases</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidScriptSummary" priority="0x0200" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
@@ -203,6 +236,12 @@
       <IDSymbol name="NavigationGroup" value="0x1014" />
       <IDSymbol name="EditingGroup" value="0x1015" />
       <IDSymbol name="RefactoringGroup" value="0x1016" />
+      <IDSymbol name="FormattingGroup" value="0x1017" />
+      <IDSymbol name="cmdidFormatDocument" value="0x011A" />
+      <IDSymbol name="cmdidFormatSelection" value="0x011B" />
+      <IDSymbol name="cmdidAddNPrefix" value="0x011C" />
+      <IDSymbol name="cmdidAddAs" value="0x011D" />
+      <IDSymbol name="cmdidRemoveAs" value="0x011E" />
       <IDSymbol name="cmdidScriptSummary" value="0x0118" />
       <IDSymbol name="cmdidQualifyNames" value="0x0117" />
       <IDSymbol name="cmdidExpandStars" value="0x0116" />
