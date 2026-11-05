@@ -120,40 +120,40 @@ namespace SqlPrompter.Core.Completion
 
                 foreach (var fk in metadata.ForeignKeys)
                 {
-                    IReadOnlyList<KeyValuePair<string, string>> pairs = null;
+                    // A key of a table to itself (an employee and the manager) fits in both directions; any other key in one.
+                    var directions = new List<IReadOnlyList<KeyValuePair<string, string>>>();
                     if (fk.ChildObjectId == targetObject.Id && fk.ReferencedObjectId == otherObject.Id)
                     {
-                        pairs = fk.Columns.Select(c => new KeyValuePair<string, string>(c.Column, c.ReferencedColumn)).ToList();
-                    }
-                    else if (fk.ChildObjectId == otherObject.Id && fk.ReferencedObjectId == targetObject.Id)
-                    {
-                        pairs = fk.Columns.Select(c => new KeyValuePair<string, string>(c.ReferencedColumn, c.Column)).ToList();
+                        directions.Add(fk.Columns.Select(c => new KeyValuePair<string, string>(c.Column, c.ReferencedColumn)).ToList());
                     }
 
-                    if (pairs == null)
+                    if (fk.ChildObjectId == otherObject.Id && fk.ReferencedObjectId == targetObject.Id)
                     {
-                        continue;
+                        directions.Add(fk.Columns.Select(c => new KeyValuePair<string, string>(c.ReferencedColumn, c.Column)).ToList());
                     }
 
-                    foreach (var p in pairs)
-                    {
-                        covered.Add(p.Key + "|" + p.Value);
-                    }
-
-                    var whole = Condition(pairs, targetReference, otherReference, options.Joins.NewTableOnLeft, quote);
-                    if (seen.Add(whole))
-                    {
-                        yield return ConditionItem(whole, fk.Name, "join by foreign key " + fk.Name, GroupKey);
-                    }
-
-                    if (options.Joins.IncludePartialKeyConditions && pairs.Count > 1)
+                    foreach (var pairs in directions)
                     {
                         foreach (var p in pairs)
                         {
-                            var single = Condition(new[] { p }, targetReference, otherReference, options.Joins.NewTableOnLeft, quote);
-                            if (seen.Add(single))
+                            covered.Add(p.Key + "|" + p.Value);
+                        }
+
+                        var whole = Condition(pairs, targetReference, otherReference, options.Joins.NewTableOnLeft, quote);
+                        if (seen.Add(whole))
+                        {
+                            yield return ConditionItem(whole, fk.Name, "join by foreign key " + fk.Name, GroupKey);
+                        }
+
+                        if (options.Joins.IncludePartialKeyConditions && pairs.Count > 1)
+                        {
+                            foreach (var p in pairs)
                             {
-                                yield return ConditionItem(single, fk.Name, "one column of the foreign key " + fk.Name, GroupPartialKey);
+                                var single = Condition(new[] { p }, targetReference, otherReference, options.Joins.NewTableOnLeft, quote);
+                                if (seen.Add(single))
+                                {
+                                    yield return ConditionItem(single, fk.Name, "one column of the foreign key " + fk.Name, GroupPartialKey);
+                                }
                             }
                         }
                     }

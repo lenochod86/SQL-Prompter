@@ -110,7 +110,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
   - [ ] optionally by matching types
   - [x] individual columns of multi-column keys
 - [x] Option for the column order in the condition (new table left or right) (#29)
-- [ ] Tests on a schema similar to real ones (convention `IdTable` ↔ `Table.IdTable`) (#29)
+- [x] Tests on a schema similar to real ones (convention `IdTable` ↔ `Table.IdTable`) (#29, #100)
 
 ### Phase 3: Snippets (M) (#30)
 
