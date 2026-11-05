@@ -1,0 +1,171 @@
+using SqlPrompter.Core.Formatting;
+using Xunit;
+
+namespace SqlPrompter.Tests
+{
+    public class FormatterTests
+    {
+        private static string Format(string sql, FormatStyle style = null) => SqlFormatter.Format(sql, style ?? new FormatStyle(), "\n").Text;
+
+        [Fact]
+        public void ShortStatementStaysOnOneLineWithCasedKeywords() =>
+            Assert.Equal("SELECT a, b FROM t WHERE x = 1", Format("select   a,b   from t\n where x=1"));
+
+        [Fact]
+        public void LongSelectIsLaidOutByClauses()
+        {
+            var result = Format("select c.Id, c.Name, c.Email, o.Total, o.CreatedAt from dbo.Customers c inner join dbo.Orders o on o.CustomerId = c.Id where c.Active = 1 and o.Total > 100 order by o.CreatedAt desc");
+
+            Assert.Equal(
+                "SELECT\tc.Id\n" +
+                "\t  , c.Name\n" +
+                "\t  , c.Email\n" +
+                "\t  , o.Total\n" +
+                "\t  , o.CreatedAt\n" +
+                "FROM\tdbo.Customers c\n" +
+                "INNER JOIN\tdbo.Orders o ON o.CustomerId = c.Id\n" +
+                "WHERE\tc.Active = 1\n" +
+                "\tAND o.Total > 100\n" +
+                "ORDER BY\to.CreatedAt DESC",
+                result);
+        }
+
+        [Fact]
+        public void CommasAtTheEndOfTheLinesWhenTheStyleSaysSo()
+        {
+            var style = new FormatStyle { CommaBeforeItems = false, UseTabs = false, CollapseStatementsShorterThan = 0, AndOrBeforeConditions = false };
+            var result = Format("select a, b from t where x = 1 or y = 2", style);
+
+            Assert.Equal("SELECT  a,\n        b\nFROM    t\nWHERE   x = 1 OR\n        y = 2", result);
+        }
+
+        [Fact]
+        public void BetweenAndIsNotSplit()
+        {
+            var style = new FormatStyle { CollapseStatementsShorterThan = 0 };
+            var result = Format("select a from t where x between 1 and 5 and y = 2", style);
+
+            Assert.Contains("WHERE\tx BETWEEN 1 AND 5\n\tAND y = 2", result);
+        }
+
+        [Fact]
+        public void LongSubqueryIsExpanded()
+        {
+            var style = new FormatStyle { CollapseSubqueriesShorterThan = 20, CollapseStatementsShorterThan = 0 };
+            var result = Format("select a from t where id in (select UserId from dbo.Orders where Total > 100)", style);
+
+            Assert.Contains("WHERE\tid IN (\n", result);
+            Assert.Contains("\n\t\t\tSELECT", result.Replace("SELECT\tUserId", "SELECT"));
+            Assert.EndsWith(")", result.TrimEnd());
+        }
+
+        [Fact]
+        public void CteIsLaidOutWithItsParentheses()
+        {
+            var style = new FormatStyle { CollapseSubqueriesShorterThan = 10, CollapseStatementsShorterThan = 0 };
+            var result = Format("with c as (select a from t where x = 1) select * from c", style);
+
+            Assert.StartsWith("WITH c AS\n(\n", result);
+            Assert.Contains("\n)\nSELECT\t*\nFROM\tc", result);
+        }
+
+        [Fact]
+        public void CasingOfFunctionsAndTypes()
+        {
+            var result = Format("declare @a int; select cast(x as varchar(10)), isnull(y, 0), date from t;");
+
+            Assert.Contains("DECLARE @a INT;", result);
+            Assert.Contains("CAST(x AS VARCHAR(10))", result);
+            Assert.Contains("ISNULL(y, 0)", result);
+            Assert.Contains(", date FROM", result);
+        }
+
+        [Fact]
+        public void BlocksAndIfAreIndented()
+        {
+            var result = Format("if @a = 1\nbegin\nselect 1\nend\nelse\nselect 2");
+
+            Assert.Equal("IF @a = 1\nBEGIN\n\tSELECT 1\nEND\nELSE\n\tSELECT 2", result);
+        }
+
+        [Fact]
+        public void ElseIfStaysOnOneLine()
+        {
+            var result = Format("if @a = 1 select 1 else if @a = 2 select 2 else select 3");
+
+            Assert.Contains("ELSE IF @a = 2", result);
+        }
+
+        [Fact]
+        public void GoStaysAlone()
+        {
+            var result = Format("select 1\ngo\n\n\nselect 2\n");
+
+            Assert.Equal("SELECT 1\nGO\nSELECT 2", result);
+        }
+
+        [Fact]
+        public void BlankLineBetweenStatementsIsKeptOnce()
+        {
+            Assert.Equal("SELECT 1\n\nSELECT 2", Format("select 1\n\n\n\nselect 2"));
+            Assert.Equal("SELECT 1\nSELECT 2", Format("select 1\nselect 2"));
+        }
+
+        [Fact]
+        public void CommentsAreKept()
+        {
+            var result = Format("-- header\nselect a, /* inline */ b from t -- trailing\nwhere x = 1");
+
+            Assert.Contains("-- header\n", result);
+            Assert.Contains("/* inline */", result);
+            Assert.Contains("-- trailing", result);
+        }
+
+        [Fact]
+        public void CreateTableColumnsAreListed()
+        {
+            var style = new FormatStyle { CollapseDdlShorterThan = 20 };
+            var result = Format("create table dbo.T (Id int not null, Name varchar(50), constraint PK primary key (Id))", style);
+
+            Assert.Equal("CREATE TABLE dbo.T\n(\n\t  Id   INT NOT NULL\n\t, Name VARCHAR(50)\n\t, CONSTRAINT PK PRIMARY KEY (Id)\n)", result);
+        }
+
+        [Theory]
+        [InlineData("select a<=b, c<>d, e>=-1, f!=g from t where x=-1")]
+        [InlineData("select 'a''b', N'x', [a b], \"q\", @v, @@rowcount, #tmp.x, 1.5e3, 0xFF from dbo.[t]")]
+        [InlineData("update t set a = a + 1, b = null where id = 3")]
+        [InlineData("insert into dbo.T (a, b) values (1, 2), (3, 4)")]
+        [InlineData("delete from t where id in (1,2,3)")]
+        [InlineData("select top (10) percent with ties a from t order by a")]
+        [InlineData("select a into #t from b; select * from #t")]
+        [InlineData("select case when a = 1 then 'x' when a = 2 then 'y' else 'z' end as c from t")]
+        [InlineData("select a from t union all select b from u except select c from v")]
+        [InlineData("select count(*), sum(a) over (partition by b order by c) from t group by b having count(*) > 1")]
+        [InlineData("exec dbo.p @a = 1, @b = 'x'; print 'done'")]
+        [InlineData("merge t using s on t.id = s.id when matched then update set a = s.a when not matched then insert (a) values (s.a);")]
+        public void FormattingNeverChangesTheScript(string sql)
+        {
+            var style = new FormatStyle { CollapseStatementsShorterThan = 0, CollapseSubqueriesShorterThan = 0 };
+            var result = SqlFormatter.Format(sql, style, "\n");
+
+            var before = SqlPrompter.Core.Lexing.Lexer.Tokenize(sql);
+            var after = SqlPrompter.Core.Lexing.Lexer.Tokenize(result.Text);
+            Assert.Equal(before.Count, after.Count);
+            for (var i = 0; i < before.Count; i++)
+            {
+                Assert.Equal(before[i].Text, after[i].Text, ignoreCase: before[i].Kind == SqlPrompter.Core.Lexing.TokenKind.Word);
+            }
+
+            Assert.Equal(0, result.Kept);
+        }
+
+        [Fact]
+        public void FormattingTwiceGivesTheSameText()
+        {
+            var style = new FormatStyle { CollapseStatementsShorterThan = 0 };
+            var once = Format("select a, b, c from t inner join u on u.id = t.id where a = 1 and b = 2 order by a", style);
+
+            Assert.Equal(once, Format(once, style));
+        }
+    }
+}
