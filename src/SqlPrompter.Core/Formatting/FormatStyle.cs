@@ -1,3 +1,6 @@
+using System;
+using System.Runtime.Serialization;
+
 namespace SqlPrompter.Core.Formatting
 {
     public enum CaseStyle
@@ -10,52 +13,121 @@ namespace SqlPrompter.Core.Formatting
 
     /// <summary>
     /// How the formatter lays out a script. The defaults follow the style the project is tested against (upper-case keywords, tabs, commas
-    /// before the items, statements shorter than 75 characters on one line); <c>SqlPromptStyleImporter</c> fills it from a SQL Prompt style.
+    /// before the items, statements shorter than 75 characters on one line); <see cref="SqlPromptStyleImporter"/> fills it from a SQL Prompt style.
     /// </summary>
+    [DataContract]
     public sealed class FormatStyle
     {
-        public CaseStyle KeywordCase { get; set; } = CaseStyle.Upper;
+        public FormatStyle()
+        {
+            SetDefaults();
+        }
 
-        public CaseStyle FunctionCase { get; set; } = CaseStyle.Upper;
+        public CaseStyle KeywordCase { get; set; }
 
-        public CaseStyle DataTypeCase { get; set; } = CaseStyle.Upper;
+        public CaseStyle FunctionCase { get; set; }
+
+        public CaseStyle DataTypeCase { get; set; }
+
+        [DataMember(Name = "keywordCase")]
+        private string KeywordCaseText
+        {
+            get => KeywordCase.ToString();
+            set => KeywordCase = Parse(value, CaseStyle.Upper);
+        }
+
+        [DataMember(Name = "functionCase")]
+        private string FunctionCaseText
+        {
+            get => FunctionCase.ToString();
+            set => FunctionCase = Parse(value, CaseStyle.Upper);
+        }
+
+        [DataMember(Name = "dataTypeCase")]
+        private string DataTypeCaseText
+        {
+            get => DataTypeCase.ToString();
+            set => DataTypeCase = Parse(value, CaseStyle.Upper);
+        }
 
         /// <summary>Leading white space is made of tabs where a whole tab fits (the rest is spaces).</summary>
-        public bool UseTabs { get; set; } = true;
+        [DataMember(Name = "useTabs")]
+        public bool UseTabs { get; set; }
 
         /// <summary>The width of one indent level and of a tab stop.</summary>
-        public int TabWidth { get; set; } = 4;
+        [DataMember(Name = "tabWidth")]
+        public int TabWidth { get; set; }
 
         /// <summary><c>, item</c> at the start of a line instead of <c>item,</c> at the end of the previous one.</summary>
-        public bool CommaBeforeItems { get; set; } = true;
+        [DataMember(Name = "commaBeforeItems")]
+        public bool CommaBeforeItems { get; set; }
 
         /// <summary>A SELECT, INSERT, UPDATE or DELETE whose text on one line is shorter than this stays on one line; 0 turns it off.</summary>
-        public int CollapseStatementsShorterThan { get; set; } = 75;
+        [DataMember(Name = "collapseStatementsShorterThan")]
+        public int CollapseStatementsShorterThan { get; set; }
 
         /// <summary>A subquery in parentheses shorter than this stays on the line of its item; 0 turns it off.</summary>
-        public int CollapseSubqueriesShorterThan { get; set; } = 75;
+        [DataMember(Name = "collapseSubqueriesShorterThan")]
+        public int CollapseSubqueriesShorterThan { get; set; }
 
         /// <summary>A CREATE TABLE shorter than this stays on one line; 0 turns it off.</summary>
-        public int CollapseDdlShorterThan { get; set; } = 75;
+        [DataMember(Name = "collapseDdlShorterThan")]
+        public int CollapseDdlShorterThan { get; set; }
 
         /// <summary><c>SELECT TOP 10</c> / <c>SELECT DISTINCT</c> are followed by a line break before the first item.</summary>
+        [DataMember(Name = "newLineAfterDistinctAndTop")]
         public bool NewLineAfterDistinctAndTop { get; set; }
 
         /// <summary><c>AND</c> and <c>OR</c> start the lines of a condition (otherwise they end them).</summary>
-        public bool AndOrBeforeConditions { get; set; } = true;
+        [DataMember(Name = "andOrBeforeConditions")]
+        public bool AndOrBeforeConditions { get; set; }
 
         /// <summary>The conditions of WHERE and HAVING are put on separate lines when there is more than one.</summary>
-        public bool ConditionsOnSeparateLines { get; set; } = true;
+        [DataMember(Name = "conditionsOnSeparateLines")]
+        public bool ConditionsOnSeparateLines { get; set; }
 
         /// <summary>Longer lines of a column list in INSERT and CREATE TABLE are broken.</summary>
-        public int MaxLineLength { get; set; } = 120;
+        [DataMember(Name = "maxLineLength")]
+        public int MaxLineLength { get; set; }
 
         /// <summary>One blank line between statements stays when the script had one (otherwise all blank lines are removed).</summary>
-        public bool KeepBlankLines { get; set; } = true;
+        [DataMember(Name = "keepBlankLines")]
+        public bool KeepBlankLines { get; set; }
 
         /// <summary>The contents of BEGIN … END are indented.</summary>
-        public bool IndentBlocks { get; set; } = true;
+        [DataMember(Name = "indentBlocks")]
+        public bool IndentBlocks { get; set; }
 
         public FormatStyle Clone() => (FormatStyle)MemberwiseClone();
+
+        [OnDeserializing]
+        private void OnDeserializing(StreamingContext context) => SetDefaults();
+
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext context)
+        {
+            TabWidth = Math.Max(1, Math.Min(16, TabWidth));
+        }
+
+        private static CaseStyle Parse(string value, CaseStyle fallback) => Enum.TryParse(value, true, out CaseStyle parsed) ? parsed : fallback;
+
+        private void SetDefaults()
+        {
+            KeywordCase = CaseStyle.Upper;
+            FunctionCase = CaseStyle.Upper;
+            DataTypeCase = CaseStyle.Upper;
+            UseTabs = true;
+            TabWidth = 4;
+            CommaBeforeItems = true;
+            CollapseStatementsShorterThan = 75;
+            CollapseSubqueriesShorterThan = 75;
+            CollapseDdlShorterThan = 75;
+            NewLineAfterDistinctAndTop = false;
+            AndOrBeforeConditions = true;
+            ConditionsOnSeparateLines = true;
+            MaxLineLength = 120;
+            KeepBlankLines = true;
+            IndentBlocks = true;
+        }
     }
 }
