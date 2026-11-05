@@ -124,6 +124,32 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void TheTabNameIsStoredAndMatchedByTheFilter()
+        {
+            var store = new HistoryStore(FilePath);
+            store.Add("SELECT 1", "srv", "db", null, Now, "SQLQuery7.sql");
+            store.Add("SELECT 2", "srv", "db", null, Now.AddMinutes(1));
+
+            var again = new HistoryStore(FilePath);
+            again.Load();
+
+            Assert.Equal("SQLQuery7.sql", again.Entries[0].Tab);
+            Assert.Equal(string.Empty, again.Entries[1].Tab);
+            Assert.Equal(new[] { "SELECT 1" }, HistoryStore.Filter(again.Entries, "query7").Select(e => e.Text));
+        }
+
+        [Fact]
+        public void EntriesWrittenBeforeTheTabNameExistedStillLoad()
+        {
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(FilePath, "{\"id\":\"a\",\"text\":\"SELECT 1\",\"server\":\"s\",\"database\":\"d\",\"ran\":\"2026-11-05T12:00:00.0000000Z\"}\n");
+            var store = new HistoryStore(FilePath);
+            store.Load();
+
+            Assert.Equal("SELECT 1", store.Entries.Single().Text);
+            Assert.Equal(string.Empty, store.Entries.Single().Tab);
+        }
+        [Fact]
         public void FilteringNeedsEveryWordAndComesNewestFirst()
         {
             var store = new HistoryStore(FilePath);
