@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 18)]
+    [ProvideMenuResource("Menus.ctmenu", 19)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
@@ -32,6 +32,11 @@ namespace SqlPrompter.Ssms
         public const int ExportSettingsId = 0x0102;
         public const int ImportSettingsId = 0x0103;
         public const int ImportFormatStyleId = 0x0119;
+        public const int FormatDocumentId = 0x011A;
+        public const int FormatSelectionId = 0x011B;
+        public const int AddNPrefixId = 0x011C;
+        public const int AddAsId = 0x011D;
+        public const int RemoveAsId = 0x011E;
         public const int ImportSnippetsId = 0x0104;
         public const int OpenSnippetsFolderId = 0x0105;
         public const int ReloadSnippetsId = 0x0106;
@@ -91,6 +96,11 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.RemoveUnusedVariables, "unused variables removed"), new CommandID(CommandSet, RemoveUnusedVariablesId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.ExpandStars(ActiveEditor.GetView()), new CommandID(CommandSet, ExpandStarsId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.QualifyNames(ActiveEditor.GetView()), new CommandID(CommandSet, QualifyNamesId)));
+                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), true), new CommandID(CommandSet, FormatDocumentId)));
+                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), false), new CommandID(CommandSet, FormatSelectionId)));
+                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddNPrefix, "N prefix added to strings"), new CommandID(CommandSet, AddNPrefixId)));
+                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddAs, "AS added to aliases"), new CommandID(CommandSet, AddAsId)));
+                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.RemoveAs, "AS removed from aliases"), new CommandID(CommandSet, RemoveAsId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.ShowSummary(ActiveEditor.GetView()), new CommandID(CommandSet, ScriptSummaryId)));
                 commands.AddCommand(new MenuCommand((s, e) => RunStatement.Run(ActiveEditor.GetView()), new CommandID(CommandSet, RunStatementId)));
                 commands.AddCommand(new MenuCommand((s, e) => { if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view) { ParameterInfoPopup.Show(view); } }, new CommandID(CommandSet, ParameterInfoId)));

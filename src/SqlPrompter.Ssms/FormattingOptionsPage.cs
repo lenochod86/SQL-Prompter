@@ -103,6 +103,15 @@ namespace SqlPrompter.Ssms
         }
 
         [Category("Layout")]
+        [DisplayName("Case keywords while typing")]
+        [Description("A reserved word you type gets the keyword case as soon as you type a space, parenthesis, comma or semicolon after it. Off by default.")]
+        public bool CaseKeywordsWhileTyping
+        {
+            get => values.CaseKeywordsWhileTyping;
+            set => values.CaseKeywordsWhileTyping = value;
+        }
+
+        [Category("Layout")]
         [DisplayName("Keep one blank line")]
         [Description("A blank line between statements stays (as one line); otherwise blank lines are removed.")]
         public bool KeepBlankLines

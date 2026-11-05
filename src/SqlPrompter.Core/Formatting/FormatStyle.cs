@@ -94,6 +94,10 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "keepBlankLines")]
         public bool KeepBlankLines { get; set; }
 
+        /// <summary>A reserved word typed in the editor gets the keyword case as soon as a space, parenthesis, comma or semicolon follows it.</summary>
+        [DataMember(Name = "caseKeywordsWhileTyping")]
+        public bool CaseKeywordsWhileTyping { get; set; }
+
         /// <summary>The contents of BEGIN … END are indented.</summary>
         [DataMember(Name = "indentBlocks")]
         public bool IndentBlocks { get; set; }
@@ -128,6 +132,7 @@ namespace SqlPrompter.Core.Formatting
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;
+            CaseKeywordsWhileTyping = false;
         }
     }
 }

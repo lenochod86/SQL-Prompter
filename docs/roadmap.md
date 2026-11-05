@@ -179,11 +179,11 @@ The user uses almost all of them. Agreed order (decision 16): #52 editor helpers
 
 Wanted, but not a priority, so it comes last.
 
-- [ ] Formatter over tokens with structure from ScriptDOM; keeps comments and refuses a change that would alter the meaning (#55)
+- [x] Formatter over tokens with the clause structure of our own splitter (not ScriptDOM, see architecture.md); keeps comments and keeps a statement as written when the result is not the same script (#55)
 - [x] Options following the SQL Prompt style and import of a `.json` style (#56): options page, menu *Import Formatting Style...*; verified in SSMS 22.11 with the user's style; options the engine lacks (alignment, parenthesis styles, CTE, JOIN, INSERT, CASE) are reported as not applied
-- [ ] Formatting actions: `N` prefix for strings, semicolons, removing unnecessary brackets, adding or removing `AS`, casing, optionally qualification and expanding `*` (#57)
-- [ ] Formatting the document or the selection (#57)
-- [ ] Upper case while typing (#57)
+- [x] Formatting actions: `N` prefix for strings, semicolons, removing brackets, adding or removing `AS`, casing, qualification and expanding `*` (#57); verified in SSMS 22.11 (menu clicks)
+- [x] Formatting the document (verified in SSMS 22.11) or the selection (#57, selection not verified)
+- [x] Upper case while typing (#57): option *Case keywords while typing*, off by default; verified in SSMS 22.11
 
 ### Phase 9: GUI enhancements (M to L) (#83)
 
