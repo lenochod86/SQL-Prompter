@@ -189,7 +189,7 @@ Wanted, but not a priority, so it comes last.
 
 The settings are text-based today (colors as `Name=#RRGGBB`, rules as delimited strings, snippet placeholders as text). This phase replaces them with proper graphical controls. It comes last, after formatting. More items are added when they come up.
 
-- [ ] User friendly editing of the coloring settings: a color picker, environments and rules as editable lists with a dropdown of environments, validation in the UI (#84)
+- [x] User friendly editing of the coloring settings: color dialog, environments and rules as grids with a dropdown of environments, validation in the UI (#84); verified in SSMS 22.11 except saving with OK and the rules grid
 - [ ] Snippet management: placeholders as a table, SQL coloring of the snippet text, a cleaner list without descriptions (#88)
 
 ## Risks
