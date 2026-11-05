@@ -30,6 +30,7 @@ namespace SqlPrompter.Ssms
         private DTEEvents dteEvents;
         private bool shuttingDown;
         private bool sawTabs;
+        private int emptyTicks;
 
         private TabSessionService(DTE dte)
         {
@@ -185,7 +186,11 @@ namespace SqlPrompter.Ssms
                 // An empty list is saved only after tabs were seen in this session (or restored), so a start that restored nothing never
                 // wipes the saved tabs.
                 sawTabs |= tabs.Count > 0;
-                if (sawTabs)
+
+                // SSMS closes the documents before it announces the shutdown, so a list that has just become empty may be the end of the
+                // session; it is saved only when it stays empty for a second tick (the user really closed every tab).
+                emptyTicks = tabs.Count == 0 ? emptyTicks + 1 : 0;
+                if (sawTabs && (tabs.Count > 0 || emptyTicks >= 2))
                 {
                     store.Save(tabs);
                 }

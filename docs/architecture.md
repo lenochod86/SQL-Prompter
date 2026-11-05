@@ -243,3 +243,7 @@ Core, Metadata and their tests can be developed in the cloud. The VSIX is built 
 ### Popups are owned and not topmost (verified in SSMS 22, #135)
 
 A WPF `Popup` is hosted in its own top-level window that is topmost, so the completion list, its description panel and the parameter info stayed above other applications. `PopupWindows.Attach` makes the popup window owned by the root window of the editor (`GWLP_HWNDPARENT`) and not topmost (`SetWindowPos` with `HWND_NOTOPMOST`) each time the popup opens. Checked: with the list open, a Notepad window moved over SSMS covers the list and the description panel.
+
+### Restoring tabs on a cold start (#140)
+
+`ScriptFactory` lives in `SQLEditors.dll` (`Extensions\Application`), which SSMS loads only when something needs it. `SsmsConnection.ScriptFactoryType` therefore looks among the loaded assemblies first and then loads `SQLEditors` by name and from its folder. Verified in SSMS 22: a cold start (no query window, the Connect dialog dismissed) restored the saved tab ("Tabs restored: 1 of 1"). The failure of the user's report (type not found) could not be reproduced on the test machine, so the fix is based on the log evidence. SSMS also closes the documents before it announces the shutdown, so an empty list of tabs is saved only when it stays empty for two ticks of the 5 s timer; otherwise closing SSMS could overwrite the saved tabs with an empty list.

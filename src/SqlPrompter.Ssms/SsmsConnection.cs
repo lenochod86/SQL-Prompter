@@ -21,11 +21,57 @@ namespace SqlPrompter.Ssms
         private static readonly ConcurrentDictionary<string, bool> ReportedAuthentication = new ConcurrentDictionary<string, bool>();
         private static Type scriptFactoryType;
 
+        /// <summary>
+        /// The type of the script factory. It lives in SQLEditors.dll, which SSMS loads only when the first query window or connection
+        /// needs it, so on a cold start (when the tabs are restored) it is loaded explicitly.
+        /// </summary>
+        private static Type ScriptFactoryType()
+        {
+            if (scriptFactoryType != null)
+            {
+                return scriptFactoryType;
+            }
+
+            var type = AssemblyTypes.FindLoaded(ScriptFactoryTypeName);
+            if (type == null)
+            {
+                try
+                {
+                    type = Assembly.Load("SQLEditors")?.GetType(ScriptFactoryTypeName, throwOnError: false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Loading SQLEditors by name failed: " + ex.Message);
+                }
+            }
+
+            if (type == null)
+            {
+                try
+                {
+                    var path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Extensions", "Application", "SQLEditors.dll");
+                    type = System.IO.File.Exists(path) ? Assembly.LoadFrom(path).GetType(ScriptFactoryTypeName, throwOnError: false) : null;
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Loading SQLEditors from its folder failed: " + ex.Message);
+                }
+            }
+
+            if (type == null)
+            {
+                Log.Write("The script factory type was not found (SQLEditors is not loaded and could not be loaded).");
+            }
+
+            scriptFactoryType = type;
+            return type;
+        }
+
         /// <summary>Connection data of the active window, or null if the window is not connected.</summary>
         public static ConnectionSettings GetActive()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var factoryType = scriptFactoryType ?? (scriptFactoryType = AssemblyTypes.FindLoaded(ScriptFactoryTypeName));
+            var factoryType = ScriptFactoryType();
             var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var active = factory?.GetType().GetProperty("CurrentlyActiveWndConnectionInfo")?.GetValue(factory);
             var info = active?.GetType().GetProperty("UIConnectionInfo")?.GetValue(active);
@@ -82,7 +128,7 @@ namespace SqlPrompter.Ssms
         public static bool OpenNewWindow(string database, string text, string server = null, string login = null)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var factoryType = scriptFactoryType ?? (scriptFactoryType = AssemblyTypes.FindLoaded(ScriptFactoryTypeName));
+            var factoryType = ScriptFactoryType();
             var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var active = factory?.GetType().GetProperty("CurrentlyActiveWndConnectionInfo")?.GetValue(factory);
             var info = active?.GetType().GetProperty("UIConnectionInfo")?.GetValue(active);
@@ -144,13 +190,13 @@ namespace SqlPrompter.Ssms
         public static bool OpenSavedTab(SavedTab tab)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var factoryType = scriptFactoryType ?? (scriptFactoryType = AssemblyTypes.FindLoaded(ScriptFactoryTypeName));
+            var factoryType = ScriptFactoryType();
             var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var create = factory?.GetType().GetMethods().FirstOrDefault(m =>
                 m.Name == "CreateNewBlankScript" && m.GetParameters().Length == 3 && m.GetParameters()[1].ParameterType.Name == "UIConnectionInfo");
             if (create == null)
             {
-                Log.Write("Restoring a tab: CreateNewBlankScript was not found among " + string.Join("; ", (factory?.GetType().GetMethods() ?? new MethodInfo[0]).Where(m => m.Name == "CreateNewBlankScript").Select(m => m.ToString())));
+                Log.Write("Restoring a tab: " + (factoryType == null ? "the script factory type was not found" : factory == null ? "ScriptFactory.Instance is null" : "CreateNewBlankScript was not found among ") + string.Join("; ", (factory?.GetType().GetMethods() ?? new MethodInfo[0]).Where(m => m.Name == "CreateNewBlankScript").Select(m => m.ToString())));
                 return false;
             }
 
