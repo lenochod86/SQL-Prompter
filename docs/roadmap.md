@@ -159,13 +159,13 @@ The user uses almost all of them. Agreed order (decision 16): #52 editor helpers
 
 - [x] Query history: every run with server, database, time and closing time, a window with filter and preview, opening in a new tab (#102)
 - [x] Restoring tabs when SSMS starts (#103); verified: unsaved tab with a SQL login comes back text intact and disconnected. Not verified: Windows authentication reconnect, saved files, several tabs
-- [ ] Refactoring (#50):
-  - [ ] qualify names
-  - [ ] expand `*`
-  - [ ] insert semicolons
-  - [ ] remove square brackets
-  - [ ] unused variables
-  - [ ] script summary
+- [x] Refactoring (#50), menu group after the editing group; verified in SSMS 22.11 on the whole script (acting on a selection is not verified):
+  - [x] qualify names
+  - [x] expand `*`
+  - [x] insert semicolons
+  - [x] remove square brackets
+  - [x] unused variables
+  - [x] script summary
 - [x] Execution warnings: `DELETE` or `UPDATE` without `WHERE` ask for confirmation (#106)
 - [ ] Code analysis (#51)
   - [x] squiggles with tooltips, analysis in the background: `= NULL`, JOIN without ON, INSERT without columns, unused variable, SELECT *, lock hints (first step, text only)

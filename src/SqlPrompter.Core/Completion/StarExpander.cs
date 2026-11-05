@@ -138,6 +138,14 @@ namespace SqlPrompter.Core.Completion
             return new StarExpansion(start, caret - start, result.ToString());
         }
 
+        /// <summary>True when the <c>*</c> ending at <paramref name="caret"/> is a select-list star (<c>*</c> or <c>alias.*</c>), not <c>COUNT(*)</c> or a multiplication.</summary>
+        internal static bool IsSelectListStar(string text, int caret)
+        {
+            var tokens = Lexer.Tokenize(text).Where(t => t.Kind != TokenKind.Comment).ToList();
+            var star = tokens.FindIndex(t => t.Kind == TokenKind.Operator && t.Text == "*" && t.End == caret);
+            return star > 0 && (tokens[star - 1].Kind == TokenKind.Dot || StartsSelectItem(tokens, star));
+        }
+
         /// <summary>The <c>*</c> starts an item of a select list: after SELECT, DISTINCT, ALL, TOP n, or a comma.</summary>
         private static bool StartsSelectItem(List<Token> tokens, int star)
         {
