@@ -247,3 +247,7 @@ A WPF `Popup` is hosted in its own top-level window that is topmost, so the comp
 ### Restoring tabs on a cold start (#140)
 
 `ScriptFactory` lives in `SQLEditors.dll` (`Extensions\Application`), which SSMS loads only when something needs it. `SsmsConnection.ScriptFactoryType` therefore looks among the loaded assemblies first and then loads `SQLEditors` by name and from its folder. Verified in SSMS 22: a cold start (no query window, the Connect dialog dismissed) restored the saved tab ("Tabs restored: 1 of 1"). The failure of the user's report (type not found) could not be reproduced on the test machine, so the fix is based on the log evidence. SSMS also closes the documents before it announces the shutdown, so an empty list of tabs is saved only when it stays empty for two ticks of the 5 s timer; otherwise closing SSMS could overwrite the saved tabs with an empty list.
+
+### Query history records the tab name (#129)
+
+Each run stores the file name of the active document (`Path.GetFileName(document.FullName)`), e.g. `SQLQuery2.sql` for a new query window or the file name of a saved script. Verified in SSMS 22: a run of `SELECT 4242 AS HistTab` was stored with `"tab":"SQLQuery2.sql"`. Entries from before have no tab and show an empty cell.

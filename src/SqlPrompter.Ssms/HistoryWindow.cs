@@ -41,7 +41,7 @@ namespace SqlPrompter.Ssms
             grid.Columns.Add(Column("Closed", "Closed", 140));
             grid.Columns.Add(Column("Database", "Database", 120));
             grid.Columns.Add(Column("Server", "Server", 120));
-            grid.Columns.Add(Column("Query", "Query", 300));
+            grid.Columns.Add(Column("Tab", "Tab", 200));
             list.View = grid;
             list.SelectionChanged += (s, e) => ShowPreview();
             list.MouseDoubleClick += (s, e) => Choose();
@@ -81,7 +81,7 @@ namespace SqlPrompter.Ssms
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.Children.Add(SnippetUi.Label("Type words to filter (text, server, database). Enter or a double click opens the query in a new tab; Esc closes."));
+            root.Children.Add(SnippetUi.Label("Type words to filter (text, tab, server, database). Enter or a double click opens the query in a new tab; Esc closes."));
             Grid.SetRow(filter, 1);
             root.Children.Add(filter);
 
@@ -203,14 +203,7 @@ namespace SqlPrompter.Ssms
 
             public string Server => Entry.Server;
 
-            public string Query
-            {
-                get
-                {
-                    var line = Entry.Text.TrimStart().Split(new[] { '\r', '\n' }, 2)[0];
-                    return line.Length > 160 ? line.Substring(0, 160) + "…" : line;
-                }
-            }
+            public string Tab => Entry.Tab;
         }
     }
 }

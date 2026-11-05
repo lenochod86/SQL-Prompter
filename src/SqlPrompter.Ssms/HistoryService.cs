@@ -59,11 +59,12 @@ namespace SqlPrompter.Ssms
             var server = connection?.Server;
             var database = connection?.Database;
             var key = document ?? string.Empty;
+            var tab = TabName(key);
             _ = Task.Run(() =>
             {
                 try
                 {
-                    var entry = Store.Add(text, server, database, login, DateTime.UtcNow);
+                    var entry = Store.Add(text, server, database, login, DateTime.UtcNow, tab);
                     if (entry == null)
                     {
                         return;
@@ -84,6 +85,19 @@ namespace SqlPrompter.Ssms
                     Log.Error("Recording the query failed", ex);
                 }
             });
+        }
+
+        /// <summary>The name of the query window: the file name of the document (SQLQuery1.sql, or the saved script).</summary>
+        private static string TabName(string document)
+        {
+            try
+            {
+                return System.IO.Path.GetFileName(document);
+            }
+            catch (ArgumentException)
+            {
+                return document;
+            }
         }
 
         public static void DocumentClosed(string document)
