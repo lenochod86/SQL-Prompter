@@ -38,7 +38,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "coloring")]
         public ColorSettings Coloring { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone() };
+        [DataMember(Name = "analysis")]
+        public AnalysisSettings Analysis { get; set; }
+
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone(), Analysis = Analysis.Clone() };
 
         public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
             new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins, null, Inserts);
@@ -56,6 +59,7 @@ namespace SqlPrompter.Core.Settings
             Inserts = Inserts ?? new InsertSettings();
             Snippets = Snippets ?? new SnippetSettings();
             Coloring = Coloring ?? new ColorSettings();
+            Analysis = Analysis ?? new AnalysisSettings();
         }
 
         private void SetDefaults()
@@ -67,6 +71,7 @@ namespace SqlPrompter.Core.Settings
             Inserts = new InsertSettings();
             Snippets = new SnippetSettings();
             Coloring = new ColorSettings();
+            Analysis = new AnalysisSettings();
         }
     }
 
