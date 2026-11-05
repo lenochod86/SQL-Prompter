@@ -80,16 +80,16 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 - [x] **Settings foundation:** pages in Tools → Options → SQL Prompter, JSON file, export and import. Every later feature adds its options (#9).
 - [x] **SQL Prompt settings import** (`.settings`): aliases, qualification, commit keys. Other parts follow with later phases (#9).
-- [ ] **Script model**, i.e. definitions in the script computed in the background (#15):
-  - [ ] columns of CTEs and derived tables
-  - [ ] `#tables` from `CREATE TABLE` and `SELECT … INTO`
-  - [ ] `@tables`
-  - [ ] variables and parameters with types, including the parameters of the procedure being edited
-- [ ] **Automatic aliases** when inserting a table (#23):
+- [x] **Script model**, i.e. definitions in the script computed in the background (#15):
+  - [x] columns of CTEs and derived tables
+  - [x] `#tables` from `CREATE TABLE` and `SELECT … INTO` (SELECT … INTO verified in SSMS, CREATE TABLE only by unit tests)
+  - [x] `@tables`
+  - [x] variables and parameters with types, including the parameters of the procedure being edited
+- [x] **Automatic aliases** when inserting a table (#23):
   - [x] from the capital letters of the name (`OrderItems` → `oi`), avoiding collisions in the query
-  - [ ] custom aliases
-  - [ ] ignored prefixes
-  - [ ] `AS` option
+  - [x] custom aliases
+  - [x] ignored prefixes
+  - [x] `AS` option
 - [x] **Qualification:** objects with schema, columns with alias (`a.Column`) (#23)
 - [x] After `SELECT` without `FROM`, columns of all tables in the database; choosing a column adds `FROM` with its table and alias (#24)
 - [x] Three-part names and tracking `USE` (#25)
