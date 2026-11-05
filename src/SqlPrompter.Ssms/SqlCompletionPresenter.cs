@@ -451,6 +451,7 @@ namespace SqlPrompter.Ssms
                 name.Inlines.Clear();
                 name.Inlines.Add(new Run(entry.CompletionItem.DisplayText) { FontStyle = FontStyles.Italic });
                 suffix.Text = string.Empty;
+                SetTextColor(isSelected);
                 if (isSelected)
                 {
                     Root.SetResourceReference(Panel.BackgroundProperty, VsBrushes.HighlightKey);
@@ -475,7 +476,7 @@ namespace SqlPrompter.Ssms
                 if (item.Properties.TryGetProperty(SqlCompletionSource.DetailKey, out string detail))
                 {
                     var run = new Run(" " + detail) { FontSize = 11 };
-                    run.SetResourceReference(TextElement.ForegroundProperty, VsBrushes.ControlLinkTextKey);
+                    run.SetResourceReference(TextElement.ForegroundProperty, isSelected && !isSoft ? VsBrushes.HighlightTextKey : VsBrushes.ControlLinkTextKey);
                     name.Inlines.Add(run);
                 }
 
@@ -485,6 +486,7 @@ namespace SqlPrompter.Ssms
                     name.Inlines.Add(keyContainer);
                 }
                 suffix.Text = item.Suffix;
+                SetTextColor(isSelected && !isSoft);
                 if (isSelected)
                 {
                     Root.SetResourceReference(Panel.BackgroundProperty, isSoft ? VsBrushes.ToolWindowBorderKey : VsBrushes.HighlightKey);
@@ -494,6 +496,14 @@ namespace SqlPrompter.Ssms
                     Root.ClearValue(Panel.BackgroundProperty);
                     Root.Background = Brushes.Transparent;
                 }
+            }
+
+            /// <summary>On the highlighted (hard selected) row the text takes the highlight text color; rows are reused, so it is always set.</summary>
+            private void SetTextColor(bool highlighted)
+            {
+                var key = highlighted ? VsBrushes.HighlightTextKey : VsBrushes.ToolWindowTextKey;
+                name.SetResourceReference(TextBlock.ForegroundProperty, key);
+                suffix.SetResourceReference(TextBlock.ForegroundProperty, key);
             }
 
             private static void AddHighlighted(TextBlock block, string text, System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.Text.Span> spans)
