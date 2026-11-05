@@ -129,6 +129,33 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>Describes the selection (or the whole script) in a new query window of the same connection, as a comment.</summary>
+        public static void ShowSummary(ITextView view)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (view == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var snapshot = view.TextBuffer.CurrentSnapshot;
+                var text = view.Selection.IsEmpty ? snapshot.GetText() : view.Selection.StreamSelectionSpan.SnapshotSpan.GetText();
+                var newLine = snapshot.LineCount > 1 ? snapshot.GetLineFromLineNumber(0).GetLineBreakText() : "\r\n";
+                var summary = SqlPrompter.Core.Editing.ScriptSummary.Build(text, newLine.Length > 0 ? newLine : "\r\n");
+                if (!SsmsConnection.OpenNewWindow(SsmsConnection.GetActive()?.Database, summary))
+                {
+                    System.Windows.Clipboard.SetText(summary);
+                    SetStatus("SQL Prompter: the summary is on the clipboard (no connected window to open it in).");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Script summary failed", ex);
+            }
+        }
+
         /// <summary>Replaces only the middle that differs between the two texts; <paramref name="offset"/> is where the original starts in the buffer.</summary>
         private static void ReplaceDifference(ITextView view, int offset, string original, string changed)
         {
