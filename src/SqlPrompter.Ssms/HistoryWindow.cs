@@ -18,7 +18,7 @@ namespace SqlPrompter.Ssms
 
         private readonly TextBox filter = SnippetUi.Box(false);
         private readonly ListView list = new ListView();
-        private readonly TextBox preview = SnippetUi.Box(true);
+        private readonly SnippetBodyEditor preview = new SnippetBodyEditor { Margin = new Thickness(0), Padding = new Thickness(4), BorderThickness = new Thickness(1) };
         private readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 6, 0, 0) };
 
         public HistoryWindow()
@@ -30,6 +30,8 @@ namespace SqlPrompter.Ssms
             ShowInTaskbar = false;
             SnippetUi.Theme(this);
             SnippetUi.Theme(list);
+            SnippetUi.Theme(preview);
+            preview.SetResourceReference(Control.BorderBrushProperty, Microsoft.VisualStudio.Shell.VsBrushes.ToolWindowBorderKey);
             preview.IsReadOnly = true;
             preview.VerticalAlignment = VerticalAlignment.Stretch;
             status.SetResourceReference(TextBlock.ForegroundProperty, Microsoft.VisualStudio.Shell.VsBrushes.WindowTextKey);
@@ -84,11 +86,22 @@ namespace SqlPrompter.Ssms
             root.Children.Add(filter);
 
             var middle = new Grid();
-            middle.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.4, GridUnitType.Star) });
-            middle.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            list.Margin = new Thickness(0, 0, 8, 0);
+            middle.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.4, GridUnitType.Star), MinWidth = 150 });
+            middle.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            middle.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 150 });
             middle.Children.Add(list);
-            Grid.SetColumn(preview, 1);
+            var splitter = new GridSplitter
+            {
+                Width = 8,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Cursor = Cursors.SizeWE,
+            };
+            Grid.SetColumn(splitter, 1);
+            middle.Children.Add(splitter);
+            Grid.SetColumn(preview, 2);
             middle.Children.Add(preview);
             Grid.SetRow(middle, 2);
             root.Children.Add(middle);
@@ -131,7 +144,7 @@ namespace SqlPrompter.Ssms
             }
             else
             {
-                preview.Text = string.Empty;
+                preview.PlainText = string.Empty;
             }
         }
 
@@ -146,7 +159,7 @@ namespace SqlPrompter.Ssms
             list.ScrollIntoView(list.SelectedItem);
         }
 
-        private void ShowPreview() => preview.Text = (list.SelectedItem as Row)?.Entry.Text ?? string.Empty;
+        private void ShowPreview() => preview.PlainText = (list.SelectedItem as Row)?.Entry.Text ?? string.Empty;
 
         private void Choose()
         {
