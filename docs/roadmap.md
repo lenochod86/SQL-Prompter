@@ -149,7 +149,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters (#44)
 - [x] Functions with parentheses (the caret goes inside when they take parameters); parameter names come with parameter info (#44, #45)
 - [x] Expanding `*` with Tab into a column list with aliases (#45)
-- [ ] Object definition panel next to the list (`CREATE` script, as in SQL Prompt) (#46)
+- [x] Object definition panel next to the list (`CREATE` script, as in SQL Prompt) (#46)
 - [x] Parameter info (#45)
 - [ ] Ranking by usage (statistics stay local, nothing is sent anywhere) (#47)
 

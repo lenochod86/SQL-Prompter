@@ -8,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
@@ -54,11 +55,16 @@ namespace SqlPrompter.Ssms
         private const double MinListWidth = 420;
         private const double MaxListWidth = 1000;
         private const double DescriptionWidth = 380;
+        private const double DefinitionWidth = 640;
+        private const int DefinitionLines = 28;
 
         private readonly IWpfTextView view;
         private readonly Popup popup;
         private readonly Popup descriptionPopup;
         private readonly TextBlock descriptionText;
+        private readonly TextBlock definitionText;
+        private CompletionItem definitionItem;
+        private DispatcherTimer definitionTimer;
         private readonly StackPanel rowPanel = new StackPanel();
         private readonly ScrollBar scrollBar;
         private readonly List<Row> rows = new List<Row>();
@@ -91,6 +97,7 @@ namespace SqlPrompter.Ssms
             scrollBar = new ScrollBar { Orientation = Orientation.Vertical, Width = 14, Visibility = Visibility.Collapsed, Focusable = false };
             scrollBar.ValueChanged += (s, e) =>
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 if (!updatingScrollBar)
                 {
                     offset = (int)Math.Round(scrollBar.Value);
@@ -108,14 +115,28 @@ namespace SqlPrompter.Ssms
             grid.Children.Add(scrollBar);
             grid.PreviewMouseWheel += (s, e) =>
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 Scroll(e.Delta > 0 ? -3 : 3);
                 e.Handled = true;
             };
 
             popup = CreatePopup(grid);
-            descriptionText = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = DescriptionWidth, Margin = new Thickness(8, 6, 8, 6) };
+            descriptionText = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = DescriptionWidth, Margin = new Thickness(8, 6, 8, 6), HorizontalAlignment = HorizontalAlignment.Left };
             descriptionText.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
-            descriptionPopup = CreatePopup(descriptionText);
+            definitionText = new TextBlock
+            {
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 12,
+                TextWrapping = TextWrapping.NoWrap,
+                Margin = new Thickness(8, 0, 8, 6),
+                MaxWidth = DefinitionWidth,
+                Visibility = Visibility.Collapsed,
+            };
+            definitionText.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+            var detailPanel = new StackPanel();
+            detailPanel.Children.Add(descriptionText);
+            detailPanel.Children.Add(definitionText);
+            descriptionPopup = CreatePopup(detailPanel);
         }
 
 #pragma warning disable CS0067 // never raised yet: no filter buttons
@@ -130,6 +151,7 @@ namespace SqlPrompter.Ssms
 
         public void Open(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             Update(session, presentation);
             popup.IsOpen = true;
             descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
@@ -137,6 +159,7 @@ namespace SqlPrompter.Ssms
 
         public void Update(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             soft = presentation.UseSoftSelection;
             if (!ReferenceEquals(lastItemList, presentation.ItemList))
             {
@@ -170,6 +193,8 @@ namespace SqlPrompter.Ssms
 
         public void Close()
         {
+            definitionTimer?.Stop();
+            definitionItem = null;
             popup.IsOpen = false;
             descriptionPopup.IsOpen = false;
         }
@@ -201,6 +226,7 @@ namespace SqlPrompter.Ssms
 
         private void Scroll(int delta)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             offset = Math.Max(0, Math.Min(Math.Max(0, items.Count - VisibleRows), offset + delta));
             Render();
         }
@@ -224,6 +250,7 @@ namespace SqlPrompter.Ssms
 
         private void Render()
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             if (showSuggestion)
             {
                 suggestionRow.BindSuggestion(new CompletionItemWithHighlight(suggestionItem), suggestionSelected);
@@ -257,6 +284,67 @@ namespace SqlPrompter.Ssms
             }
 
             descriptionText.Text = description ?? string.Empty;
+            UpdateDefinition(selected >= 0 && selected < items.Count ? items[selected].CompletionItem : null);
+        }
+
+        /// <summary>
+        /// Shows the script of the selected object under its description: at once when it was loaded lately, otherwise after a short
+        /// pause (so that moving through the list does not ask the database for every item) and in the background.
+        /// </summary>
+        private void UpdateDefinition(CompletionItem item)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (ReferenceEquals(item, definitionItem))
+            {
+                return;
+            }
+
+            definitionItem = item;
+            definitionTimer?.Stop();
+            ShowDefinition(null);
+            if (item == null || !item.Properties.TryGetProperty(SqlCompletionSource.DefinitionKey, out DefinitionRef reference))
+            {
+                return;
+            }
+
+            if (DefinitionPreview.TryGetCached(reference, out var cached))
+            {
+                ShowDefinition(cached);
+                return;
+            }
+
+            definitionTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            definitionTimer.Tick += (s, e) =>
+            {
+                definitionTimer.Stop();
+                if (ReferenceEquals(definitionItem, item))
+                {
+                    DefinitionPreview.Request(reference, script =>
+                    {
+                        if (ReferenceEquals(definitionItem, item))
+                        {
+                            ShowDefinition(script);
+                        }
+                    });
+                }
+            };
+            definitionTimer.Start();
+        }
+
+        private void ShowDefinition(string script)
+        {
+            if (string.IsNullOrWhiteSpace(script))
+            {
+                definitionText.Text = string.Empty;
+                definitionText.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var lines = script.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\t", "    ").Split('\n');
+            var shown = lines.Take(DefinitionLines).Select(l => l.Length > 110 ? l.Substring(0, 110) + "..." : l);
+            definitionText.Text = string.Join("\n", shown) + (lines.Length > DefinitionLines ? "\n..." : string.Empty);
+            definitionText.Visibility = Visibility.Visible;
+            descriptionPopup.IsOpen = popup.IsOpen;
         }
 
         private void Position(CompletionPresentationViewModel presentation)
