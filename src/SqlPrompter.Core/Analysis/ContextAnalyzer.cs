@@ -178,6 +178,16 @@ namespace SqlPrompter.Core.Analysis
             var clauseState = ScanClause(structure, block.Start, nameStart);
             var anchorAtBlockLevel = structure.Depth[anchorIndex] == block.Depth;
 
+            // 0. The column list of INSERT INTO table (…).
+            if (qualifier.Count == 0 && (anchor.Kind == TokenKind.OpenParen || anchor.Kind == TokenKind.Comma))
+            {
+                var insertColumns = TryInsertColumns(tokens, statementStart, anchorIndex, Make);
+                if (insertColumns != null)
+                {
+                    return insertColumns;
+                }
+            }
+
             // 1. Object name after FROM, JOIN, UPDATE, INTO …
             var objectKeywords = ObjectNameAnchor(tokens, anchorIndex, statementStart);
             var commaInFrom = anchor.Kind == TokenKind.Comma && anchorAtBlockLevel && clauseState.InFrom && clauseState.Clause == Clause.From;
@@ -190,6 +200,8 @@ namespace SqlPrompter.Core.Analysis
                 }
 
                 var objectName = Make(ContextKind.ObjectName);
+                objectName.InsertTarget = (anchor.IsWord("INTO") && anchorIndex > statementStart && tokens[anchorIndex - 1].IsWord("INSERT")) || anchor.IsWord("INSERT");
+                objectName.ProcedureName = anchor.IsWord("EXEC") || anchor.IsWord("EXECUTE") || anchor.Kind == TokenKind.Operator;
                 objectName.PreferredKeywords = qualifier.Count == 0 ? objectKeywords ?? Array.Empty<string>() : Array.Empty<string>();
 
                 // Not for INSERT INTO, UPDATE, DELETE FROM … and not when an alias is already typed after the name.
@@ -416,8 +428,18 @@ namespace SqlPrompter.Core.Analysis
             var anchor = tokens[anchorIndex];
             var prev = anchorIndex > statementStart ? tokens[anchorIndex - 1] : null;
             var prevWord = prev?.Upper;
+            if (anchor.Kind == TokenKind.Operator && anchor.Text == "=" && anchorIndex - 2 >= statementStart &&
+                tokens[anchorIndex - 1].Kind == TokenKind.Variable && (tokens[anchorIndex - 2].IsWord("EXEC") || tokens[anchorIndex - 2].IsWord("EXECUTE")))
+            {
+                // EXEC @result = procedure
+                return Array.Empty<string>();
+            }
+
             switch (anchor.Upper)
             {
+                case "EXEC":
+                case "EXECUTE":
+                    return Array.Empty<string>();
                 case "FROM":
                 case "JOIN":
                 case "APPLY":
@@ -441,6 +463,61 @@ namespace SqlPrompter.Core.Analysis
                 default:
                     return null;
             }
+        }
+
+        /// <summary>
+        /// "INSERT INTO table (|" or "INSERT INTO table (a, |": the columns of the table. Null when the caret is somewhere else.
+        /// </summary>
+        private static CaretContext TryInsertColumns(List<Token> tokens, int statementStart, int anchorIndex, Func<ContextKind, CaretContext> make)
+        {
+            var open = anchorIndex;
+            if (tokens[anchorIndex].Kind == TokenKind.Comma)
+            {
+                var j = anchorIndex - 1;
+                while (j > statementStart && (tokens[j].IsNamePart || tokens[j].Kind == TokenKind.Comma))
+                {
+                    j--;
+                }
+
+                if (tokens[j].Kind != TokenKind.OpenParen)
+                {
+                    return null;
+                }
+
+                open = j;
+            }
+
+            var parts = new List<string>();
+            var k = open - 1;
+            while (k >= statementStart && tokens[k].IsNamePart)
+            {
+                parts.Insert(0, tokens[k].IdentifierValue);
+                if (k - 1 >= statementStart && tokens[k - 1].Kind == TokenKind.Dot)
+                {
+                    k -= 2;
+                }
+                else
+                {
+                    k--;
+                    break;
+                }
+            }
+
+            if (parts.Count == 0 || parts.Count > 3 || k < statementStart)
+            {
+                return null;
+            }
+
+            var isInsert = tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= statementStart && tokens[k - 1].IsWord("INSERT"));
+            if (!isInsert)
+            {
+                return null;
+            }
+
+            var context = make(ContextKind.InsertColumns);
+            context.Sources = new[] { new TableSource(TableSourceKind.Object, parts, null, 0) };
+            context.FirstInsertColumn = tokens[anchorIndex].Kind == TokenKind.OpenParen;
+            return context;
         }
 
         private static TableSource FindQualifiedSource(IReadOnlyList<TableSource> sources, IReadOnlyList<string> qualifier)

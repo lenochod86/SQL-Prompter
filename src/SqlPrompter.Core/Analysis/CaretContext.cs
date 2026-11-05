@@ -32,6 +32,9 @@ namespace SqlPrompter.Core.Analysis
 
         /// <summary>A variable or parameter (@name) is being typed.</summary>
         Variable,
+
+        /// <summary>The column list of INSERT INTO table (…): the columns of <see cref="CaretContext.Sources"/> (one table) are offered.</summary>
+        InsertColumns,
     }
 
     public enum TableSourceKind
@@ -146,6 +149,15 @@ namespace SqlPrompter.Core.Analysis
         /// </summary>
         public bool AliasAllowed { get; internal set; }
 
+        /// <summary>The name is the target of INSERT [INTO]: choosing a table can insert its column list with it.</summary>
+        public bool InsertTarget { get; internal set; }
+
+        /// <summary>The name follows EXEC: stored procedures are offered and choosing one inserts its parameters.</summary>
+        public bool ProcedureName { get; internal set; }
+
+        /// <summary>With <see cref="ContextKind.InsertColumns"/>: the caret is right after the opening parenthesis (not after a comma).</summary>
+        public bool FirstInsertColumn { get; internal set; }
+
         /// <summary>The name follows JOIN, so tables related by a foreign key to the tables of the query can be offered first.</summary>
         public bool AfterJoin { get; internal set; }
 
@@ -206,6 +218,9 @@ namespace SqlPrompter.Core.Analysis
             SoftSelection = SoftSelection,
             AliasAllowed = AliasAllowed,
             AfterJoin = AfterJoin,
+            InsertTarget = InsertTarget,
+            ProcedureName = ProcedureName,
+            FirstInsertColumn = FirstInsertColumn,
             InOtherDatabase = inOtherDatabase,
         };
 

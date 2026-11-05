@@ -51,11 +51,14 @@ namespace SqlPrompter.Core.Model
 
     public sealed class DbColumn
     {
-        public DbColumn(string name, string typeName, bool isNullable)
+        public DbColumn(string name, string typeName, bool isNullable, bool isIdentity = false, bool isComputed = false, bool isRowVersion = false)
         {
             Name = name;
             TypeName = typeName;
             IsNullable = isNullable;
+            IsIdentity = isIdentity;
+            IsComputed = isComputed;
+            IsRowVersion = isRowVersion;
         }
 
         public string Name { get; }
@@ -64,6 +67,65 @@ namespace SqlPrompter.Core.Model
         public string TypeName { get; }
 
         public bool IsNullable { get; }
+
+        public bool IsIdentity { get; }
+
+        public bool IsComputed { get; }
+
+        /// <summary>A timestamp / rowversion column.</summary>
+        public bool IsRowVersion { get; }
+
+        /// <summary>Whether an INSERT can supply a value: not an identity, computed or rowversion column.</summary>
+        public bool IsInsertable => !IsIdentity && !IsComputed && !IsRowVersion;
+    }
+
+    /// <summary>A parameter of a stored procedure.</summary>
+    public sealed class DbParameter
+    {
+        public DbParameter(string name, string typeName, bool isOutput, bool hasDefault, string defaultText = null)
+        {
+            Name = name;
+            TypeName = typeName;
+            IsOutput = isOutput;
+            HasDefault = hasDefault;
+            DefaultText = defaultText;
+        }
+
+        /// <summary>With the at sign, e.g. @Id.</summary>
+        public string Name { get; }
+
+        /// <summary>Type including length, e.g. nvarchar(50).</summary>
+        public string TypeName { get; }
+
+        public bool IsOutput { get; }
+
+        /// <summary>The parameter has a default value, so it is optional.</summary>
+        public bool HasDefault { get; }
+
+        /// <summary>The default value as written in the procedure, or null when it has none or could not be read.</summary>
+        public string DefaultText { get; }
+    }
+
+    /// <summary>A stored procedure with its parameters in the order of the declaration.</summary>
+    public sealed class DbProcedure
+    {
+        public DbProcedure(int id, string schema, string name, IReadOnlyList<DbParameter> parameters)
+        {
+            Id = id;
+            Schema = schema;
+            Name = name;
+            Parameters = parameters ?? System.Array.Empty<DbParameter>();
+        }
+
+        public int Id { get; }
+
+        public string Schema { get; }
+
+        public string Name { get; }
+
+        public IReadOnlyList<DbParameter> Parameters { get; }
+
+        public override string ToString() => Schema + "." + Name;
     }
 
     /// <summary>One column pair of a foreign key: the column of the referencing (child) table and the column it points to.</summary>
@@ -124,6 +186,9 @@ namespace SqlPrompter.Core.Model
 
         /// <summary>Foreign keys between the tables of the database; empty if unknown.</summary>
         IReadOnlyList<DbForeignKey> ForeignKeys { get; }
+
+        /// <summary>User stored procedures with their parameters; empty if unknown.</summary>
+        IReadOnlyList<DbProcedure> Procedures { get; }
 
         /// <summary>The columns of the primary key of the object in key order, or an empty list.</summary>
         IReadOnlyList<string> GetPrimaryKey(DbObject dbObject);

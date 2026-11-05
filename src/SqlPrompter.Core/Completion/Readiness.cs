@@ -59,6 +59,7 @@ namespace SqlPrompter.Core.Completion
                         ? new Readiness(ReadinessState.Unsupported, null)
                         : new Readiness(ReadinessState.Ready, null);
 
+                case ContextKind.InsertColumns:
                 case ContextKind.Expression:
                     return EvaluateExpression(context, metadata, script ?? ScriptModel.Empty);
 

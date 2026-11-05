@@ -29,16 +29,19 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "joins")]
         public JoinSettings Joins { get; set; }
 
+        [DataMember(Name = "inserts")]
+        public InsertSettings Inserts { get; set; }
+
         [DataMember(Name = "snippets")]
         public SnippetSettings Snippets { get; set; }
 
         [DataMember(Name = "coloring")]
         public ColorSettings Coloring { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone() };
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone() };
 
         public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
-            new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins);
+            new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins, null, Inserts);
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context) => SetDefaults();
@@ -50,6 +53,7 @@ namespace SqlPrompter.Core.Settings
             Behavior = Behavior ?? new BehaviorSettings();
             Aliases = Aliases ?? new AliasSettings();
             Joins = Joins ?? new JoinSettings();
+            Inserts = Inserts ?? new InsertSettings();
             Snippets = Snippets ?? new SnippetSettings();
             Coloring = Coloring ?? new ColorSettings();
         }
@@ -60,6 +64,7 @@ namespace SqlPrompter.Core.Settings
             Behavior = new BehaviorSettings();
             Aliases = new AliasSettings();
             Joins = new JoinSettings();
+            Inserts = new InsertSettings();
             Snippets = new SnippetSettings();
             Coloring = new ColorSettings();
         }

@@ -65,6 +65,8 @@ namespace SqlPrompter.Metadata
 
         public IReadOnlyList<DbForeignKey> ForeignKeys => Array.Empty<DbForeignKey>();
 
+        public IReadOnlyList<DbProcedure> Procedures => Array.Empty<DbProcedure>();
+
         public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) => Array.Empty<string>();
 
         public DbObject FindObject(string schema, string name) =>

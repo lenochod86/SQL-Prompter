@@ -50,6 +50,8 @@ namespace SqlPrompter.Ssms
         private const string DescriptionKey = "SqlPrompter.Description";
         internal const string FromEditKey = "SqlPrompter.FromEdit";
         internal const string CaretBackKey = "SqlPrompter.CaretBack";
+        internal const string BlockKey = "SqlPrompter.Block";
+        internal const string BeforeLineKey = "SqlPrompter.BeforeLine";
         internal const string DetailKey = "SqlPrompter.Detail";
         internal const string KeyKey = "SqlPrompter.Key";
         /// <summary>Session property: true when Enter may insert the selected suggestion (not a place where a name of the user's own is typed).</summary>
@@ -79,6 +81,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Snippet] = Icon(KnownMonikers.Snippet, "Snippet"),
             [SuggestionKind.ScriptTable] = Icon(KnownMonikers.Table, "Table defined in the script"),
             [SuggestionKind.Variable] = Icon(KnownMonikers.LocalVariable, "Variable"),
+            [SuggestionKind.Procedure] = Icon(KnownMonikers.StoredProcedure, "Stored procedure"),
         };
 
         private readonly MetadataService service;
@@ -124,7 +127,7 @@ namespace SqlPrompter.Ssms
                 // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
                 var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
                 RequestScriptColumns(prepared, script);
-                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets)).Select(s => ToItem(s, prepared)).ToImmutableArray();
+                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor)).Select(s => ToItem(s, prepared)).ToImmutableArray();
                 session.Properties[HardSelectionKey] = !prepared.Context.SoftSelection;
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 // Where the user probably types a name of their own (an alias), Enter must keep what was typed instead of inserting
@@ -169,6 +172,7 @@ namespace SqlPrompter.Ssms
             var insertion = trigger.Reason == CompletionTriggerReason.Insertion;
             if (context.Kind == ContextKind.None ||
                 (insertion && trigger.Character == ' ' && context.Kind != ContextKind.ObjectName) ||
+                (insertion && trigger.Character == '(' && context.Kind != ContextKind.InsertColumns) ||
                 (insertion && trigger.Character == '.' && context.Qualifier.Count == 0 && context.Kind != ContextKind.Name))
             {
                 return CompletionStartData.DoesNotParticipateInCompletion;
@@ -194,10 +198,39 @@ namespace SqlPrompter.Ssms
                 loader = null;
             }
 
-            pending = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns());
+            pending = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart));
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
+        }
+
+        /// <summary>The line the insertion starts on, its indentation and the width of the editor: multi-line insertions are laid out with them.</summary>
+        private EditorLayout BuildEditorLayout(ITextSnapshot snapshot, int position)
+        {
+            var layout = new EditorLayout();
+            try
+            {
+                var line = snapshot.GetLineFromPosition(Math.Min(position, snapshot.Length));
+                var text = line.GetText();
+                layout.LinePrefix = text.Substring(0, Math.Min(text.Length, position - line.Start.Position));
+                layout.LineIndent = new string(text.TakeWhile(c => c == ' ' || c == '\t').ToArray());
+                var firstBreak = snapshot.GetLineFromLineNumber(0).GetLineBreakText();
+                layout.NewLine = line.LineBreakLength > 0 ? line.GetLineBreakText() : firstBreak.Length > 0 ? firstBreak : "\r\n";
+                var options = textView.Options;
+                var spaces = options.GetOptionValue(DefaultOptions.ConvertTabsToSpacesOptionId);
+                layout.IndentUnit = spaces ? new string(' ', Math.Max(1, options.GetOptionValue(DefaultOptions.IndentSizeOptionId))) : "\t";
+                var columnWidth = textView is IWpfTextView wpf && wpf.FormattedLineSource != null ? wpf.FormattedLineSource.ColumnWidth : 0;
+                if (columnWidth > 0 && textView.ViewportWidth > 0)
+                {
+                    layout.LineWidth = Math.Max(40, (int)(textView.ViewportWidth / columnWidth) - 2);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reading the editor layout failed", ex);
+            }
+
+            return layout;
         }
 
         /// <summary>
@@ -251,7 +284,7 @@ namespace SqlPrompter.Ssms
                     return true;
                 case CompletionTriggerReason.Insertion:
                     var c = trigger.Character;
-                    return char.IsLetter(c) || c == '_' || c == '.' || c == '[' || c == ' ' || c == '@' || c == '#';
+                    return char.IsLetter(c) || c == '_' || c == '.' || c == '[' || c == ' ' || c == '@' || c == '#' || c == '(';
                 default:
                     return false;
             }
@@ -294,6 +327,16 @@ namespace SqlPrompter.Ssms
                 item.Properties.AddProperty(CaretBackKey, suggestion.CaretBack);
             }
 
+            if (suggestion.IsBlock)
+            {
+                item.Properties.AddProperty(BlockKey, true);
+            }
+
+            if (suggestion.BeforeLine != null)
+            {
+                item.Properties.AddProperty(BeforeLineKey, suggestion.BeforeLine);
+            }
+
             if (suggestion.FromClause != null && prepared.Context.FromInsertPosition >= 0)
             {
                 var position = prepared.BatchStart + prepared.Context.FromInsertPosition;
@@ -316,8 +359,10 @@ namespace SqlPrompter.Ssms
                 int caretInBatch,
                 DatabaseMetadataCache cache,
                 IMetadataLoader loader,
-                Func<TableSource, IReadOnlyList<DbColumn>> remoteColumns)
+                Func<TableSource, IReadOnlyList<DbColumn>> remoteColumns,
+                EditorLayout editor)
             {
+                Editor = editor;
                 Snapshot = snapshot;
                 Context = context;
                 Metadata = metadata;
@@ -330,6 +375,8 @@ namespace SqlPrompter.Ssms
             }
 
             public string Batch { get; }
+
+            public EditorLayout Editor { get; }
 
             public Func<TableSource, IReadOnlyList<DbColumn>> RemoteColumns { get; }
 
@@ -432,6 +479,34 @@ namespace SqlPrompter.Ssms
                     catch (Exception ex)
                     {
                         Log.Error("Adding the FROM clause failed", ex);
+                    }
+                }
+
+                // INSERT with its column list, EXEC with its parameters: several lines, optionally with lines above (DECLARE for OUTPUT
+                // parameters). The typed character (Space, Enter, Tab) is swallowed so that it does not land after the text.
+                if (item.Properties.TryGetProperty(SqlCompletionSource.BlockKey, out bool block) && block)
+                {
+                    try
+                    {
+                        var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                        var before = item.Properties.TryGetProperty(SqlCompletionSource.BeforeLineKey, out string lines) ? lines : string.Empty;
+                        using (var blockEdit = buffer.CreateEdit())
+                        {
+                            blockEdit.Replace(span, item.InsertText);
+                            if (before.Length > 0)
+                            {
+                                blockEdit.Insert(span.Snapshot.GetLineFromPosition(span.Start.Position).Start.Position, before);
+                            }
+
+                            blockEdit.Apply();
+                        }
+
+                        MoveCaret(session, buffer, span.Start.Position + before.Length + item.InsertText.Length);
+                        return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Inserting the statement text failed", ex);
                     }
                 }
 
