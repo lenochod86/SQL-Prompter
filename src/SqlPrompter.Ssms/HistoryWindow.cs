@@ -62,9 +62,9 @@ namespace SqlPrompter.Ssms
                     Choose();
                     e.Handled = true;
                 }
-                else if (e.Key == Key.Down || e.Key == Key.Up)
+                else if (e.Key == Key.Down || e.Key == Key.Up || e.Key == Key.PageDown || e.Key == Key.PageUp)
                 {
-                    Move(e.Key == Key.Down ? 1 : -1);
+                    Move(e.Key == Key.Down ? 1 : e.Key == Key.Up ? -1 : e.Key == Key.PageDown ? 10 : -10);
                     e.Handled = true;
                 }
             };

@@ -148,6 +148,17 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        private void Move(int step)
+        {
+            if (list.Items.Count == 0)
+            {
+                return;
+            }
+
+            list.SelectedIndex = Math.Max(0, Math.Min(list.Items.Count - 1, list.SelectedIndex + step));
+            list.ScrollIntoView(list.SelectedItem);
+        }
+
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
@@ -161,11 +172,19 @@ namespace SqlPrompter.Ssms
                     e.Handled = true;
                     break;
                 case Key.Down:
-                    list.SelectedIndex = Math.Min(list.Items.Count - 1, list.SelectedIndex + 1);
+                    Move(1);
                     e.Handled = true;
                     break;
                 case Key.Up:
-                    list.SelectedIndex = Math.Max(0, list.SelectedIndex - 1);
+                    Move(-1);
+                    e.Handled = true;
+                    break;
+                case Key.PageDown:
+                    Move(10);
+                    e.Handled = true;
+                    break;
+                case Key.PageUp:
+                    Move(-10);
                     e.Handled = true;
                     break;
             }
