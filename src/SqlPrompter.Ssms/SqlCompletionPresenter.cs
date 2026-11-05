@@ -121,6 +121,7 @@ namespace SqlPrompter.Ssms
             };
 
             popup = CreatePopup(grid);
+            PopupWindows.Attach(popup, () => view.VisualElement);
             descriptionText = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = DescriptionWidth, Margin = new Thickness(8, 6, 8, 6), HorizontalAlignment = HorizontalAlignment.Left };
             descriptionText.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
             definitionText = new TextBlock
@@ -137,6 +138,7 @@ namespace SqlPrompter.Ssms
             detailPanel.Children.Add(descriptionText);
             detailPanel.Children.Add(definitionText);
             descriptionPopup = CreatePopup(detailPanel);
+            PopupWindows.Attach(descriptionPopup, () => view.VisualElement);
         }
 
 #pragma warning disable CS0067 // never raised yet: no filter buttons

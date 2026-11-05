@@ -32,6 +32,7 @@ namespace SqlPrompter.Ssms
             border.SetResourceReference(Border.BackgroundProperty, VsBrushes.ToolWindowBackgroundKey);
             border.SetResourceReference(Border.BorderBrushProperty, VsBrushes.ToolWindowBorderKey);
             popup = new Popup { Child = border, AllowsTransparency = false, StaysOpen = true, Focusable = false, Placement = PlacementMode.Relative };
+            PopupWindows.Attach(popup, () => view.VisualElement);
             view.Caret.PositionChanged += (s, e) =>
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
