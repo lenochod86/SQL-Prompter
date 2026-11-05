@@ -83,6 +83,19 @@ namespace SqlPrompter.Core.Completion
         /// <summary>The item inserts several lines; the character that committed it (Space) is not typed after it.</summary>
         public bool IsBlock { get; }
 
+        /// <summary>Schema of the database object whose definition (script) belongs to the item; null for items that are no object.</summary>
+        public string DefinitionSchema { get; private set; }
+
+        /// <summary>Name of the database object whose definition belongs to the item.</summary>
+        public string DefinitionName { get; private set; }
+
+        internal Suggestion WithDefinition(string schema, string name)
+        {
+            DefinitionSchema = schema;
+            DefinitionName = name;
+            return this;
+        }
+
         public string DisplayText { get; }
 
         public string InsertText { get; }
@@ -145,7 +158,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag, s.CaretBack, s.BeforeLine, s.IsBlock);
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag, s.CaretBack, s.BeforeLine, s.IsBlock).WithDefinition(s.DefinitionSchema, s.DefinitionName);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -367,7 +380,7 @@ namespace SqlPrompter.Core.Completion
                 suffix,
                 plain.Description + " with its column list",
                 0,
-                isBlock: true);
+                isBlock: true).WithDefinition(plain.DefinitionSchema, plain.DefinitionName);
             if (options.Inserts.ColumnsMode == InsertColumnsMode.Item)
             {
                 yield return plain;
@@ -452,7 +465,7 @@ namespace SqlPrompter.Core.Completion
                 "procedure " + procedure + (parameters.Count > 0 ? " (" + signature + ")" : string.Empty),
                 0,
                 beforeLine: declarations.Length > 0 ? declarations : null,
-                isBlock: parameters.Count > 0);
+                isBlock: parameters.Count > 0).WithDefinition(procedure.Schema, procedure.Name);
         }
 
         /// <summary>The alias after a table or view; table-valued functions need their parameters first, so they get none.</summary>
@@ -517,7 +530,7 @@ namespace SqlPrompter.Core.Completion
                 suffix,
                 "scalar function " + function + " (" + function.ParameterCount + (function.ParameterCount == 1 ? " parameter)" : " parameters)"),
                 3,
-                caretBack: function.ParameterCount > 0 ? 1 : 0);
+                caretBack: function.ParameterCount > 0 ? 1 : 0).WithDefinition(function.Schema, function.Name);
 
         private static Suggestion ObjectSuggestion(DbObject dbObject, string insertText, string suffix)
         {
@@ -553,7 +566,8 @@ namespace SqlPrompter.Core.Completion
                 suffix,
                 description + " " + dbObject + target,
                 0,
-                caretBack: isFunction && dbObject.ParameterCount > 0 ? 1 : 0);
+                caretBack: isFunction && dbObject.ParameterCount > 0 ? 1 : 0)
+                .WithDefinition(dbObject.Kind == DbObjectKind.Synonym ? null : dbObject.Schema, dbObject.Kind == DbObjectKind.Synonym ? null : dbObject.Name);
         }
 
         /// <summary>Columns of one table source and how to describe their owner.</summary>

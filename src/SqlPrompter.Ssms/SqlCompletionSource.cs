@@ -51,6 +51,7 @@ namespace SqlPrompter.Ssms
         internal const string FromEditKey = "SqlPrompter.FromEdit";
         internal const string CaretBackKey = "SqlPrompter.CaretBack";
         internal const string BlockKey = "SqlPrompter.Block";
+        internal const string DefinitionKey = "SqlPrompter.Definition";
         internal const string BeforeLineKey = "SqlPrompter.BeforeLine";
         internal const string DetailKey = "SqlPrompter.Detail";
         internal const string KeyKey = "SqlPrompter.Key";
@@ -303,6 +304,11 @@ namespace SqlPrompter.Ssms
             if (suggestion.IsBlock)
             {
                 item.Properties.AddProperty(BlockKey, true);
+            }
+
+            if (suggestion.DefinitionName != null && prepared.Metadata is DatabaseSnapshot)
+            {
+                item.Properties.AddProperty(DefinitionKey, new DefinitionRef(prepared.Metadata.DatabaseName, suggestion.DefinitionSchema, suggestion.DefinitionName));
             }
 
             if (suggestion.BeforeLine != null)
