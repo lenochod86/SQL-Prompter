@@ -39,6 +39,24 @@ namespace SqlPrompter.Ssms
             set => values.RankByUsage = value;
         }
 
+        [Category("Editing")]
+        [DisplayName("Auto-close quotes and brackets")]
+        [Description("Typing ' or [ also inserts the closing character; typing it again steps over it. Nothing is closed inside strings, comments and bracketed names.")]
+        public bool AutoClose
+        {
+            get => values.AutoClose;
+            set => values.AutoClose = value;
+        }
+
+        [Category("Editing")]
+        [DisplayName("Highlight matching names")]
+        [Description("Highlights the other places of the script where the name under the caret appears (compared by name, ignoring case and brackets).")]
+        public bool HighlightMatches
+        {
+            get => values.HighlightMatches;
+            set => values.HighlightMatches = value;
+        }
+
         [Category("Suggestions")]
         [DisplayName("Keyword case")]
         [Description("MatchTyped inserts upper case, or lower case if you started typing in lower case.")]
