@@ -82,7 +82,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] **SQL Prompt settings import** (`.settings`): aliases, qualification, commit keys. Other parts follow with later phases (#9).
 - [x] **Script model**, i.e. definitions in the script computed in the background (#15):
   - [x] columns of CTEs and derived tables
-  - [x] `#tables` from `CREATE TABLE` and `SELECT … INTO`
+  - [x] `#tables` from `CREATE TABLE` and `SELECT … INTO` (SELECT … INTO verified in SSMS, CREATE TABLE only by unit tests)
   - [x] `@tables`
   - [x] variables and parameters with types, including the parameters of the procedure being edited
 - [x] **Automatic aliases** when inserting a table (#23):
