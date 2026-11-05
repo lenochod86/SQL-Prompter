@@ -145,8 +145,8 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 ### Phase 6: Extended IntelliSense (L) (#43)
 
-- [ ] `INSERT`: full statement with the column list, optionally with `VALUES` and default values (#44)
-- [ ] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters (#44)
+- [x] `INSERT`: full statement with the column list, optionally with `VALUES` and default values (#44)
+- [x] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters (#44)
 - [x] Functions with parentheses (the caret goes inside when they take parameters); parameter names come with parameter info (#44, #45)
 - [ ] Expanding `*` with Tab into a column list with aliases (#45)
 - [ ] Object definition panel next to the list (`CREATE` script, as in SQL Prompt) (#46)
@@ -213,3 +213,8 @@ By the user on 2026-11-03:
 By the user on 2026-11-04:
 
 11. **GUI enhancements** come as the last phase, after formatting. The first item is a user friendly editor for the coloring settings, because typing color values as text is too hard to use. The snippet management window follows.
+
+By the user on 2026-11-04 (answers on #44):
+
+12. **INSERT:** the column list is offered in three ways chosen in the settings: automatically when the table is chosen after `INSERT INTO` (default), as a second item, or after typing `(` behind the table name. Identity, computed and rowversion columns are left out; columns with defaults and nullable ones are included. Layout (setting): one line, each column on its own line (default), or as many as fit the editor width. After the column list (setting): a new line (default) or `VALUES` with a placeholder per column (`''`, `N''`, `0`, `NULL` for nullable columns).
+13. **EXEC:** after the procedure all parameters are inserted, named, each on its own line aligned with the first one, with the default value as written in the procedure (`NULL` when it cannot be read); OUTPUT parameters get `DECLARE` lines above the `EXEC` and are passed as `@p = @p OUTPUT`.

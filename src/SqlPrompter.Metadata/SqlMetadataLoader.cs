@@ -5,9 +5,11 @@ using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlPrompter.Core.Completion;
 using SqlPrompter.Core.Model;
 using SqlPrompter.Core.Sql;
 using DbColumn = SqlPrompter.Core.Model.DbColumn;
+using DbParameter = SqlPrompter.Core.Model.DbParameter;
 
 namespace SqlPrompter.Metadata
 {
@@ -50,7 +52,7 @@ LEFT JOIN sys.synonyms AS sn ON sn.object_id = o.object_id
 WHERE o.type IN ('U', 'V', 'IF', 'TF', 'FT', 'FN', 'FS', 'SN');
 
 -- Columns of user objects right away, of system objects on demand.
-SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable
+SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable, c.is_identity, c.is_computed
 FROM sys.columns AS c
 JOIN sys.objects AS o ON o.object_id = c.object_id
 JOIN sys.types AS t ON t.user_type_id = c.user_type_id
@@ -79,7 +81,28 @@ JOIN sys.index_columns AS ic ON ic.object_id = i.object_id AND ic.index_id = i.i
 JOIN sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
 JOIN sys.objects AS o ON o.object_id = i.object_id
 WHERE i.is_primary_key = 1 AND o.is_ms_shipped = 0
-ORDER BY i.object_id, ic.key_ordinal;";
+ORDER BY i.object_id, ic.key_ordinal;
+
+-- User stored procedures with their parameters, for EXEC.
+SELECT o.object_id, s.name, o.name
+FROM sys.procedures AS o
+JOIN sys.schemas AS s ON s.schema_id = o.schema_id
+WHERE o.is_ms_shipped = 0
+ORDER BY o.object_id;
+
+SELECT p.object_id, p.name, t.name, p.max_length, p.precision, p.scale, p.is_output, p.has_default_value
+FROM sys.parameters AS p
+JOIN sys.procedures AS o ON o.object_id = p.object_id
+JOIN sys.types AS t ON t.user_type_id = p.user_type_id
+WHERE o.is_ms_shipped = 0 AND p.parameter_id > 0
+ORDER BY p.object_id, p.parameter_id;
+
+-- sys.parameters.has_default_value is only set for CLR procedures: the default values of T-SQL ones are in the text of the procedure,
+-- and the beginning of it holds the parameters.
+SELECT m.object_id, LEFT(m.definition, 4000)
+FROM sys.sql_modules AS m
+WHERE m.object_id IN (SELECT p.object_id FROM sys.parameters AS p JOIN sys.procedures AS o ON o.object_id = p.object_id
+                      WHERE o.is_ms_shipped = 0 AND p.parameter_id > 0);";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -191,10 +214,12 @@ FROM sys.objects;";
                         key.Add(reader.GetString(1));
                     }
 
+                    var procedures = await ReadProceduresAsync(reader, cancellationToken).ConfigureAwait(false);
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
                     return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers, foreignKeys,
-                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value));
+                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures);
                 }
             }
         }
@@ -222,7 +247,7 @@ FROM sys.objects;";
                 }
 
                 command.CommandText = @"
-SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable
+SELECT c.object_id, c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable, c.is_identity, c.is_computed
 FROM sys.all_columns AS c
 JOIN sys.types AS t ON t.user_type_id = c.user_type_id
 WHERE c.object_id IN (" + string.Join(", ", names) + @")
@@ -259,7 +284,7 @@ ORDER BY i.object_id, ic.key_ordinal;";
             }
         }
 
-        /// <summary>Reads rows (object_id, name, type, max_length, precision, scale, is_nullable) ordered by object.</summary>
+        /// <summary>Reads rows (object_id, name, type, max_length, precision, scale, is_nullable, is_identity, is_computed) ordered by object.</summary>
         private static async Task<IReadOnlyDictionary<int, IReadOnlyList<DbColumn>>> ReadColumnsAsync(DbDataReader reader, CancellationToken cancellationToken)
         {
             var lists = new Dictionary<int, List<DbColumn>>();
@@ -274,10 +299,53 @@ ORDER BY i.object_id, ic.key_ordinal;";
                 list.Add(new DbColumn(
                     reader.GetString(1),
                     FormatType(reader.GetString(2), reader.GetInt16(3), reader.GetByte(4), reader.GetByte(5)),
-                    reader.GetBoolean(6)));
+                    reader.GetBoolean(6),
+                    reader.GetBoolean(7),
+                    reader.GetBoolean(8),
+                    string.Equals(reader.GetString(2), "timestamp", StringComparison.OrdinalIgnoreCase)));
             }
 
             return lists.ToDictionary(p => p.Key, p => (IReadOnlyList<DbColumn>)p.Value);
+        }
+
+        /// <summary>Reads the three result sets of the procedure part of the objects query: procedures, parameters, headers.</summary>
+        private static async Task<IReadOnlyList<DbProcedure>> ReadProceduresAsync(DbDataReader reader, CancellationToken cancellationToken)
+        {
+            var heads = new List<(int Id, string Schema, string Name)>();
+            await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                heads.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+            }
+
+            var parameters = new Dictionary<int, List<(string Name, string Type, bool Output, bool HasDefault)>>();
+            await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var id = reader.GetInt32(0);
+                if (!parameters.TryGetValue(id, out var list))
+                {
+                    parameters[id] = list = new List<(string Name, string Type, bool Output, bool HasDefault)>();
+                }
+
+                list.Add((reader.GetString(1), FormatType(reader.GetString(2), reader.GetInt16(3), reader.GetByte(4), reader.GetByte(5)), reader.GetBoolean(6), reader.GetBoolean(7)));
+            }
+
+            var defaults = new Dictionary<int, IReadOnlyDictionary<string, string>>();
+            await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                defaults[reader.GetInt32(0)] = ProcedureHeader.ReadDefaults(reader.IsDBNull(1) ? null : reader.GetString(1));
+            }
+
+            return heads.Select(h =>
+            {
+                defaults.TryGetValue(h.Id, out var written);
+                var list = parameters.TryGetValue(h.Id, out var found) ? found : new List<(string Name, string Type, bool Output, bool HasDefault)>();
+                return new DbProcedure(h.Id, h.Schema, h.Name, list
+                    .Select(p => new DbParameter(p.Name, p.Type, p.Output, p.HasDefault || (written != null && written.ContainsKey(p.Name)), written != null && written.TryGetValue(p.Name, out var text) ? text : null))
+                    .ToList());
+            }).ToList();
         }
 
         /// <summary>Seconds a call to a linked server may take before it is given up on.</summary>
