@@ -31,6 +31,9 @@
       <Group guid="guidSqlPrompterCmdSet" id="EditingGroup" priority="0x0500">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="RefactoringGroup" priority="0x0550">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
@@ -139,6 +142,24 @@
           <ButtonText>Script Results Grid Selection As INSERT</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRemoveBrackets" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
+        <Strings>
+          <ButtonText>Remove Square Brackets</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidInsertSemicolons" priority="0x0101" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
+        <Strings>
+          <ButtonText>Insert Semicolons</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRemoveUnusedVariables" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
+        <Strings>
+          <ButtonText>Remove Unused Variables</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -157,6 +178,10 @@
       <IDSymbol name="SnippetsGroup" value="0x1013" />
       <IDSymbol name="NavigationGroup" value="0x1014" />
       <IDSymbol name="EditingGroup" value="0x1015" />
+      <IDSymbol name="RefactoringGroup" value="0x1016" />
+      <IDSymbol name="cmdidRemoveBrackets" value="0x0113" />
+      <IDSymbol name="cmdidInsertSemicolons" value="0x0114" />
+      <IDSymbol name="cmdidRemoveUnusedVariables" value="0x0115" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />
