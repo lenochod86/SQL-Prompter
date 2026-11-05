@@ -107,7 +107,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] Complete conditions after `ON` (#29):
   - [x] by foreign keys
   - [x] by matching column names
-  - [ ] optionally by matching types
+  - [x] choose the sources of conditions: foreign keys, same name, same name and type (#99; decision: three independent options)
   - [x] individual columns of multi-column keys
 - [x] Option for the column order in the condition (new table left or right) (#29)
 - [x] Tests on a schema similar to real ones (convention `IdTable` ↔ `Table.IdTable`) (#29, #100)

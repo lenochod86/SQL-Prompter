@@ -15,6 +15,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "newTableOnLeft")]
         public bool NewTableOnLeft { get; set; }
 
+        /// <summary>Offer the conditions of foreign keys (the columns they reference).</summary>
+        [DataMember(Name = "foreignKeyConditions")]
+        public bool ForeignKeyConditions { get; set; }
+
         /// <summary>Offer the individual column pairs of a key over several columns besides the whole condition.</summary>
         [DataMember(Name = "includePartialKeyConditions")]
         public bool IncludePartialKeyConditions { get; set; }
@@ -37,6 +41,7 @@ namespace SqlPrompter.Core.Settings
             // Follows the user's SQL Prompt settings: partial FK conditions and name matched conditions on, "swap order of columns" on,
             // which puts the new table on the right (SQL Prompt's default is table2.id = table1.id, the new table on the left).
             NewTableOnLeft = false;
+            ForeignKeyConditions = true;
             IncludePartialKeyConditions = true;
             NameMatchedConditions = true;
             RequireSameTypeForNameMatches = false;

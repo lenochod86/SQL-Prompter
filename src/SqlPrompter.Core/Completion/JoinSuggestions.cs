@@ -118,7 +118,7 @@ namespace SqlPrompter.Core.Completion
                 var otherReference = SqlIdentifier.Quote(other.ReferenceName, quote);
                 var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var fk in metadata.ForeignKeys)
+                foreach (var fk in options.Joins.ForeignKeyConditions ? metadata.ForeignKeys : new DbForeignKey[0])
                 {
                     // A key of a table to itself (an employee and the manager) fits in both directions; any other key in one.
                     var directions = new List<IReadOnlyList<KeyValuePair<string, string>>>();
