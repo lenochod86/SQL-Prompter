@@ -179,8 +179,9 @@ namespace SqlPrompter.Ssms
         private readonly ListBox list = new ListBox();
         private readonly TextBox prefix = SnippetUi.Box(false);
         private readonly TextBox description = SnippetUi.Box(false);
-        private readonly TextBox body = SnippetUi.Box(true);
-        private readonly TextBox placeholders = SnippetUi.Box(true, 90);
+        private readonly SnippetBodyEditor body = NewBody();
+        private readonly System.Collections.ObjectModel.ObservableCollection<PlaceholderRow> placeholderRows = new System.Collections.ObjectModel.ObservableCollection<PlaceholderRow>();
+        private readonly DataGrid placeholders = NewPlaceholderGrid();
         private readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
         private Snippet editing;
 
@@ -239,7 +240,8 @@ namespace SqlPrompter.Ssms
             Grid.SetRowSpan(body, 1);
             editor.Children.Add(body);
             var fieldsPanel = new StackPanel();
-            fieldsPanel.Children.Add(SnippetUi.Label("Custom fields, one per line: name = default value"));
+            fieldsPanel.Children.Add(SnippetUi.Label("Custom fields (name and the default value shown when the snippet is inserted)"));
+            placeholders.ItemsSource = placeholderRows;
             fieldsPanel.Children.Add(placeholders);
             Grid.SetRow(fieldsPanel, 5);
             editor.Children.Add(fieldsPanel);
@@ -278,7 +280,7 @@ namespace SqlPrompter.Ssms
             list.Items.Clear();
             foreach (var snippet in result.Snippets)
             {
-                var item = new ListBoxItem { Content = SnippetUi.Describe(snippet), Tag = snippet };
+                var item = new ListBoxItem { Content = snippet.Prefix, Tag = snippet };
                 list.Items.Add(item);
                 if (snippet.Id == selectId)
                 {
@@ -289,6 +291,45 @@ namespace SqlPrompter.Ssms
             status.Text = result.Snippets.Count + " snippets" + (result.Errors.Count > 0 ? "; not readable: " + string.Join(", ", result.Errors.Select(e => e.Split(':')[0])) : string.Empty);
         }
 
+
+        private sealed class PlaceholderRow
+        {
+            public string Name { get; set; }
+
+            public string DefaultValue { get; set; }
+        }
+
+        private static SnippetBodyEditor NewBody()
+        {
+            var editor = new SnippetBodyEditor { Margin = new Thickness(0, 2, 0, 8), Padding = new Thickness(4), BorderThickness = new Thickness(1) };
+            SnippetUi.Theme(editor);
+            editor.SetResourceReference(Control.BorderBrushProperty, VsBrushes.ToolWindowBorderKey);
+            return editor;
+        }
+
+        private static DataGrid NewPlaceholderGrid()
+        {
+            var grid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                CanUserAddRows = true,
+                CanUserDeleteRows = true,
+                CanUserResizeRows = false,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                Height = 110,
+                Margin = new Thickness(0, 2, 0, 8),
+                SelectionUnit = DataGridSelectionUnit.FullRow,
+            };
+            SnippetUi.Theme(grid);
+            grid.SetResourceReference(DataGrid.RowBackgroundProperty, VsBrushes.WindowKey);
+            grid.SetResourceReference(DataGrid.BackgroundProperty, VsBrushes.WindowKey);
+            grid.SetResourceReference(DataGrid.BorderBrushProperty, VsBrushes.ToolWindowBorderKey);
+            grid.SetResourceReference(DataGrid.HorizontalGridLinesBrushProperty, VsBrushes.ToolWindowBorderKey);
+            grid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Default value", Binding = new System.Windows.Data.Binding("DefaultValue"), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
+            return grid;
+        }
         private bool isNew;
 
         private void Edit(Snippet snippet, bool isNew = false)
@@ -297,8 +338,12 @@ namespace SqlPrompter.Ssms
             editing = snippet ?? Snippet.Create(string.Empty, string.Empty, string.Empty);
             prefix.Text = editing.Prefix;
             description.Text = editing.Description;
-            body.Text = editing.Body;
-            placeholders.Text = SnippetText.PlaceholdersToText(editing.Placeholders);
+            body.PlainText = editing.Body;
+            placeholderRows.Clear();
+            foreach (var placeholder in editing.Placeholders ?? new List<SnippetPlaceholder>())
+            {
+                placeholderRows.Add(new PlaceholderRow { Name = placeholder.Name, DefaultValue = placeholder.DefaultValue });
+            }
             if (this.isNew)
             {
                 list.SelectedItem = null;
@@ -324,8 +369,12 @@ namespace SqlPrompter.Ssms
 
             editing.Prefix = text;
             editing.Description = description.Text.Trim();
-            editing.Body = body.Text;
-            editing.Placeholders = SnippetText.ParsePlaceholders(placeholders.Text);
+            editing.Body = body.PlainText;
+            placeholders.CommitEdit(DataGridEditingUnit.Row, true);
+            editing.Placeholders = placeholderRows
+                .Where(r => !string.IsNullOrWhiteSpace(r.Name))
+                .Select(r => new SnippetPlaceholder { Name = r.Name.Trim(), DefaultValue = r.DefaultValue ?? string.Empty })
+                .ToList();
             store.Save(editing);
             SnippetService.Reload();
             Reload(editing.Id);
