@@ -142,6 +142,12 @@
           <ButtonText>Script Results Grid Selection As INSERT</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidQualifyNames" priority="0x00E0" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
+        <Strings>
+          <ButtonText>Qualify Object Names</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidExpandStars" priority="0x00F0" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
@@ -185,6 +191,7 @@
       <IDSymbol name="NavigationGroup" value="0x1014" />
       <IDSymbol name="EditingGroup" value="0x1015" />
       <IDSymbol name="RefactoringGroup" value="0x1016" />
+      <IDSymbol name="cmdidQualifyNames" value="0x0117" />
       <IDSymbol name="cmdidExpandStars" value="0x0116" />
       <IDSymbol name="cmdidRemoveBrackets" value="0x0113" />
       <IDSymbol name="cmdidInsertSemicolons" value="0x0114" />

@@ -89,6 +89,46 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>Puts the schema in front of the table, view, function and procedure names of the selection (or the whole script).</summary>
+        public static void QualifyNames(ITextView view)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (view == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var snapshot = view.TextBuffer.CurrentSnapshot;
+                var selection = view.Selection.IsEmpty
+                    ? new SnapshotSpan(snapshot, 0, snapshot.Length)
+                    : view.Selection.StreamSelectionSpan.SnapshotSpan;
+                var metadata = MetadataService.Current?.CacheForActiveWindow(out _, SqlBatch.FindUsedDatabase(snapshot, selection.Start.Position))?.Current;
+                if (metadata == null)
+                {
+                    SetStatus("SQL Prompter: the metadata of the database is not loaded yet.");
+                    return;
+                }
+
+                var original = snapshot.GetText();
+                var changed = SqlPrompter.Core.Editing.NameQualifier.Qualify(original, selection.Start.Position, selection.End.Position, metadata, out var count);
+                if (changed == original)
+                {
+                    SetStatus("SQL Prompter: no names to qualify.");
+                    return;
+                }
+
+                ReplaceDifference(view, 0, original, changed);
+                SetStatus("SQL Prompter: qualified " + count + " names.");
+                Log.Write("Refactoring: qualified " + count + " names.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Qualifying names failed", ex);
+            }
+        }
+
         /// <summary>Replaces only the middle that differs between the two texts; <paramref name="offset"/> is where the original starts in the buffer.</summary>
         private static void ReplaceDifference(ITextView view, int offset, string original, string changed)
         {
