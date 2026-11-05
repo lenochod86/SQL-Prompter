@@ -28,6 +28,9 @@
       <Group guid="guidSqlPrompterCmdSet" id="NavigationGroup" priority="0x0400">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="EditingGroup" priority="0x0500">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
@@ -112,6 +115,18 @@
           <ButtonText>Reset Usage Statistics</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddCommas" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Add Commas To Selected Lines</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddQuotesAndCommas" priority="0x0101" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Add Quotes And Commas To Selected Lines</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -129,6 +144,9 @@
       <IDSymbol name="SettingsGroup" value="0x1012" />
       <IDSymbol name="SnippetsGroup" value="0x1013" />
       <IDSymbol name="NavigationGroup" value="0x1014" />
+      <IDSymbol name="EditingGroup" value="0x1015" />
+      <IDSymbol name="cmdidAddCommas" value="0x010F" />
+      <IDSymbol name="cmdidAddQuotesAndCommas" value="0x0110" />
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
       <IDSymbol name="cmdidParameterInfo" value="0x010D" />

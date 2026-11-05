@@ -155,7 +155,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 
 ### Phase 7: Tools (M to L) (#48)
 
-The user uses almost all of them; the order within the phase is agreed before it starts.
+The user uses almost all of them. Agreed order (decision 16): #52 editor helpers, #49 history and tabs, #51 warnings and analysis, #53 script as INSERT, #50 refactoring.
 
 - [ ] Query history and restoring tabs when SSMS starts (#49)
 - [ ] Refactoring (#50):
@@ -167,9 +167,9 @@ The user uses almost all of them; the order within the phase is agreed before it
   - [ ] script summary
 - [ ] Execution warnings (`DELETE` or `UPDATE` without `WHERE` …) (#51)
 - [ ] Code analysis (#51)
-- [ ] Selection actions: add commas, add quotes and commas (#52)
-- [ ] Highlighting matching objects in the script (#52)
-- [ ] Auto-closing `'` and `[` (#52)
+- [x] Selection actions: add commas, add quotes and commas (#52)
+- [x] Highlighting matching objects in the script (#52)
+- [x] Auto-closing `'` and `[` (#52)
 - [ ] Script as INSERT from the results grid (not yet known whether SSMS 22 allows it) (#53)
 
 ### Phase 8: Formatting (L) (#54)
@@ -223,3 +223,9 @@ By the user on 2026-11-04 (answers on #45):
 
 14. **Expanding `*`:** Tab with the caret right after the `*`; one column per line, qualified with the alias where the table has one (no alias is made up); all columns of all tables in source order, `a.*` expands only `a`; always all columns (identity and rowversion included).
 15. **Parameter info:** a tooltip with the signature and the current parameter in bold, for the functions and procedures of the database (not the built-in functions; a separate issue if wanted later). It shows automatically after `(` and `,` and on Ctrl+Shift+Space.
+
+By the user on 2026-11-05 (answers on #48 and #49):
+
+16. **Order of phase 7** by use: #52, #49, #51, #53, #50.
+17. **Query history (#49):** records the text, server, database, the time of the run and, when the query tab is closed, the time it was closed; all runs; kept forever by default with an option to keep only N days; no exclusion of servers or databases; the plain text lives in a local file. A window like the snippet manager (filter, list, text preview), no shortcut for now; Enter or double click opens the query in a new tab on the same server and database. History comes before tab restoration.
+18. **Restoring tabs (#49):** all tabs, unsaved text included; tabs reconnect automatically. Passwords are never stored: tabs that need a password open unconnected with the server and database remembered (option (a) on #49), after research on what SSMS itself exposes.

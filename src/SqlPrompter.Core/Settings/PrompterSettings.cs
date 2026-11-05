@@ -110,6 +110,14 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "rankByUsage")]
         public bool RankByUsage { get; set; }
 
+        /// <summary>Typing <c>'</c> or <c>[</c> also inserts the closing character.</summary>
+        [DataMember(Name = "autoClose")]
+        public bool AutoClose { get; set; }
+
+        /// <summary>The other places of the name under the caret are highlighted.</summary>
+        [DataMember(Name = "highlightMatches")]
+        public bool HighlightMatches { get; set; }
+
         public KeywordCase KeywordCase { get; set; }
 
         /// <summary>The JSON serializer writes enums as numbers; the file holds the readable name instead.</summary>
@@ -141,6 +149,8 @@ namespace SqlPrompter.Core.Settings
             KeywordCase = KeywordCase.MatchTyped;
             MarkItems = true;
             RankByUsage = true;
+            AutoClose = true;
+            HighlightMatches = true;
         }
     }
 }
