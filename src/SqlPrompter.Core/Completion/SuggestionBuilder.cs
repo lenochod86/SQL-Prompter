@@ -607,6 +607,10 @@ namespace SqlPrompter.Core.Completion
             return columns == null ? null : new SourceColumns(source, columns, dbObject.ToString(), dbObject, metadata);
         }
 
+        /// <summary>The columns of a source in the script or the database, or null if they are not known (yet).</summary>
+        internal static IReadOnlyList<DbColumn> ColumnsOf(TableSource source, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options) =>
+            ResolveColumns(source, metadata, script ?? ScriptModel.Empty, options ?? SuggestionOptions.Default)?.Columns;
+
         private static IEnumerable<Suggestion> ExpressionSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             var quote = context.QuoteIdentifiers;

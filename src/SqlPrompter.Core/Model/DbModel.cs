@@ -190,6 +190,9 @@ namespace SqlPrompter.Core.Model
         /// <summary>User stored procedures with their parameters; empty if unknown.</summary>
         IReadOnlyList<DbProcedure> Procedures { get; }
 
+        /// <summary>The parameters of a user function in the order of the declaration; empty if it has none or they are not known.</summary>
+        IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function);
+
         /// <summary>The columns of the primary key of the object in key order, or an empty list.</summary>
         IReadOnlyList<string> GetPrimaryKey(DbObject dbObject);
 

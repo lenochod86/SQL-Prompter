@@ -12,6 +12,7 @@ namespace SqlPrompter.Metadata
         private readonly HashSet<string> schemaSet;
         private readonly IReadOnlyDictionary<int, IReadOnlyList<DbColumn>> columns;
         private readonly IReadOnlyDictionary<int, IReadOnlyList<string>> primaryKeys;
+        private readonly IReadOnlyDictionary<int, IReadOnlyList<DbParameter>> functionParameters;
 
         public DatabaseSnapshot(
             string databaseName,
@@ -24,7 +25,8 @@ namespace SqlPrompter.Metadata
             IReadOnlyList<string> linkedServers = null,
             IReadOnlyList<DbForeignKey> foreignKeys = null,
             IReadOnlyDictionary<int, IReadOnlyList<string>> primaryKeys = null,
-            IReadOnlyList<DbProcedure> procedures = null)
+            IReadOnlyList<DbProcedure> procedures = null,
+            IReadOnlyDictionary<int, IReadOnlyList<DbParameter>> functionParameters = null)
         {
             DatabaseName = databaseName ?? string.Empty;
             DefaultSchema = string.IsNullOrEmpty(defaultSchema) ? "dbo" : defaultSchema;
@@ -34,6 +36,7 @@ namespace SqlPrompter.Metadata
             LinkedServers = linkedServers ?? Array.Empty<string>();
             ForeignKeys = foreignKeys ?? Array.Empty<DbForeignKey>();
             Procedures = procedures ?? Array.Empty<DbProcedure>();
+            this.functionParameters = functionParameters ?? new Dictionary<int, IReadOnlyList<DbParameter>>();
             this.primaryKeys = primaryKeys ?? new Dictionary<int, IReadOnlyList<string>>();
             Version = version;
             this.columns = columns ?? new Dictionary<int, IReadOnlyList<DbColumn>>();
@@ -55,6 +58,7 @@ namespace SqlPrompter.Metadata
             LinkedServers = source.LinkedServers;
             ForeignKeys = source.ForeignKeys;
             Procedures = source.Procedures;
+            functionParameters = source.functionParameters;
             primaryKeys = source.primaryKeys;
             Version = source.Version;
             byName = source.byName;
@@ -77,6 +81,9 @@ namespace SqlPrompter.Metadata
         public IReadOnlyList<DbForeignKey> ForeignKeys { get; }
 
         public IReadOnlyList<DbProcedure> Procedures { get; }
+
+        public IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function) =>
+            function != null && functionParameters.TryGetValue(function.Id, out var list) ? list : Array.Empty<DbParameter>();
 
         public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) =>
             dbObject != null && primaryKeys.TryGetValue(dbObject.Id, out var key) ? key : Array.Empty<string>();
