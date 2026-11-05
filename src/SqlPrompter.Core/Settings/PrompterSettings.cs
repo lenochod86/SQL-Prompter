@@ -106,6 +106,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "markItems")]
         public bool MarkItems { get; set; }
 
+        /// <summary>Items chosen more often come first in their group; the counts stay on this machine.</summary>
+        [DataMember(Name = "rankByUsage")]
+        public bool RankByUsage { get; set; }
+
         public KeywordCase KeywordCase { get; set; }
 
         /// <summary>The JSON serializer writes enums as numbers; the file holds the readable name instead.</summary>
@@ -136,6 +140,7 @@ namespace SqlPrompter.Core.Settings
             CommitOnClosingBracket = false;
             KeywordCase = KeywordCase.MatchTyped;
             MarkItems = true;
+            RankByUsage = true;
         }
     }
 }

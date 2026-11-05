@@ -31,6 +31,15 @@ namespace SqlPrompter.Ssms
         }
 
         [Category("Suggestions")]
+        [DisplayName("Rank by usage")]
+        [Description("Items you choose more often come first in their group. The counts are kept on this computer only (%APPDATA%\\SqlPrompter\\usage.json); reset them with SQL Prompter > Reset Usage Statistics.")]
+        public bool RankByUsage
+        {
+            get => values.RankByUsage;
+            set => values.RankByUsage = value;
+        }
+
+        [Category("Suggestions")]
         [DisplayName("Keyword case")]
         [Description("MatchTyped inserts upper case, or lower case if you started typing in lower case.")]
         public KeywordCase KeywordCase

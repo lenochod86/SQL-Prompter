@@ -106,6 +106,12 @@
           <ButtonText>Parameter Info</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidResetUsage" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
+        <Strings>
+          <ButtonText>Reset Usage Statistics</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -126,6 +132,7 @@
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
       <IDSymbol name="cmdidParameterInfo" value="0x010D" />
+      <IDSymbol name="cmdidResetUsage" value="0x010E" />
       <IDSymbol name="cmdidImportSnippets" value="0x0104" />
       <IDSymbol name="cmdidOpenSnippetsFolder" value="0x0105" />
       <IDSymbol name="cmdidReloadSnippets" value="0x0106" />
