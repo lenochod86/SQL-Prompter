@@ -59,6 +59,15 @@ namespace SqlPrompter.Ssms
         }
 
         [Category("History")]
+        [DisplayName("Restore query tabs at start")]
+        [Description("The open query tabs, with their text and connection, are saved every few seconds to %APPDATA%\\SqlPrompter\\tabs.json and opened again when SSMS starts. Windows authentication reconnects; a tab with a SQL login opens unconnected (passwords are never stored) with a comment naming the server and database.")]
+        public bool RestoreTabs
+        {
+            get => values.RestoreTabs;
+            set => values.RestoreTabs = value;
+        }
+
+        [Category("History")]
         [DisplayName("Keep query history")]
         [Description("Every executed query is written to %APPDATA%\\SqlPrompter\\history.jsonl on this computer (never sent anywhere). Open it with SQL Prompter > Query History.")]
         public bool KeepHistory

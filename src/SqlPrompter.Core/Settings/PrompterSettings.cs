@@ -131,6 +131,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "historyDays")]
         public int HistoryDays { get; set; }
 
+        /// <summary>The open query tabs, text and connection, are kept and come back when SSMS starts (no passwords).</summary>
+        [DataMember(Name = "restoreTabs")]
+        public bool RestoreTabs { get; set; }
+
         /// <summary>Running a DELETE without WHERE asks for confirmation first.</summary>
         [DataMember(Name = "warnDeleteWithoutWhere")]
         public bool WarnDeleteWithoutWhere { get; set; }
@@ -174,6 +178,7 @@ namespace SqlPrompter.Core.Settings
             HighlightMatches = true;
             KeepHistory = true;
             HistoryDays = 0;
+            RestoreTabs = true;
             WarnDeleteWithoutWhere = true;
             WarnUpdateWithoutWhere = true;
         }
