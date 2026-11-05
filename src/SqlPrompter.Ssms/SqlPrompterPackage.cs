@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 11)]
+    [ProvideMenuResource("Menus.ctmenu", 12)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
@@ -41,15 +41,18 @@ namespace SqlPrompter.Ssms
         public const int ResetUsageId = 0x010E;
         public const int AddCommasId = 0x010F;
         public const int AddQuotesAndCommasId = 0x0110;
+        public const int QueryHistoryId = 0x0111;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
+        private HistoryRecorder historyRecorder;
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
             SnippetService.Start();
             UsageService.Start();
+            HistoryService.Start();
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             TabColoring.Start();
             DefaultKeyBindings.Apply();
@@ -69,6 +72,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => GoToDefinitionHandler.Run(ActiveEditor.GetView()), new CommandID(CommandSet, GoToDefinitionId)));
                 commands.AddCommand(new MenuCommand((s, e) => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddCommas, "commas"), new CommandID(CommandSet, AddCommasId)));
                 commands.AddCommand(new MenuCommand((s, e) => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddQuotesAndCommas, "quotes and commas"), new CommandID(CommandSet, AddQuotesAndCommasId)));
+                commands.AddCommand(new MenuCommand((s, e) => OpenQueryHistory(), new CommandID(CommandSet, QueryHistoryId)));
                 commands.AddCommand(new MenuCommand((s, e) => RunStatement.Run(ActiveEditor.GetView()), new CommandID(CommandSet, RunStatementId)));
                 commands.AddCommand(new MenuCommand((s, e) => { if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view) { ParameterInfoPopup.Show(view); } }, new CommandID(CommandSet, ParameterInfoId)));
             }
@@ -78,6 +82,7 @@ namespace SqlPrompter.Ssms
                 if (await GetServiceAsync(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)
                 {
                     schemaChangeWatcher = SchemaChangeWatcher.Start(dte);
+                    historyRecorder = HistoryRecorder.Start(dte);
                 }
             }
             catch (Exception ex)
@@ -242,6 +247,27 @@ namespace SqlPrompter.Ssms
             {
                 Log.Error("Creating a snippet from the selection failed", ex);
                 ShowMessage("Creating the snippet failed: " + ex.Message);
+            }
+        }
+
+        private void OpenQueryHistory()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var window = new HistoryWindow();
+                ActiveEditor.SetOwner(window);
+                window.ShowDialog();
+                var chosen = window.Chosen;
+                if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login))
+                {
+                    ShowMessage("Open a query window connected to a server first; the new tab is opened like it.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening the query history failed", ex);
+                ShowMessage("Opening the query history failed: " + ex.Message);
             }
         }
 

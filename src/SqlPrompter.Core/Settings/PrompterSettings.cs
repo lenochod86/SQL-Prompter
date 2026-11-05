@@ -118,6 +118,14 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
 
+        /// <summary>Every executed query is written to the history on this machine.</summary>
+        [DataMember(Name = "keepHistory")]
+        public bool KeepHistory { get; set; }
+
+        /// <summary>History older than this many days is removed when SSMS starts; 0 keeps it forever.</summary>
+        [DataMember(Name = "historyDays")]
+        public int HistoryDays { get; set; }
+
         public KeywordCase KeywordCase { get; set; }
 
         /// <summary>The JSON serializer writes enums as numbers; the file holds the readable name instead.</summary>
@@ -151,6 +159,8 @@ namespace SqlPrompter.Core.Settings
             RankByUsage = true;
             AutoClose = true;
             HighlightMatches = true;
+            KeepHistory = true;
+            HistoryDays = 0;
         }
     }
 }
