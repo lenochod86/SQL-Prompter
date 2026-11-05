@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 8)]
+    [ProvideMenuResource("Menus.ctmenu", 9)]
     [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
     [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
     [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
@@ -37,6 +37,7 @@ namespace SqlPrompter.Ssms
         public const int ManageSnippetsId = 0x0109;
         public const int GoToDefinitionId = 0x010B;
         public const int RunStatementId = 0x010C;
+        public const int ParameterInfoId = 0x010D;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
@@ -62,6 +63,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
                 commands.AddCommand(new MenuCommand((s, e) => GoToDefinitionHandler.Run(ActiveEditor.GetView()), new CommandID(CommandSet, GoToDefinitionId)));
                 commands.AddCommand(new MenuCommand((s, e) => RunStatement.Run(ActiveEditor.GetView()), new CommandID(CommandSet, RunStatementId)));
+                commands.AddCommand(new MenuCommand((s, e) => { if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view) { ParameterInfoPopup.Show(view); } }, new CommandID(CommandSet, ParameterInfoId)));
             }
 
             try

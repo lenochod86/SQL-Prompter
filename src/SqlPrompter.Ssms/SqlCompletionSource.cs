@@ -204,34 +204,7 @@ namespace SqlPrompter.Ssms
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
         }
 
-        /// <summary>The line the insertion starts on, its indentation and the width of the editor: multi-line insertions are laid out with them.</summary>
-        private EditorLayout BuildEditorLayout(ITextSnapshot snapshot, int position)
-        {
-            var layout = new EditorLayout();
-            try
-            {
-                var line = snapshot.GetLineFromPosition(Math.Min(position, snapshot.Length));
-                var text = line.GetText();
-                layout.LinePrefix = text.Substring(0, Math.Min(text.Length, position - line.Start.Position));
-                layout.LineIndent = new string(text.TakeWhile(c => c == ' ' || c == '\t').ToArray());
-                var firstBreak = snapshot.GetLineFromLineNumber(0).GetLineBreakText();
-                layout.NewLine = line.LineBreakLength > 0 ? line.GetLineBreakText() : firstBreak.Length > 0 ? firstBreak : "\r\n";
-                var options = textView.Options;
-                var spaces = options.GetOptionValue(DefaultOptions.ConvertTabsToSpacesOptionId);
-                layout.IndentUnit = spaces ? new string(' ', Math.Max(1, options.GetOptionValue(DefaultOptions.IndentSizeOptionId))) : "\t";
-                var columnWidth = textView is IWpfTextView wpf && wpf.FormattedLineSource != null ? wpf.FormattedLineSource.ColumnWidth : 0;
-                if (columnWidth > 0 && textView.ViewportWidth > 0)
-                {
-                    layout.LineWidth = Math.Max(40, (int)(textView.ViewportWidth / columnWidth) - 2);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Reading the editor layout failed", ex);
-            }
-
-            return layout;
-        }
+        private EditorLayout BuildEditorLayout(ITextSnapshot snapshot, int position) => EditorLayouts.Read(textView, snapshot, position);
 
         /// <summary>
         /// Returns metadata from the cache and starts loading missing parts in the background. It never waits for the database:

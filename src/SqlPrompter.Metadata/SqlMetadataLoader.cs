@@ -83,7 +83,7 @@ JOIN sys.objects AS o ON o.object_id = i.object_id
 WHERE i.is_primary_key = 1 AND o.is_ms_shipped = 0
 ORDER BY i.object_id, ic.key_ordinal;
 
--- User stored procedures with their parameters, for EXEC.
+-- User stored procedures and functions with their parameters, for EXEC and parameter info.
 SELECT o.object_id, s.name, o.name
 FROM sys.procedures AS o
 JOIN sys.schemas AS s ON s.schema_id = o.schema_id
@@ -92,9 +92,9 @@ ORDER BY o.object_id;
 
 SELECT p.object_id, p.name, t.name, p.max_length, p.precision, p.scale, p.is_output, p.has_default_value
 FROM sys.parameters AS p
-JOIN sys.procedures AS o ON o.object_id = p.object_id
+JOIN sys.objects AS o ON o.object_id = p.object_id
 JOIN sys.types AS t ON t.user_type_id = p.user_type_id
-WHERE o.is_ms_shipped = 0 AND p.parameter_id > 0
+WHERE o.is_ms_shipped = 0 AND o.type IN ('P', 'PC', 'FN', 'IF', 'TF', 'FS', 'FT') AND p.parameter_id > 0
 ORDER BY p.object_id, p.parameter_id;
 
 -- sys.parameters.has_default_value is only set for CLR procedures: the default values of T-SQL ones are in the text of the procedure,
@@ -214,12 +214,12 @@ FROM sys.objects;";
                         key.Add(reader.GetString(1));
                     }
 
-                    var procedures = await ReadProceduresAsync(reader, cancellationToken).ConfigureAwait(false);
+                    var (procedures, functionParameters) = await ReadProceduresAsync(reader, cancellationToken).ConfigureAwait(false);
 
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
                     return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers, foreignKeys,
-                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures);
+                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures, functionParameters);
                 }
             }
         }
@@ -309,7 +309,7 @@ ORDER BY i.object_id, ic.key_ordinal;";
         }
 
         /// <summary>Reads the three result sets of the procedure part of the objects query: procedures, parameters, headers.</summary>
-        private static async Task<IReadOnlyList<DbProcedure>> ReadProceduresAsync(DbDataReader reader, CancellationToken cancellationToken)
+        private static async Task<(IReadOnlyList<DbProcedure> Procedures, IReadOnlyDictionary<int, IReadOnlyList<DbParameter>> FunctionParameters)> ReadProceduresAsync(DbDataReader reader, CancellationToken cancellationToken)
         {
             var heads = new List<(int Id, string Schema, string Name)>();
             await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
@@ -338,7 +338,7 @@ ORDER BY i.object_id, ic.key_ordinal;";
                 defaults[reader.GetInt32(0)] = ProcedureHeader.ReadDefaults(reader.IsDBNull(1) ? null : reader.GetString(1));
             }
 
-            return heads.Select(h =>
+            var procedures = heads.Select(h =>
             {
                 defaults.TryGetValue(h.Id, out var written);
                 var list = parameters.TryGetValue(h.Id, out var found) ? found : new List<(string Name, string Type, bool Output, bool HasDefault)>();
@@ -346,6 +346,14 @@ ORDER BY i.object_id, ic.key_ordinal;";
                     .Select(p => new DbParameter(p.Name, p.Type, p.Output, p.HasDefault || (written != null && written.ContainsKey(p.Name)), written != null && written.TryGetValue(p.Name, out var text) ? text : null))
                     .ToList());
             }).ToList();
+
+            var procedureIds = new HashSet<int>(heads.Select(h => h.Id));
+            var functions = parameters
+                .Where(p => !procedureIds.Contains(p.Key))
+                .ToDictionary(
+                    p => p.Key,
+                    p => (IReadOnlyList<DbParameter>)p.Value.Select(x => new DbParameter(x.Name, x.Type, x.Output, x.HasDefault)).ToList());
+            return (procedures, functions);
         }
 
         /// <summary>Seconds a call to a linked server may take before it is given up on.</summary>

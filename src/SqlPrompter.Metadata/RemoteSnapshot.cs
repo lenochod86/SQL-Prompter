@@ -67,6 +67,8 @@ namespace SqlPrompter.Metadata
 
         public IReadOnlyList<DbProcedure> Procedures => Array.Empty<DbProcedure>();
 
+        public IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function) => Array.Empty<DbParameter>();
+
         public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) => Array.Empty<string>();
 
         public DbObject FindObject(string schema, string name) =>

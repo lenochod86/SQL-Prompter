@@ -100,6 +100,12 @@
           <ButtonText>Run Statement At Caret</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidParameterInfo" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
+        <Strings>
+          <ButtonText>Parameter Info</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -119,6 +125,7 @@
       <IDSymbol name="NavigationGroup" value="0x1014" />
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
+      <IDSymbol name="cmdidParameterInfo" value="0x010D" />
       <IDSymbol name="cmdidImportSnippets" value="0x0104" />
       <IDSymbol name="cmdidOpenSnippetsFolder" value="0x0105" />
       <IDSymbol name="cmdidReloadSnippets" value="0x0106" />
