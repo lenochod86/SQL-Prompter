@@ -126,6 +126,14 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "historyDays")]
         public int HistoryDays { get; set; }
 
+        /// <summary>Running a DELETE without WHERE asks for confirmation first.</summary>
+        [DataMember(Name = "warnDeleteWithoutWhere")]
+        public bool WarnDeleteWithoutWhere { get; set; }
+
+        /// <summary>Running an UPDATE without WHERE asks for confirmation first.</summary>
+        [DataMember(Name = "warnUpdateWithoutWhere")]
+        public bool WarnUpdateWithoutWhere { get; set; }
+
         public KeywordCase KeywordCase { get; set; }
 
         /// <summary>The JSON serializer writes enums as numbers; the file holds the readable name instead.</summary>
@@ -161,6 +169,8 @@ namespace SqlPrompter.Core.Settings
             HighlightMatches = true;
             KeepHistory = true;
             HistoryDays = 0;
+            WarnDeleteWithoutWhere = true;
+            WarnUpdateWithoutWhere = true;
         }
     }
 }

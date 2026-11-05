@@ -166,7 +166,7 @@ The user uses almost all of them. Agreed order (decision 16): #52 editor helpers
   - [ ] remove square brackets
   - [ ] unused variables
   - [ ] script summary
-- [ ] Execution warnings (`DELETE` or `UPDATE` without `WHERE` …) (#51)
+- [x] Execution warnings: `DELETE` or `UPDATE` without `WHERE` ask for confirmation (#106)
 - [ ] Code analysis (#51)
 - [x] Selection actions: add commas, add quotes and commas (#52)
 - [x] Highlighting matching objects in the script (#52)

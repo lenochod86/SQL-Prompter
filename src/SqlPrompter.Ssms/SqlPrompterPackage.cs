@@ -45,7 +45,7 @@ namespace SqlPrompter.Ssms
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
-        private HistoryRecorder historyRecorder;
+        private ExecutionHooks executionHooks;
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
@@ -82,7 +82,7 @@ namespace SqlPrompter.Ssms
                 if (await GetServiceAsync(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)
                 {
                     schemaChangeWatcher = SchemaChangeWatcher.Start(dte);
-                    historyRecorder = HistoryRecorder.Start(dte);
+                    executionHooks = ExecutionHooks.Start(dte);
                 }
             }
             catch (Exception ex)
