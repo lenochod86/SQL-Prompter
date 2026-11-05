@@ -85,11 +85,13 @@ namespace SqlPrompter.Ssms
                 delay.Stop();
                 HideTip();
             };
+#pragma warning disable VSSDK007 // fire and forget on purpose: the handler must return at once
             EventHandler changed = (s, e) => ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
             {
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                 Analyze();
             }).Task.FileAndForget("sqlprompter/analysis");
+#pragma warning restore VSSDK007
             SettingsService.Changed += changed;
             view.Closed += (s, e) => SettingsService.Changed -= changed;
             delay.Start();
@@ -121,6 +123,7 @@ namespace SqlPrompter.Ssms
 
                 var run = ++version;
                 var text = current.GetText();
+#pragma warning disable VSSDK007 // fire and forget on purpose: the result comes back through SetIssues
                 ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
                 {
                     try
@@ -139,6 +142,7 @@ namespace SqlPrompter.Ssms
                         Log.Error("Code analysis failed", ex);
                     }
                 }).Task.FileAndForget("sqlprompter/analysis");
+#pragma warning restore VSSDK007
             }
             catch (Exception ex)
             {

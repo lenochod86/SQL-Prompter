@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Reflection;
 using Microsoft.VisualStudio.Shell;
+using SqlPrompter.Core.History;
 using SqlPrompter.Metadata;
 
 namespace SqlPrompter.Ssms
@@ -133,6 +134,75 @@ namespace SqlPrompter.Ssms
             create.Invoke(factory, new[] { scriptType, clone, null });
             var view = ActiveEditor.GetView();
             view?.TextBuffer.Insert(0, text ?? string.Empty);
+            return view != null;
+        }
+
+        /// <summary>
+        /// Opens a window for a saved tab: connected with Windows authentication when the tab had that, otherwise unconnected with a comment
+        /// that names the server and database it had (a password is never stored). Returns false when SSMS refused.
+        /// </summary>
+        public static bool OpenSavedTab(SavedTab tab)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var factoryType = scriptFactoryType ?? (scriptFactoryType = AssemblyTypes.FindLoaded(ScriptFactoryTypeName));
+            var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            var create = factory?.GetType().GetMethods().FirstOrDefault(m =>
+                m.Name == "CreateNewBlankScript" && m.GetParameters().Length == 3 && m.GetParameters()[1].ParameterType.Name == "UIConnectionInfo");
+            if (create == null)
+            {
+                Log.Write("Restoring a tab: CreateNewBlankScript was not found among " + string.Join("; ", (factory?.GetType().GetMethods() ?? new MethodInfo[0]).Where(m => m.Name == "CreateNewBlankScript").Select(m => m.ToString())));
+                return false;
+            }
+
+            var text = tab.Text ?? string.Empty;
+            object info = null;
+            if (tab.IsConnected && string.IsNullOrEmpty(tab.Login))
+            {
+                var infoType = create.GetParameters()[1].ParameterType;
+                info = Activator.CreateInstance(infoType);
+                SetProperty(info, "ServerName", tab.Server);
+                SetProperty(info, "AuthenticationType", 0);
+                var options = (NameValueCollection)infoType.GetProperty("AdvancedOptions").GetValue(info);
+                options["DATABASE"] = tab.Database ?? string.Empty;
+                if (!string.IsNullOrEmpty(tab.Encrypt))
+                {
+                    options["ENCRYPT_CONNECTION"] = tab.Encrypt;
+                }
+
+                if (!string.IsNullOrEmpty(tab.TrustServerCertificate))
+                {
+                    options["TRUST_SERVER_CERTIFICATE"] = tab.TrustServerCertificate;
+                }
+            }
+            else if (tab.IsConnected && !text.StartsWith("-- SQL Prompter: this tab was connected", StringComparison.Ordinal))
+            {
+                text = "-- SQL Prompter: this tab was connected to " + tab.Server + (string.IsNullOrEmpty(tab.Database) ? string.Empty : ", database " + tab.Database) +
+                    " as " + tab.Login + ". Connect again to continue.\r\n" + text;
+            }
+
+            var scriptType = Enum.Parse(create.GetParameters()[0].ParameterType, "Sql");
+            create.Invoke(factory, new[] { scriptType, info, null });
+            if (info == null)
+            {
+                // With no connection given SSMS copies the one of the active window, so the new window is disconnected explicitly.
+                try
+                {
+                    (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("Query.Disconnect");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Disconnecting the restored tab failed", ex);
+                }
+            }
+
+            var view = ActiveEditor.GetView();
+            if (view == null)
+            {
+                Log.Write("Restoring a tab: the new window has no editor view.");
+                return false;
+            }
+
+            view.TextBuffer.Insert(0, text);
             return view != null;
         }
 

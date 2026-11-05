@@ -158,7 +158,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 The user uses almost all of them. Agreed order (decision 16): #52 editor helpers, #49 history and tabs, #51 warnings and analysis, #53 script as INSERT, #50 refactoring.
 
 - [x] Query history: every run with server, database, time and closing time, a window with filter and preview, opening in a new tab (#102)
-- [ ] Restoring tabs when SSMS starts (#103)
+- [x] Restoring tabs when SSMS starts (#103); verified: unsaved tab with a SQL login comes back text intact and disconnected. Not verified: Windows authentication reconnect, saved files, several tabs
 - [ ] Refactoring (#50):
   - [ ] qualify names
   - [ ] expand `*`

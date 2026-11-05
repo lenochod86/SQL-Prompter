@@ -47,6 +47,7 @@ namespace SqlPrompter.Ssms
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
         private ExecutionHooks executionHooks;
+        private TabSessionService tabSession;
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
@@ -84,6 +85,7 @@ namespace SqlPrompter.Ssms
                 {
                     schemaChangeWatcher = SchemaChangeWatcher.Start(dte);
                     executionHooks = ExecutionHooks.Start(dte);
+                    tabSession = TabSessionService.Start(dte);
                 }
             }
             catch (Exception ex)
