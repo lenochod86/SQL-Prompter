@@ -76,6 +76,24 @@ namespace SqlPrompter.Ssms
             set => values.HistoryDays = Math.Max(0, value);
         }
 
+        [Category("Execution warnings")]
+        [DisplayName("Warn about DELETE without WHERE")]
+        [Description("Running a script with a DELETE that has no WHERE (and no TOP, and does not clear a temporary table or table variable) asks for confirmation first.")]
+        public bool WarnDeleteWithoutWhere
+        {
+            get => values.WarnDeleteWithoutWhere;
+            set => values.WarnDeleteWithoutWhere = value;
+        }
+
+        [Category("Execution warnings")]
+        [DisplayName("Warn about UPDATE without WHERE")]
+        [Description("Running a script with an UPDATE that has no WHERE (and no TOP, and does not change a temporary table or table variable) asks for confirmation first.")]
+        public bool WarnUpdateWithoutWhere
+        {
+            get => values.WarnUpdateWithoutWhere;
+            set => values.WarnUpdateWithoutWhere = value;
+        }
+
         [Category("Suggestions")]
         [DisplayName("Keyword case")]
         [Description("MatchTyped inserts upper case, or lower case if you started typing in lower case.")]
