@@ -38,10 +38,10 @@ namespace SqlPrompter.Ssms
 
             var grid = new GridView();
             grid.Columns.Add(Column("Run", "Run", 140));
+            grid.Columns.Add(Column("Tab", "Tab", 130));
             grid.Columns.Add(Column("Closed", "Closed", 140));
             grid.Columns.Add(Column("Database", "Database", 120));
             grid.Columns.Add(Column("Server", "Server", 120));
-            grid.Columns.Add(Column("Tab", "Tab", 200));
             list.View = grid;
             list.SelectionChanged += (s, e) => ShowPreview();
             list.MouseDoubleClick += (s, e) => Choose();
