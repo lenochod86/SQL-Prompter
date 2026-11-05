@@ -173,7 +173,8 @@ namespace SqlPrompter.Ssms
             var context = ContextAnalyzer.Analyze(batch, triggerLocation.Position - batchStart);
             var insertion = trigger.Reason == CompletionTriggerReason.Insertion;
             if (context.Kind == ContextKind.None ||
-                (insertion && trigger.Character == ' ' && context.Kind != ContextKind.ObjectName) ||
+                (insertion && trigger.Character == ' ' && context.Kind != ContextKind.ObjectName && !AfterComma(batch, triggerLocation.Position - batchStart, context)) ||
+                (insertion && trigger.Character == ',' && !AfterComma(batch, triggerLocation.Position - batchStart, context)) ||
                 (insertion && trigger.Character == '(' && context.Kind != ContextKind.InsertColumns) ||
                 (insertion && trigger.Character == '.' && context.Qualifier.Count == 0 && context.Kind != ContextKind.Name))
             {
@@ -205,6 +206,10 @@ namespace SqlPrompter.Ssms
                 CompletionParticipation.ProvidesItems,
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
         }
+
+        /// <summary>The list opens by itself after a comma (or the space after it) where the next item is a name or an expression.</summary>
+        private static bool AfterComma(string batch, int caret, CaretContext context) =>
+            SettingsService.Current.Behavior.SuggestAfterComma && CommaTrigger.ShouldOpen(batch, caret, context);
 
         private EditorLayout BuildEditorLayout(ITextSnapshot snapshot, int position) => EditorLayouts.Read(textView, snapshot, position);
 
@@ -259,7 +264,7 @@ namespace SqlPrompter.Ssms
                     return true;
                 case CompletionTriggerReason.Insertion:
                     var c = trigger.Character;
-                    return char.IsLetter(c) || c == '_' || c == '.' || c == '[' || c == ' ' || c == '@' || c == '#' || c == '(';
+                    return char.IsLetter(c) || c == '_' || c == '.' || c == '[' || c == ' ' || c == ',' || c == '@' || c == '#' || c == '(';
                 default:
                     return false;
             }
@@ -436,6 +441,12 @@ namespace SqlPrompter.Ssms
         public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            // A space typed while nothing has been typed yet (the list opened after a comma) only closes the list.
+            if (typedChar == ' ' && session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot).Length == 0)
+            {
+                return CloseWithoutInserting;
+            }
+
             // Enter and Tab arrive as '\n' and '\t'; they always insert.
             if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || Keys.Commits(typedChar))
             {
