@@ -1,3 +1,5 @@
+using SqlPrompter.Core.Formatting;
+
 namespace SqlPrompter.Core.Completion
 {
     /// <summary>What the editor looks like where the list is shown; multi-line insertions (INSERT, EXEC) are laid out with it.</summary>
@@ -19,5 +21,8 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>Characters that fit on a line of the editor; used by the "fit the width" layout.</summary>
         public int LineWidth { get; set; } = 100;
+
+        /// <summary>The formatting style that generated lists (an expanded <c>*</c>, EXEC parameters) follow; null keeps commas at the ends of the lines.</summary>
+        public FormatStyle Style { get; set; }
     }
 }

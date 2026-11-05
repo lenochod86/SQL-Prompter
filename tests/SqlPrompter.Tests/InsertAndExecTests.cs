@@ -285,5 +285,23 @@ namespace SqlPrompter.Tests
             Assert.Equal("7", cut["@a"]);
             Assert.Empty(ProcedureHeader.ReadDefaults(null));
         }
-    }
+
+        [Theory]
+        [InlineData(true, false, "dbo.p @id = 0\n         , @kod = ''\n         , @name = 'test'")]
+        [InlineData(false, false, "dbo.p @id = 0,\n           @kod = '',\n           @name = 'test'")]
+        [InlineData(true, true, "dbo.p @id = 0\n\t\t\t, @kod = ''\n\t\t\t, @name = 'test'")]
+        [InlineData(false, true, "dbo.p @id = 0,\n\t\t\t  @kod = '',\n\t\t\t  @name = 'test'")]
+        public void ProcedureParametersFollowTheFormattingStyle(bool commaBefore, bool tabs, string expected)
+        {
+            var parameters = new[]
+            {
+                new DbParameter("@id", "int", false, false),
+                new DbParameter("@kod", "varchar(10)", false, false),
+                new DbParameter("@name", "varchar(10)", false, true, "'test'"),
+            };
+            var style = new SqlPrompter.Core.Formatting.FormatStyle { CommaBeforeItems = commaBefore, UseTabs = tabs, TabWidth = 4 };
+            var layout = new EditorLayout { NewLine = "\n", LinePrefix = tabs ? "EXEC\t" : "EXEC ", Style = style };
+
+            Assert.Equal(expected, InsertBuilder.ProcedureCall("dbo.p", parameters, layout));
+        }    }
 }

@@ -77,18 +77,18 @@ namespace SqlPrompter.Core.Completion
         {
             var newLine = whole.Contains("\r\n") ? "\r\n" : whole.Contains("\n") ? "\n" : "\r\n";
             var script = ScriptModel.Build(batch, caret);
-            var expansion = StarExpander.TryExpand(batch, caret, metadata, script, options.WithEditor(Layout(batch, caret, newLine)));
+            var expansion = StarExpander.TryExpand(batch, caret, metadata, script, options.WithEditor(Layout(batch, caret, newLine, options.Editor.Style)));
             if (expansion == null)
             {
                 return null;
             }
 
             // The text is aligned with the first column, so the layout is read where the replaced text starts (alias.* starts earlier).
-            expansion = StarExpander.TryExpand(batch, caret, metadata, script, options.WithEditor(Layout(batch, expansion.Start, newLine))) ?? expansion;
+            expansion = StarExpander.TryExpand(batch, caret, metadata, script, options.WithEditor(Layout(batch, expansion.Start, newLine, options.Editor.Style))) ?? expansion;
             return batch.Remove(expansion.Start, expansion.Length).Insert(expansion.Start, expansion.Text);
         }
 
-        private static EditorLayout Layout(string batch, int position, string newLine)
+        private static EditorLayout Layout(string batch, int position, string newLine, SqlPrompter.Core.Formatting.FormatStyle style)
         {
             var lineStart = position;
             while (lineStart > 0 && batch[lineStart - 1] != '\n' && batch[lineStart - 1] != '\r')
@@ -102,6 +102,7 @@ namespace SqlPrompter.Core.Completion
                 NewLine = newLine,
                 LinePrefix = prefix,
                 LineIndent = new string(prefix.TakeWhile(c => c == ' ' || c == '\t').ToArray()),
+                Style = style,
             };
         }
     }

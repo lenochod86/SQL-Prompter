@@ -122,7 +122,7 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>
         /// The procedure name followed by all its parameters as <c>@name = value</c>, the first on the same line and the others
-        /// aligned with it. A parameter with a default value gets it as written, an OUTPUT parameter the variable of the same name.
+        /// aligned with it by the formatting style (<see cref="FormattedList"/>). A parameter with a default value gets it as written, an OUTPUT parameter the variable of the same name.
         /// </summary>
         public static string ProcedureCall(string procedureText, IReadOnlyList<DbParameter> parameters, EditorLayout editor)
         {
@@ -131,35 +131,11 @@ namespace SqlPrompter.Core.Completion
                 return procedureText;
             }
 
-            var text = new StringBuilder(procedureText).Append(' ');
-            var align = Align(editor.LinePrefix + procedureText + " ");
-            for (var i = 0; i < parameters.Count; i++)
-            {
-                var parameter = parameters[i];
-                if (i > 0)
-                {
-                    text.Append(editor.NewLine).Append(align);
-                }
-
-                text.Append(parameter.Name).Append(" = ");
-                if (parameter.IsOutput)
-                {
-                    text.Append(parameter.Name).Append(" OUTPUT");
-                }
-                else
-                {
-                    text.Append(parameter.HasDefault ? parameter.DefaultText ?? "NULL" : SqlDefaults.ValueFor(parameter.TypeName, false));
-                }
-
-                if (i < parameters.Count - 1)
-                {
-                    text.Append(',');
-                }
-            }
-
-            return text.ToString();
+            var items = parameters.Select(parameter => parameter.Name + " = " + (parameter.IsOutput
+                ? parameter.Name + " OUTPUT"
+                : parameter.HasDefault ? parameter.DefaultText ?? "NULL" : SqlDefaults.ValueFor(parameter.TypeName, false))).ToList();
+            return procedureText + " " + FormattedList.Join(items, editor.LinePrefix + procedureText + " ", editor);
         }
-
         /// <summary>The <c>DECLARE</c> lines for the OUTPUT parameters, to go above the EXEC; empty when there are none.</summary>
         public static string OutputDeclarations(IReadOnlyList<DbParameter> parameters, EditorLayout editor)
         {

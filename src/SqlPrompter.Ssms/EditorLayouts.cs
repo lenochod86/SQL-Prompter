@@ -12,7 +12,7 @@ namespace SqlPrompter.Ssms
         /// <summary>The line the insertion starts on, its indentation and the width of the editor. Must run on the UI thread.</summary>
         public static EditorLayout Read(ITextView textView, ITextSnapshot snapshot, int position)
         {
-            var layout = new EditorLayout();
+            var layout = new EditorLayout { Style = SettingsService.Current.Formatting };
             try
             {
                 var line = snapshot.GetLineFromPosition(Math.Min(position, snapshot.Length));

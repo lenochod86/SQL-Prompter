@@ -26,7 +26,7 @@ namespace SqlPrompter.Core.Completion
         public string Text { get; }
     }
 
-    /// <summary>Expands <c>*</c> and <c>alias.*</c> in a select list into the column list, one column per line.</summary>
+    /// <summary>Expands <c>*</c> and <c>alias.*</c> in a select list into the column list, one column per line laid out by the formatting style (<see cref="FormattedList"/>).</summary>
     public static class StarExpander
     {
         /// <summary>
@@ -118,24 +118,8 @@ namespace SqlPrompter.Core.Completion
                 return null;
             }
 
-            var editor = options.Editor;
-            var align = new string(editor.LinePrefix.Select(c => c == '\t' ? '\t' : ' ').ToArray());
-            var result = new StringBuilder();
-            for (var i = 0; i < parts.Count; i++)
-            {
-                if (i > 0)
-                {
-                    result.Append(editor.NewLine).Append(align);
-                }
-
-                result.Append(parts[i]);
-                if (i < parts.Count - 1)
-                {
-                    result.Append(',');
-                }
-            }
-
-            return new StarExpansion(start, caret - start, result.ToString());
+            var result = FormattedList.Join(parts, options.Editor.LinePrefix, options.Editor);
+            return new StarExpansion(start, caret - start, result);
         }
 
         /// <summary>True when the <c>*</c> ending at <paramref name="caret"/> is a select-list star (<c>*</c> or <c>alias.*</c>), not <c>COUNT(*)</c> or a multiplication.</summary>
