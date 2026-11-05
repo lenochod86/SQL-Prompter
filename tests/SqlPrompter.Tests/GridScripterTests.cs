@@ -15,6 +15,67 @@ namespace SqlPrompter.Tests
                 text);
         }
 
+        [Fact]
+        public void TheSelectionBecomesACreateInsertDropScript()
+        {
+            var text = GridScripter.ToTemporaryTable("Id\tName\tNote\r\n1\tAnna\tNULL\r\n2\tO'Neil\t\r\n");
+
+            Assert.Equal(
+                "CREATE TABLE #temptable (\r\n    Id int NULL,\r\n    Name nvarchar(50) NULL,\r\n    Note nvarchar(max) NULL\r\n);\r\n\r\n" +
+                "INSERT INTO #temptable (Id, Name, Note)\r\nVALUES\r\n    (1, N'Anna', NULL),\r\n    (2, N'O''Neil', N'');\r\n\r\n" +
+                "-- Work with the data here.\r\n\r\nDROP TABLE #temptable;\r\n",
+                text);
+        }
+
+        [Theory]
+        [InlineData("1|2|-3", "int")]
+        [InlineData("1|3000000000", "bigint")]
+        [InlineData("1.5|22.25", "decimal(4, 2)")]
+        [InlineData("-10.5|2", "decimal(3, 1)")]
+        [InlineData("2026-11-05|2026-01-01", "date")]
+        [InlineData("2026-11-05 10:00:00|2026-11-05 10:00:00.123", "datetime2(3)")]
+        [InlineData("0e0e8c2e-1f5a-4a2e-9a39-3c2b3c0e9a11|NULL", "uniqueidentifier")]
+        [InlineData("007|8", "nvarchar(50)")]
+        [InlineData("1|abc", "nvarchar(50)")]
+        [InlineData("NULL|", "nvarchar(max)")]
+        public void TypesFitTheValues(string values, string expected) => Assert.Equal(expected, GridScripter.InferType(values.Split('|')));
+
+        [Fact]
+        public void LongTextsGetRoomOrMax()
+        {
+            Assert.Equal("nvarchar(100)", GridScripter.InferType(new[] { new string('x', 51) }));
+            Assert.Equal("nvarchar(max)", GridScripter.InferType(new[] { new string('x', 2001) }));
+        }
+
+        [Fact]
+        public void ColumnNamesAreUniqueAndNeverEmpty()
+        {
+            var text = GridScripter.ToTemporaryTable("IdCountry\tName\tIdCountry\t(No column name)\t\r\n1\ta\t2\tb\tc\r\n");
+
+            Assert.Contains("IdCountry int NULL,\r\n    Name nvarchar(50) NULL,\r\n    IdCountry_2 int NULL,\r\n    Column4 nvarchar(50) NULL,\r\n    Column5 nvarchar(50) NULL\r\n);", text);
+            Assert.Contains("INSERT INTO #temptable (IdCountry, Name, IdCountry_2, Column4, Column5)", text);
+        }
+
+        [Fact]
+        public void EmptyCellsInNumberColumnsAreNull()
+        {
+            var text = GridScripter.ToTemporaryTable("a\tb\r\n1\tx\r\n\ty\r\n");
+
+            Assert.Contains("    (1, N'x'),\r\n    (NULL, N'y');", text);
+        }
+
+        [Fact]
+        public void ManyRowsAreSplitAndTheTableIsDroppedOnce()
+        {
+            var rows = string.Join("\r\n", System.Linq.Enumerable.Range(1, GridScripter.RowsPerStatement + 5));
+            var text = GridScripter.ToTemporaryTable("a\r\n" + rows);
+
+            Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(text, "INSERT INTO #temptable").Count);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "DROP TABLE"));
+        }
+
+        [Fact]
+        public void NothingToScriptWithoutRows() => Assert.Null(GridScripter.ToTemporaryTable("a"));
         [Theory]
         [InlineData("0", "0")]
         [InlineData("42", "42")]

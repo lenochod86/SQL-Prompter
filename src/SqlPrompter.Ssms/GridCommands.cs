@@ -8,7 +8,7 @@ namespace SqlPrompter.Ssms
 {
     /// <summary>
     /// Commands on the results grid. The grid has no API for an extension, so the selected cells are copied with SSMS's own command
-    /// (Edit.CopywithHeaders) and the clipboard text is turned into INSERT statements, which open in a new query window on the same connection.
+    /// (Edit.CopywithHeaders) and the clipboard text is turned into a temporary table script (CREATE, INSERT, DROP), which open in a new query window on the same connection.
     /// </summary>
     internal static class GridCommands
     {
@@ -48,8 +48,7 @@ namespace SqlPrompter.Ssms
                     Clipboard.SetText(original);
                 }
 
-                var query = SchemaChangeWatcher.ExecutedText(dte);
-                var insert = GridScripter.ToInsert(copied, GridScripter.GuessTable(query));
+                var insert = GridScripter.ToTemporaryTable(copied);
                 if (insert == null)
                 {
                     Tell("Select the rows (or cells) in the results grid first.");
@@ -60,12 +59,12 @@ namespace SqlPrompter.Ssms
                 if (!SsmsConnection.OpenNewWindow(database, insert))
                 {
                     Clipboard.SetText(insert);
-                    Tell("The INSERT statements are on the clipboard (no connected window to open them in).");
+                    Tell("The script is on the clipboard (no connected window to open them in).");
                 }
             }
             catch (Exception ex)
             {
-                Log.Error("Scripting the grid as INSERT failed", ex);
+                Log.Error("Scripting the grid as a temporary table failed", ex);
             }
         }
 
