@@ -29,6 +29,7 @@ namespace SqlPrompter.Ssms
 
                 Set(dte, "SQLPrompter.GoToDefinition", "SQL Query Editor::F12");
                 Set(dte, "SQLPrompter.RunStatementAtCaret", "SQL Query Editor::Shift+F5");
+                Set(dte, "SQLPrompter.ParameterInfo", "SQL Query Editor::Ctrl+Shift+Space");
             }
             catch (Exception ex)
             {

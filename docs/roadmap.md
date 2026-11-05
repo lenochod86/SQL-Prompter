@@ -148,9 +148,9 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] `INSERT`: full statement with the column list, optionally with `VALUES` and default values (#44)
 - [x] `EXEC`: procedures with parameters, default values and `DECLARE` for output parameters (#44)
 - [x] Functions with parentheses (the caret goes inside when they take parameters); parameter names come with parameter info (#44, #45)
-- [ ] Expanding `*` with Tab into a column list with aliases (#45)
+- [x] Expanding `*` with Tab into a column list with aliases (#45)
 - [ ] Object definition panel next to the list (`CREATE` script, as in SQL Prompt) (#46)
-- [ ] Parameter info (#45)
+- [x] Parameter info (#45)
 - [ ] Ranking by usage (statistics stay local, nothing is sent anywhere) (#47)
 
 ### Phase 7: Tools (M to L) (#48)
@@ -218,3 +218,8 @@ By the user on 2026-11-04 (answers on #44):
 
 12. **INSERT:** the column list is offered in three ways chosen in the settings: automatically when the table is chosen after `INSERT INTO` (default), as a second item, or after typing `(` behind the table name. Identity, computed and rowversion columns are left out; columns with defaults and nullable ones are included. Layout (setting): one line, each column on its own line (default), or as many as fit the editor width. After the column list (setting): a new line (default) or `VALUES` with a placeholder per column (`''`, `N''`, `0`, `NULL` for nullable columns).
 13. **EXEC:** after the procedure all parameters are inserted, named, each on its own line aligned with the first one, with the default value as written in the procedure (`NULL` when it cannot be read); OUTPUT parameters get `DECLARE` lines above the `EXEC` and are passed as `@p = @p OUTPUT`.
+
+By the user on 2026-11-04 (answers on #45):
+
+14. **Expanding `*`:** Tab with the caret right after the `*`; one column per line, qualified with the alias where the table has one (no alias is made up); all columns of all tables in source order, `a.*` expands only `a`; always all columns (identity and rowversion included).
+15. **Parameter info:** a tooltip with the signature and the current parameter in bold, for the functions and procedures of the database (not the built-in functions; a separate issue if wanted later). It shows automatically after `(` and `,` and on Ctrl+Shift+Space.

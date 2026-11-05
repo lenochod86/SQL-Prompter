@@ -41,3 +41,7 @@ CREATE SCHEMA sales;
 GO
 CREATE PROCEDURE sales.Report @Year INT, @Month INT AS SELECT @Year, @Month;
 GO
+CREATE FUNCTION dbo.fnTax (@Amount MONEY, @Rate DECIMAL(5, 2)) RETURNS MONEY AS BEGIN RETURN @Amount * @Rate / 100; END
+GO
+CREATE FUNCTION dbo.fnOrdersOf (@IdCustomers INT) RETURNS TABLE AS RETURN (SELECT IdOrders, Total FROM dbo.Orders WHERE IdCustomers = @IdCustomers);
+GO
