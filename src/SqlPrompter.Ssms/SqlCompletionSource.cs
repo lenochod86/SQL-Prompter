@@ -52,6 +52,8 @@ namespace SqlPrompter.Ssms
         internal const string CaretBackKey = "SqlPrompter.CaretBack";
         internal const string DetailKey = "SqlPrompter.Detail";
         internal const string KeyKey = "SqlPrompter.Key";
+        /// <summary>Session property: true when Enter may insert the selected suggestion (not a place where a name of the user's own is typed).</summary>
+        internal const string HardSelectionKey = "SqlPrompter.HardSelection";
         internal const string SnippetKey = "SqlPrompter.Snippet";
         internal const string DescriptionPropertyKey = DescriptionKey;
 
@@ -123,6 +125,7 @@ namespace SqlPrompter.Ssms
                 var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
                 RequestScriptColumns(prepared, script);
                 var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets)).Select(s => ToItem(s, prepared)).ToImmutableArray();
+                session.Properties[HardSelectionKey] = !prepared.Context.SoftSelection;
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 // Where the user probably types a name of their own (an alias), Enter must keep what was typed instead of inserting
                 // a suggestion: the editor then offers the typed text as a "suggestion item" and only Tab inserts a real suggestion.
