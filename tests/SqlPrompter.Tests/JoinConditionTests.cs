@@ -152,6 +152,20 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void ForeignKeyConditionsCanBeTurnedOff()
+        {
+            var sql = "SELECT * FROM dbo.Orders o JOIN dbo.OrderLines ol ON |";
+            var on = Conditions(sql, new JoinSettings { NewTableOnLeft = true });
+            var off = Conditions(sql, new JoinSettings { NewTableOnLeft = true, ForeignKeyConditions = false });
+            var onlyNames = Conditions(sql, new JoinSettings { NewTableOnLeft = true, ForeignKeyConditions = false, NameMatchedConditions = false });
+
+            Assert.Contains(on, i => i.Suffix != "same name");
+            Assert.DoesNotContain(off, i => i.Suffix != "same name");
+            Assert.Contains(off, i => i.Suffix == "same name");
+            Assert.Empty(onlyNames);
+        }
+
+        [Fact]
         public void NameMatchesOfKeyColumnsComeBeforeOtherNames()
         {
             // Orders and Shipments share no foreign key; IdOrder is a key column in Orders, Note is not a key anywhere.

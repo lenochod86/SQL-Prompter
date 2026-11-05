@@ -22,6 +22,15 @@ namespace SqlPrompter.Ssms
         }
 
         [Category("Conditions")]
+        [DisplayName("Foreign keys")]
+        [Description("Offer the condition of a foreign key (the columns it references).")]
+        public bool ForeignKeyConditions
+        {
+            get => values.ForeignKeyConditions;
+            set => values.ForeignKeyConditions = value;
+        }
+
+        [Category("Conditions")]
         [DisplayName("Single columns of multi-column keys")]
         [Description("Besides the whole condition of a foreign key over several columns, offer each column pair on its own.")]
         public bool IncludePartialKeyConditions
