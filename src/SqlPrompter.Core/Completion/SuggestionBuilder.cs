@@ -40,6 +40,9 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>Variable or parameter defined in the script.</summary>
         Variable,
+
+        /// <summary>A stored procedure; choosing it inserts its parameters.</summary>
+        Procedure,
     }
 
     public enum KeyKind
@@ -51,9 +54,11 @@ namespace SqlPrompter.Core.Completion
 
     public sealed class Suggestion
     {
-        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null, KeyKind key = KeyKind.None, object tag = null, int caretBack = 0)
+        public Suggestion(SuggestionKind kind, string displayText, string insertText, string filterText, string suffix, string description, int group, string fromClause = null, string detail = null, KeyKind key = KeyKind.None, object tag = null, int caretBack = 0, string beforeLine = null, bool isBlock = false)
         {
             CaretBack = caretBack;
+            BeforeLine = beforeLine;
+            IsBlock = isBlock;
             Kind = kind;
             DisplayText = displayText;
             InsertText = insertText;
@@ -71,6 +76,12 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>How many characters before the end of the inserted text the caret goes, e.g. 1 to land inside the parentheses of a function.</summary>
         public int CaretBack { get; }
+
+        /// <summary>Text (whole lines) inserted before the line the item is committed on, e.g. the DECLARE lines above an EXEC; null for most items.</summary>
+        public string BeforeLine { get; }
+
+        /// <summary>The item inserts several lines; the character that committed it (Space) is not typed after it.</summary>
+        public bool IsBlock { get; }
 
         public string DisplayText { get; }
 
@@ -134,7 +145,7 @@ namespace SqlPrompter.Core.Completion
             }
 
             string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag, s.CaretBack);
+            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag, s.CaretBack, s.BeforeLine, s.IsBlock);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -145,6 +156,8 @@ namespace SqlPrompter.Core.Completion
                     return KeywordSuggestions(context, 0).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
                     return ObjectSuggestions(context, metadata, script, options).ToList();
+                case ContextKind.InsertColumns:
+                    return InsertColumnSuggestions(context, metadata, options).ToList();
                 case ContextKind.Expression:
                     return ExpressionSuggestions(context, metadata, script, options).ToList();
                 case ContextKind.Name:
@@ -244,6 +257,16 @@ namespace SqlPrompter.Core.Completion
 
         private static IEnumerable<Suggestion> ObjectSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
+            if (context.ProcedureName)
+            {
+                foreach (var suggestion in ProcedureSuggestions(context, metadata, options))
+                {
+                    yield return suggestion;
+                }
+
+                yield break;
+            }
+
             if (context.Qualifier.Count == 0)
             {
                 foreach (var suggestion in ScriptTableSuggestions(context, script, options))
@@ -270,7 +293,11 @@ namespace SqlPrompter.Core.Completion
                 var schema = context.Qualifier[0].Length == 0 ? metadata.DefaultSchema : context.Qualifier[0];
                 foreach (var dbObject in metadata.Objects.Where(o => o.Kind != DbObjectKind.ScalarFunction && string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
                 {
-                    yield return ObjectSuggestion(dbObject, SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject), null);
+                    var qualifiedInsert = SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject);
+                    foreach (var suggestion in WithInsertColumns(context, metadata, options, dbObject, qualifiedInsert, null))
+                    {
+                        yield return suggestion;
+                    }
                 }
 
                 yield break;
@@ -288,7 +315,10 @@ namespace SqlPrompter.Core.Completion
             {
                 var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(dbObject.Schema, quote) + "." : string.Empty) +
                     SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject);
-                yield return ObjectSuggestion(dbObject, insert, dbObject.Schema);
+                foreach (var suggestion in WithInsertColumns(context, metadata, options, dbObject, insert, dbObject.Schema))
+                {
+                    yield return suggestion;
+                }
             }
 
             foreach (var schema in metadata.Schemas)
@@ -311,6 +341,118 @@ namespace SqlPrompter.Core.Completion
                 var text = Keywords.ApplyCase(keyword, context.TypedPrefix);
                 yield return new Suggestion(SuggestionKind.Keyword, text, text, text, null, null, 2);
             }
+        }
+
+        /// <summary>
+        /// The suggestion for a table or view; as the target of an INSERT it carries the column list (or has a second item that does),
+        /// depending on the settings.
+        /// </summary>
+        private static IEnumerable<Suggestion> WithInsertColumns(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options, DbObject dbObject, string insertText, string suffix)
+        {
+            var plain = ObjectSuggestion(dbObject, insertText, suffix);
+            var columns = context.InsertTarget && (dbObject.Kind == DbObjectKind.Table || dbObject.Kind == DbObjectKind.View)
+                ? InsertBuilder.InsertableColumns(metadata.GetColumns(dbObject))
+                : null;
+            if (columns == null || columns.Count == 0 || options.Inserts.ColumnsMode == InsertColumnsMode.AfterParenthesis)
+            {
+                yield return plain;
+                yield break;
+            }
+
+            var withColumns = new Suggestion(
+                plain.Kind,
+                options.Inserts.ColumnsMode == InsertColumnsMode.Item ? dbObject.Name + " (columns)" : dbObject.Name,
+                InsertBuilder.TableWithColumns(insertText, columns, options.Inserts, options.Editor, context.QuoteIdentifiers),
+                dbObject.Name,
+                suffix,
+                plain.Description + " with its column list",
+                0,
+                isBlock: true);
+            if (options.Inserts.ColumnsMode == InsertColumnsMode.Item)
+            {
+                yield return plain;
+            }
+
+            yield return withColumns;
+        }
+
+        /// <summary>The columns an INSERT can supply, after "INSERT INTO table (", and an item that inserts all of them.</summary>
+        private static IEnumerable<Suggestion> InsertColumnSuggestions(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        {
+            var source = context.Sources.FirstOrDefault();
+            var dbObject = source == null ? null : Readiness.Resolve(source, metadata);
+            var columns = dbObject == null ? null : InsertBuilder.InsertableColumns(metadata.GetColumns(dbObject));
+            if (columns == null || columns.Count == 0)
+            {
+                yield break;
+            }
+
+            if (context.FirstInsertColumn && options.Inserts.ColumnsMode == InsertColumnsMode.AfterParenthesis)
+            {
+                yield return new Suggestion(
+                    SuggestionKind.Column,
+                    "(all columns)",
+                    InsertBuilder.ColumnsAfterParenthesis(columns, options.Inserts, options.Editor, context.QuoteIdentifiers),
+                    "all columns",
+                    null,
+                    "all insertable columns of " + dbObject + " (not identity, computed or rowversion)",
+                    -1,
+                    isBlock: true);
+            }
+
+            foreach (var column in columns)
+            {
+                yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, context.QuoteIdentifiers), null, dbObject.Name, 0, KeyKind.None);
+            }
+        }
+
+        /// <summary>Stored procedures after EXEC; choosing one inserts its parameters (and DECLARE lines for the OUTPUT ones).</summary>
+        private static IEnumerable<Suggestion> ProcedureSuggestions(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        {
+            if (metadata == null || context.Qualifier.Count > 1)
+            {
+                yield break;
+            }
+
+            var quote = context.QuoteIdentifiers;
+            if (context.Qualifier.Count == 1)
+            {
+                var schema = context.Qualifier[0].Length == 0 ? metadata.DefaultSchema : context.Qualifier[0];
+                foreach (var procedure in metadata.Procedures.Where(p => string.Equals(p.Schema, schema, StringComparison.OrdinalIgnoreCase)))
+                {
+                    yield return ProcedureSuggestion(procedure, SqlIdentifier.Quote(procedure.Name, quote), null, options);
+                }
+
+                yield break;
+            }
+
+            foreach (var procedure in metadata.Procedures)
+            {
+                var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(procedure.Schema, quote) + "." : string.Empty) + SqlIdentifier.Quote(procedure.Name, quote);
+                yield return ProcedureSuggestion(procedure, insert, procedure.Schema, options);
+            }
+
+            foreach (var schema in metadata.Schemas)
+            {
+                yield return new Suggestion(SuggestionKind.Schema, schema, SqlIdentifier.Quote(schema, quote), schema, null, "schema", 1);
+            }
+        }
+
+        private static Suggestion ProcedureSuggestion(DbProcedure procedure, string nameText, string suffix, SuggestionOptions options)
+        {
+            var parameters = procedure.Parameters;
+            var signature = string.Join(", ", parameters.Select(p => p.Name + " " + p.TypeName + (p.IsOutput ? " OUTPUT" : string.Empty) + (p.HasDefault ? " = " + (p.DefaultText ?? "...") : string.Empty)));
+            var declarations = InsertBuilder.OutputDeclarations(parameters, options.Editor);
+            return new Suggestion(
+                SuggestionKind.Procedure,
+                procedure.Name,
+                InsertBuilder.ProcedureCall(nameText, parameters, options.Editor),
+                procedure.Name,
+                suffix,
+                "procedure " + procedure + (parameters.Count > 0 ? " (" + signature + ")" : string.Empty),
+                0,
+                beforeLine: declarations.Length > 0 ? declarations : null,
+                isBlock: parameters.Count > 0);
         }
 
         /// <summary>The alias after a table or view; table-valued functions need their parameters first, so they get none.</summary>

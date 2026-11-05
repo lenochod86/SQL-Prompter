@@ -119,7 +119,7 @@ namespace SqlPrompter.Tests
         [Fact]
         public void FallbackOffersKeywordsFunctionsAndTypes()
         {
-            var items = SuggestionBuilder.Build(Analyze("EXEC |"), null);
+            var items = SuggestionBuilder.Build(Analyze("SET @x = |"), null);
 
             Assert.Contains(items, i => i.Kind == SuggestionKind.Keyword);
             Assert.Contains(items, i => i.Kind == SuggestionKind.Function);

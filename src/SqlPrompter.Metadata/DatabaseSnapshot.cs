@@ -23,7 +23,8 @@ namespace SqlPrompter.Metadata
             IReadOnlyList<string> databases = null,
             IReadOnlyList<string> linkedServers = null,
             IReadOnlyList<DbForeignKey> foreignKeys = null,
-            IReadOnlyDictionary<int, IReadOnlyList<string>> primaryKeys = null)
+            IReadOnlyDictionary<int, IReadOnlyList<string>> primaryKeys = null,
+            IReadOnlyList<DbProcedure> procedures = null)
         {
             DatabaseName = databaseName ?? string.Empty;
             DefaultSchema = string.IsNullOrEmpty(defaultSchema) ? "dbo" : defaultSchema;
@@ -32,6 +33,7 @@ namespace SqlPrompter.Metadata
             Databases = databases ?? Array.Empty<string>();
             LinkedServers = linkedServers ?? Array.Empty<string>();
             ForeignKeys = foreignKeys ?? Array.Empty<DbForeignKey>();
+            Procedures = procedures ?? Array.Empty<DbProcedure>();
             this.primaryKeys = primaryKeys ?? new Dictionary<int, IReadOnlyList<string>>();
             Version = version;
             this.columns = columns ?? new Dictionary<int, IReadOnlyList<DbColumn>>();
@@ -52,6 +54,7 @@ namespace SqlPrompter.Metadata
             Databases = source.Databases;
             LinkedServers = source.LinkedServers;
             ForeignKeys = source.ForeignKeys;
+            Procedures = source.Procedures;
             primaryKeys = source.primaryKeys;
             Version = source.Version;
             byName = source.byName;
@@ -72,6 +75,8 @@ namespace SqlPrompter.Metadata
         public IReadOnlyList<string> LinkedServers { get; }
 
         public IReadOnlyList<DbForeignKey> ForeignKeys { get; }
+
+        public IReadOnlyList<DbProcedure> Procedures { get; }
 
         public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) =>
             dbObject != null && primaryKeys.TryGetValue(dbObject.Id, out var key) ? key : Array.Empty<string>();

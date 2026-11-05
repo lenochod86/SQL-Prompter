@@ -378,9 +378,7 @@ namespace SqlPrompter.Tests
         }
 
         [Theory]
-        [InlineData("INSERT INTO dbo.Users (|")]
         [InlineData("INSERT INTO dbo.Users VALUES (|")]
-        [InlineData("EXEC |")]
         [InlineData("SET @x = |")]
         public void UnknownPositionsFallBackToKeywords(string sql)
         {
