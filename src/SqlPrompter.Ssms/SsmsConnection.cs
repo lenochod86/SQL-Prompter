@@ -78,7 +78,7 @@ namespace SqlPrompter.Ssms
         /// Opens a new query window connected like the active one but to <paramref name="database"/> and puts <paramref name="text"/> into it
         /// (verified in SSMS 22.11, see docs/architecture.md). Returns false when there is no connected window to copy from.
         /// </summary>
-        public static bool OpenNewWindow(string database, string text)
+        public static bool OpenNewWindow(string database, string text, string server = null, string login = null)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var factoryType = scriptFactoryType ?? (scriptFactoryType = AssemblyTypes.FindLoaded(ScriptFactoryTypeName));
@@ -112,6 +112,16 @@ namespace SqlPrompter.Ssms
                 cloneOptions["DATABASE"] = database;
             }
 
+            // Another server than the window the copy is made from: Windows authentication, or the SQL login (the password is never stored;
+            // SSMS asks for it if it has to).
+            if (!string.IsNullOrEmpty(server) && !string.Equals(server, Convert.ToString(infoType.GetProperty("ServerName")?.GetValue(info)), StringComparison.OrdinalIgnoreCase))
+            {
+                SetProperty(clone, "ServerName", server);
+                SetProperty(clone, "AuthenticationType", login == null ? 0 : 1);
+                SetProperty(clone, "UserName", login);
+                SetProperty(clone, "Password", null);
+            }
+
             var create = factory.GetType().GetMethods().FirstOrDefault(m =>
                 m.Name == "CreateNewBlankScript" && m.GetParameters().Length == 3 && m.GetParameters()[1].ParameterType == infoType);
             if (create == null)
@@ -124,6 +134,18 @@ namespace SqlPrompter.Ssms
             var view = ActiveEditor.GetView();
             view?.TextBuffer.Insert(0, text ?? string.Empty);
             return view != null;
+        }
+
+        private static void SetProperty(object target, string name, object value)
+        {
+            var property = target.GetType().GetProperty(name);
+            if (property == null || !property.CanWrite)
+            {
+                return;
+            }
+
+            var type = property.PropertyType;
+            property.SetValue(target, type.IsEnum && value is int number ? Enum.ToObject(type, number) : value);
         }
     }
 

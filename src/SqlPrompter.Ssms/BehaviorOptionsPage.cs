@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.Shell;
@@ -55,6 +56,24 @@ namespace SqlPrompter.Ssms
         {
             get => values.HighlightMatches;
             set => values.HighlightMatches = value;
+        }
+
+        [Category("History")]
+        [DisplayName("Keep query history")]
+        [Description("Every executed query is written to %APPDATA%\\SqlPrompter\\history.jsonl on this computer (never sent anywhere). Open it with SQL Prompter > Query History.")]
+        public bool KeepHistory
+        {
+            get => values.KeepHistory;
+            set => values.KeepHistory = value;
+        }
+
+        [Category("History")]
+        [DisplayName("Keep history for days")]
+        [Description("History older than this many days is removed when SSMS starts. 0 keeps it forever.")]
+        public int HistoryDays
+        {
+            get => values.HistoryDays;
+            set => values.HistoryDays = Math.Max(0, value);
         }
 
         [Category("Suggestions")]

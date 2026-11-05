@@ -53,7 +53,7 @@ namespace SqlPrompter.Ssms
             try
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
-                var script = ExecutedText();
+                var script = ExecutedText(dte);
                 if (script == null)
                 {
                     return;
@@ -80,7 +80,7 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>The selection if there is one, otherwise the whole document, as SSMS executes it.</summary>
-        private string ExecutedText()
+        internal static string ExecutedText(DTE dte)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var document = dte.ActiveDocument;
