@@ -428,7 +428,9 @@ namespace SqlPrompter.Core.Completion
         {
             var source = context.Sources.FirstOrDefault();
             var dbObject = source == null ? null : Readiness.Resolve(source, metadata);
-            var columns = dbObject == null ? null : InsertBuilder.InsertableColumns(metadata.GetColumns(dbObject));
+            var columns = dbObject == null ? null : context.IndexColumns
+                ? metadata.GetColumns(dbObject)?.Where(c => !context.ExcludedColumns.Contains(c.Name, StringComparer.OrdinalIgnoreCase)).ToList()
+                : InsertBuilder.InsertableColumns(metadata.GetColumns(dbObject));
             if (columns == null || columns.Count == 0)
             {
                 yield break;

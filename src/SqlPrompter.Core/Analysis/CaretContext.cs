@@ -158,6 +158,12 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>With <see cref="ContextKind.InsertColumns"/>: the caret is right after the opening parenthesis (not after a comma).</summary>
         public bool FirstInsertColumn { get; internal set; }
 
+        /// <summary>With <see cref="ContextKind.InsertColumns"/>: the column list of an index (key columns or INCLUDE) of CREATE INDEX, where every column of the table fits.</summary>
+        public bool IndexColumns { get; internal set; }
+
+        /// <summary>With <see cref="ContextKind.InsertColumns"/> for an index: the columns that are listed already and are not offered again.</summary>
+        public IReadOnlyList<string> ExcludedColumns { get; internal set; } = Array.Empty<string>();
+
         /// <summary>The name follows JOIN, so tables related by a foreign key to the tables of the query can be offered first.</summary>
         public bool AfterJoin { get; internal set; }
 
@@ -254,6 +260,8 @@ namespace SqlPrompter.Core.Analysis
             InsertTarget = InsertTarget,
             ProcedureName = ProcedureName,
             FirstInsertColumn = FirstInsertColumn,
+            IndexColumns = IndexColumns,
+            ExcludedColumns = ExcludedColumns,
             InOtherDatabase = inOtherDatabase,
         };
 

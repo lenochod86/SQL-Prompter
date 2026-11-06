@@ -346,6 +346,13 @@ Verified in SSMS 22: Ctrl+Space after `WHERE ty` and `AS a ij` and after `WHERE 
 | `DELETE |` / `DELETE FROM t |` / `DELETE t |` | `FROM`, `TOP` / `WHERE` / `FROM`, `WHERE` | `OUTPUT`, `OPTION` |
 | `CREATE |` / `ALTER |` / `DROP |` | `TABLE`, `VIEW`, `PROCEDURE`, `FUNCTION`, `INDEX`, `TRIGGER` (+ `OR ALTER` after `CREATE`) | `SCHEMA`, `DATABASE`, `TYPE`, `SEQUENCE` |
 | `CREATE OR |`, `DROP TABLE |` | `ALTER`, `IF EXISTS` | |
+| `CREATE |` (index DDL, #197) | also `UNIQUE`, `CLUSTERED`, `NONCLUSTERED`, `COLUMNSTORE` | |
+| `CREATE UNIQUE |` / `CREATE NONCLUSTERED |` / `CREATE COLUMNSTORE |` | `CLUSTERED`, `NONCLUSTERED`, `INDEX` / `INDEX`, `COLUMNSTORE` / `INDEX` | |
+| `CREATE INDEX name |`, `ALTER INDEX name |`, `DROP INDEX name |` | `ON` (only); `ALTER INDEX |`: `ALL` | |
+| `… ON table |` | `ALTER INDEX`: `REBUILD`, `REORGANIZE`, `DISABLE`, `SET`; `DROP INDEX`: `WITH`; clustered columnstore: `WITH`, `ON` | `RESUME`, `PAUSE`, `ABORT` |
+| `CREATE INDEX … ON t (cols) |` | `INCLUDE`, `WHERE`, `WITH`, `ON` (after `INCLUDE (…)`: `WHERE`, `WITH`, `ON`; after `WITH (…)`: `ON`) | |
+| `ON (key column |` | `ASC`, `DESC` | |
+| `WITH (|` / `, |` / `option = |` | index options (only) / `ON`, `OFF` (`DATA_COMPRESSION`: `NONE`, `ROW`, `PAGE`, `COLUMNSTORE`, `COLUMNSTORE_ARCHIVE`; numeric options: nothing) | |
 | `BEGIN |` / `END TRY BEGIN |` | `TRANSACTION`, `TRAN`, `TRY` / `CATCH` | `CATCH`, statement keywords |
 | `CASE |`, `CASE x |` | `WHEN` | |
 | `CASE WHEN c |` | `THEN` (`BETWEEN x` → `AND`) | `AND`, `OR` |
@@ -369,7 +376,9 @@ Verified in SSMS 22: Ctrl+Space after `WHERE ty` and `AS a ij` and after `WHERE 
 | `FOR XML PATH('r') |`, `FOR XML AUTO, |` | `ROOT`, `TYPE`, `ELEMENTS` (JSON: `ROOT`, `INCLUDE_NULL_VALUES`, `WITHOUT_ARRAY_WRAPPER`) | `BINARY BASE64`, `XMLSCHEMA`, `XSINIL` |
 | statement start | `SELECT`, `INSERT INTO`, `UPDATE`, `DELETE FROM`, `WITH`, `DECLARE`, `SET`, `EXEC`, `IF`, `BEGIN` | the other statement keywords |
 
-Cases are in `KeywordMapTests` and `KeywordMapMoreTests`. A position unknown to the map keeps the old behavior (all keywords, with those the analyzer preferred before first). Not covered yet: the clauses of `CREATE TABLE` / `ALTER TABLE`, `EXEC` parameter names (offered elsewhere), `FETCH` of cursors, `FOR` after `DECLARE … CURSOR`. Verified only by unit tests (and four positions in SSMS 22) until the user tests the VSIX.
+**Index DDL (#197).** `IndexDdl` (Core, `Analysis`) holds the positions of `CREATE [UNIQUE] [CLUSTERED | NONCLUSTERED] [COLUMNSTORE] INDEX`, `ALTER INDEX` and `DROP INDEX`. In these statements every position the map knows is a keyword list (kind `Fallback`, or `Keyword` when only the listed words fit), so keywords that do not fit are ranked lower, not hidden. After `ON` tables and views are offered; in the key column list and in `INCLUDE (…)` the columns of the table (`ContextKind.InsertColumns` with `IndexColumns`: all columns, without those already listed, the `INCLUDE` list also without the key columns; no column picker). Not covered yet (follow-up issue): columns in the filter predicate after `WHERE`, index names after `ALTER INDEX` / `DROP INDEX`, the column picker for index columns, and the other DDL statements that still fall back to generic keywords (`CREATE TABLE` column definitions and constraints, `ALTER TABLE ADD` / `ALTER COLUMN`, `CREATE STATISTICS`). Verified by unit tests only, not yet in SSMS.
+
+Cases are in `KeywordMapTests`, `KeywordMapMoreTests` and `IndexDdlTests`. A position unknown to the map keeps the old behavior (all keywords, with those the analyzer preferred before first). Not covered yet: the clauses of `CREATE TABLE` / `ALTER TABLE`, `EXEC` parameter names (offered elsewhere), `FETCH` of cursors, `FOR` after `DECLARE … CURSOR`. Verified only by unit tests (and four positions in SSMS 22) until the user tests the VSIX.
 
 **Snippets** are offered in every position (not after a qualifier and not in a name that is being invented): those whose prefix starts with the typed text in group 1 (next to the aliases), all the others (those that contain it and, before a character is typed, all) in the last group (`SuggestionBuilder.SnippetsLastGroup`, 50). Usage ranking takes precedence: a snippet that was chosen before is sorted as if it were in group 1 and, within the group, by the number of uses (`Suggestion.RankedSortText`).
 
