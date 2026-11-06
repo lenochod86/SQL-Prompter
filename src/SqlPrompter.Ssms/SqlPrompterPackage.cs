@@ -100,9 +100,15 @@ namespace SqlPrompter.Ssms
             {
                 if (await GetServiceAsync(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)
                 {
-                    schemaChangeWatcher = SchemaChangeWatcher.Start(dte);
-                    executionHooks = ExecutionHooks.Start(dte);
+                    var report = SsmsCompatibility.Run(dte);
+                    if (SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.ExecuteHook))
+                    {
+                        schemaChangeWatcher = SchemaChangeWatcher.Start(dte);
+                        executionHooks = ExecutionHooks.Start(dte);
+                    }
+
                     tabSession = TabSessionService.Start(dte);
+                    SsmsCompatibility.TellOnce(this, report);
                 }
             }
             catch (Exception ex)
@@ -360,8 +366,11 @@ namespace SqlPrompter.Ssms
                     }
                 }
 
-                var dte = (EnvDTE.DTE)GetGlobalService(typeof(EnvDTE.DTE));
-                dte.ExecuteCommand(left ? "Edit.WordPrevious" : "Edit.WordNext");
+                if (SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.WordKeys))
+                {
+                    var dte = (EnvDTE.DTE)GetGlobalService(typeof(EnvDTE.DTE));
+                    dte.ExecuteCommand(left ? "Edit.WordPrevious" : "Edit.WordNext");
+                }
             }
             catch (Exception ex)
             {

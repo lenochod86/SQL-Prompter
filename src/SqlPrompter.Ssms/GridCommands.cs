@@ -23,6 +23,12 @@ namespace SqlPrompter.Ssms
                     return;
                 }
 
+                if (!SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.ResultsGrid))
+                {
+                    Tell("This feature is switched off: the copy command of the results grid was not found in this SSMS version (see the log).");
+                    return;
+                }
+
                 // In the editor the same copy command would take the SQL text, not rows.
                 if (ActiveEditor.GetView()?.HasAggregateFocus == true)
                 {

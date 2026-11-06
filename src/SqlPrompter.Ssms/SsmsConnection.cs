@@ -67,10 +67,18 @@ namespace SqlPrompter.Ssms
             return type;
         }
 
+        /// <summary>The script factory type for the compatibility check (no log line when it is missing; the check logs).</summary>
+        internal static Type ScriptFactoryTypeOrNull() => ScriptFactoryType();
+
         /// <summary>Connection data of the active window, or null if the window is not connected.</summary>
         public static ConnectionSettings GetActive()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            if (!SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.ActiveConnection))
+            {
+                return null;
+            }
+
             var factoryType = ScriptFactoryType();
             var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var active = factory?.GetType().GetProperty("CurrentlyActiveWndConnectionInfo")?.GetValue(factory);
@@ -128,6 +136,11 @@ namespace SqlPrompter.Ssms
         public static bool OpenNewWindow(string database, string text, string server = null, string login = null)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            if (!SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.OpenWindow))
+            {
+                return false;
+            }
+
             var factoryType = ScriptFactoryType();
             var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var active = factory?.GetType().GetProperty("CurrentlyActiveWndConnectionInfo")?.GetValue(factory);
@@ -190,6 +203,11 @@ namespace SqlPrompter.Ssms
         public static bool OpenSavedTab(SavedTab tab)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            if (!SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.RestoreTabs))
+            {
+                return false;
+            }
+
             var factoryType = ScriptFactoryType();
             var factory = factoryType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var create = factory?.GetType().GetMethods().FirstOrDefault(m =>
