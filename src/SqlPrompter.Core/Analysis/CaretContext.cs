@@ -215,6 +215,9 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>With <see cref="ContextKind.DataType"/>: the name (variable without @, or the operand of CAST) whose same-named columns give the types to offer first.</summary>
         public string TypeOfName { get; internal set; }
 
+        /// <summary>With <see cref="ContextKind.DataType"/> in a column definition: the usual sized types (nvarchar(100), decimal(18,2) ...) are offered too.</summary>
+        public bool DataTypeSizes { get; internal set; }
+
         /// <summary>After <c>INSERT INTO table (columns) |</c>: the table (VALUES and SELECT are offered pre-filled for the listed columns).</summary>
         public TableSource InsertTail { get; internal set; }
 

@@ -199,7 +199,7 @@ namespace SqlPrompter.Core.Completion
                 case ContextKind.Variable:
                     return VariableSuggestions(context, script, 0).ToList();
                 case ContextKind.DataType:
-                    return ColumnTypeSuggestions(context, metadata).Concat(DataTypeSuggestions(context, 0)).ToList();
+                    return ColumnTypeSuggestions(context, metadata).Concat(SizedTypeSuggestions(context)).Concat(DataTypeSuggestions(context, 0)).ToList();
                 case ContextKind.Fallback:
                     return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0))
                         .Concat(SnippetSuggestions(context, options))
@@ -290,7 +290,28 @@ namespace SqlPrompter.Core.Completion
             foreach (var type in found.GroupBy(f => f.Key, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()))
             {
                 var owners = type.Select(t => t.Value).Take(3).ToList();
-                yield return new Suggestion(SuggestionKind.DataType, type.Key, type.Key, type.Key, owners[0], "type of " + string.Join(", ", owners) + (type.Count() > 3 ? " ..." : string.Empty), -20 + order++);
+                yield return new Suggestion(SuggestionKind.DataType, type.Key, type.Key, type.Key, owners[0], "type of " + string.Join(", ", owners) + (type.Count() > 3 ? " ..." : string.Empty), -80 + order++);
+            }
+        }
+
+        private static readonly string[] SizedTypes =
+        {
+            "nvarchar(50)", "nvarchar(100)", "nvarchar(255)", "nvarchar(MAX)", "varchar(50)", "varchar(100)", "varchar(255)", "varchar(MAX)", "char(10)", "nchar(10)",
+            "decimal(18,2)", "decimal(18,4)", "datetime2(0)", "datetime2(7)", "varbinary(MAX)",
+        };
+
+        /// <summary>The usual lengths in a column definition, after the types of the same-named columns.</summary>
+        private static IEnumerable<Suggestion> SizedTypeSuggestions(CaretContext context)
+        {
+            if (!context.DataTypeSizes)
+            {
+                yield break;
+            }
+
+            var order = 0;
+            foreach (var type in SizedTypes)
+            {
+                yield return new Suggestion(SuggestionKind.DataType, type, type, type, null, "data type with a usual length", -60 + order++);
             }
         }
 

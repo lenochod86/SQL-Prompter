@@ -191,6 +191,13 @@ namespace SqlPrompter.Core.Analysis
             var clauseState = ScanClause(structure, block.Start, nameStart);
             var anchorAtBlockLevel = structure.Depth[anchorIndex] == block.Depth;
 
+            // CREATE TABLE and ALTER TABLE: column definitions and the actions on a table.
+            var tableDdl = TableDdl.At(tokens, statementStart, anchorIndex);
+            if (tableDdl != null)
+            {
+                return TableDdlContext(tableDdl, qualifier, Make);
+            }
+
             // 0. The column list of INSERT INTO table (…).
             if (qualifier.Count == 0 && (anchor.Kind == TokenKind.OpenParen || anchor.Kind == TokenKind.Comma))
             {
@@ -513,6 +520,45 @@ namespace SqlPrompter.Core.Analysis
 
             target.InsertTail = new TableSource(TableSourceKind.Object, parts, null, 0);
             target.InsertTailColumns = columns;
+        }
+
+        private static CaretContext TableDdlContext(TableDdlPosition ddl, IReadOnlyList<string> qualifier, Func<ContextKind, CaretContext> make)
+        {
+            if (ddl.Kind == ContextKind.ObjectName)
+            {
+                if (qualifier.Count > 3)
+                {
+                    return make(ContextKind.Name);
+                }
+
+                var objectName = make(ContextKind.ObjectName);
+                objectName.PreferredKeywords = Array.Empty<string>();
+                return objectName;
+            }
+
+            if (qualifier.Count > 0 || ddl.Kind == ContextKind.Name)
+            {
+                return make(ContextKind.Name);
+            }
+
+            switch (ddl.Kind)
+            {
+                case ContextKind.DataType:
+                    var dataType = make(ContextKind.DataType);
+                    dataType.TypeOfName = ddl.TypeOfName;
+                    dataType.DataTypeSizes = ddl.Sizes;
+                    return dataType;
+                case ContextKind.InsertColumns:
+                    var columns = make(ContextKind.InsertColumns);
+                    columns.Sources = new[] { new TableSource(TableSourceKind.Object, ddl.Table, null, 0) };
+                    columns.IndexColumns = true;
+                    return columns;
+                default:
+                    var keywords = make(ddl.Keywords.Exclusive ? ContextKind.Keyword : ContextKind.Fallback);
+                    keywords.SoftSelection = true;
+                    keywords.ApplyPosition(ddl.Keywords, false);
+                    return keywords;
+            }
         }
 
         private static readonly string[] ComparisonOperators ={ "=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>" };
