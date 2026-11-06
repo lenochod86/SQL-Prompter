@@ -180,7 +180,7 @@ namespace SqlPrompter.Core.Completion
                     return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0)).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
                     return context.Module != ModuleKind.None
-                        ? ObjectSuggestions(context, metadata, script, options).ToList()
+                        ? ObjectSuggestions(context, metadata, script, options).Concat(context.ModuleAction == ModuleAction.Drop ? KeywordSuggestions(context, 1) : Enumerable.Empty<Suggestion>()).ToList()
                         : ObjectSuggestions(context, metadata, script, options).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.InsertColumns:
                     return InsertColumnSuggestions(context, metadata, options).ToList();

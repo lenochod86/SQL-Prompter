@@ -57,7 +57,7 @@ namespace SqlPrompter.Tests
 
             var items = SuggestionBuilder.Build(context, Database());
 
-            Assert.Equal(expected.OrderBy(x => x), items.Select(i => i.DisplayText).OrderBy(x => x));
+            Assert.Equal(expected.OrderBy(x => x), items.Where(i => i.Kind != SuggestionKind.Keyword).Select(i => i.DisplayText).OrderBy(x => x));
         }
 
         [Fact]

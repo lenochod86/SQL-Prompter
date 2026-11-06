@@ -208,7 +208,8 @@ namespace SqlPrompter.Core.Analysis
                 module.Module = moduleKind;
                 module.ModuleAction = moduleAction;
                 module.ModuleHeaderStart = tokens[statementStart].Start;
-                module.PreferredKeywords = Array.Empty<string>();
+                module.PreferredKeywords = moduleAction == ModuleAction.Drop ? new[] { "IF EXISTS" } : Array.Empty<string>();
+                module.OnlyExpectedKeywords = moduleAction == ModuleAction.Drop;
                 return module;
             }
 
