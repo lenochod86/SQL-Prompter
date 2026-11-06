@@ -110,6 +110,7 @@ namespace SqlPrompter.Ssms
         private readonly List<Entry> entries;
         private Action chosen;
         private bool closing;
+        private readonly CtrlTapDetector closeTap = new CtrlTapDetector();
 
         private QuickActionsPopup(IWpfTextView view, bool hasSelection)
         {
@@ -139,6 +140,9 @@ namespace SqlPrompter.Ssms
             filter.TextChanged += (s, e) => Fill();
             list.MouseDoubleClick += (s, e) => Choose();
             PreviewKeyDown += OnKeyDown;
+            PreviewKeyDown += OnCtrlDown;
+            PreviewKeyUp += OnCtrlUp;
+            PreviewMouseDown += (s, e) => closeTap.Interrupted();
             Loaded += (s, e) => filter.Focus();
             Closing += (s, e) => closing = true;
             Deactivated += (s, e) =>
@@ -159,6 +163,39 @@ namespace SqlPrompter.Ssms
                 }
             };
             Fill();
+        }
+
+        private static bool IsCtrl(Key key) => key == Key.LeftCtrl || key == Key.RightCtrl;
+
+        /// <summary>A tap of Ctrl on its own closes the popup again (#240); the decision is the one that opens it (<see cref="CtrlTapDetector"/>, which also counts the input the editor never sees).</summary>
+        private void OnCtrlDown(object sender, KeyEventArgs e)
+        {
+            if (IsCtrl(e.Key))
+            {
+                closeTap.CtrlDown(e.IsRepeat, Keyboard.Modifiers == ModifierKeys.Control, InputWatcher.Count);
+            }
+            else
+            {
+                closeTap.Interrupted();
+            }
+        }
+
+        private void OnCtrlUp(object sender, KeyEventArgs e)
+        {
+            if (!IsCtrl(e.Key))
+            {
+                closeTap.Interrupted();
+                return;
+            }
+
+            if (closeTap.CtrlUp(Keyboard.Modifiers == ModifierKeys.None, InputWatcher.Count) && !closing)
+            {
+                // Nothing is run and nothing changes in the script; the focus goes back to the editor when the window closes.
+                closing = true;
+                chosen = null;
+                e.Handled = true;
+                Close();
+            }
         }
 
         public static void Show(IWpfTextView view)
