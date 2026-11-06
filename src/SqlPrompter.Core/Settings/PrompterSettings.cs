@@ -137,6 +137,14 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "quickActionsOnCtrl")]
         public bool QuickActionsOnCtrl { get; set; }
 
+        /// <summary>Rows of the suggestion list (set by dragging its corner).</summary>
+        [DataMember(Name = "listRows")]
+        public int ListRows { get; set; }
+
+        /// <summary>Width of the suggestion list in pixels; 0 follows the longest item.</summary>
+        [DataMember(Name = "listWidth")]
+        public int ListWidth { get; set; }
+
         /// <summary>The other places of the name under the caret are highlighted.</summary>
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
@@ -195,6 +203,8 @@ namespace SqlPrompter.Core.Settings
             AutoClose = true;
             SuggestAfterComma = true;
             HighlightMatches = true;
+            ListRows = 12;
+            ListWidth = 0;
             QuickActionsOnCtrl = true;
             ShowStarHint = true;
             KeepHistory = true;

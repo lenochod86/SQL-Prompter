@@ -42,6 +42,11 @@ namespace SqlPrompter.Ssms
         public const int VisibleRows = 12;
 
         private const double RowHeight = 22;
+        private const double GripHeight = 14;
+        private const int MinRows = 4;
+        private const int MaxRows = 40;
+        private const double MinWidth = 300;
+        private const double MaxWidth = 1600;
 
         /// <summary>Icons are drawn for this background so that they get the colors of the current theme.</summary>
         private static Color BackgroundColor
@@ -79,6 +84,10 @@ namespace SqlPrompter.Ssms
         private bool suggestionSelected;
         private CompletionItem suggestionItem;
         private double listWidth = MinListWidth;
+        private int visibleRows = VisibleRows;
+        private double widthSetting;
+        private double dragRows;
+        private double dragWidth;
         private readonly Grid listGrid;
 
         public SqlCompletionPresenter(IWpfTextView view)
@@ -87,13 +96,14 @@ namespace SqlPrompter.Ssms
             suggestionRow = new Row(this) { IsSuggestion = true };
             suggestionRow.Root.Visibility = Visibility.Collapsed;
             rowPanel.Children.Add(suggestionRow.Root);
-            for (var i = 0; i < VisibleRows; i++)
+            for (var i = 0; i < MaxRows; i++)
             {
                 var row = new Row(this);
                 rows.Add(row);
                 rowPanel.Children.Add(row.Root);
             }
 
+            ReadSizeSettings();
             scrollBar = new ScrollBar { Orientation = Orientation.Vertical, Width = 14, Visibility = Visibility.Collapsed, Focusable = false };
             scrollBar.ValueChanged += (s, e) =>
             {
@@ -109,10 +119,16 @@ namespace SqlPrompter.Ssms
             listGrid = grid;
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(GripHeight) });
             Grid.SetColumn(rowPanel, 0);
             Grid.SetColumn(scrollBar, 1);
             grid.Children.Add(rowPanel);
             grid.Children.Add(scrollBar);
+            var grip = CreateGrip();
+            Grid.SetRow(grip, 1);
+            Grid.SetColumnSpan(grip, 2);
+            grid.Children.Add(grip);
             grid.PreviewMouseWheel += (s, e) =>
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
@@ -154,6 +170,7 @@ namespace SqlPrompter.Ssms
         public void Open(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            ReadSizeSettings();
             Update(session, presentation);
             popup.IsOpen = true;
             descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
@@ -167,15 +184,15 @@ namespace SqlPrompter.Ssms
             {
                 lastItemList = presentation.ItemList;
                 items = presentation.ItemList.ToList();
-                listWidth = MeasureWidth(items);
+                listWidth = widthSetting > 0 ? widthSetting : MeasureWidth(items);
                 listGrid.Width = listWidth;
                 offset = 0;
-                scrollBar.Visibility = items.Count > VisibleRows ? Visibility.Visible : Visibility.Collapsed;
+                scrollBar.Visibility = items.Count > visibleRows ? Visibility.Visible : Visibility.Collapsed;
                 updatingScrollBar = true;
                 scrollBar.Minimum = 0;
-                scrollBar.Maximum = Math.Max(0, items.Count - VisibleRows);
-                scrollBar.ViewportSize = VisibleRows;
-                scrollBar.LargeChange = VisibleRows;
+                scrollBar.Maximum = Math.Max(0, items.Count - visibleRows);
+                scrollBar.ViewportSize = visibleRows;
+                scrollBar.LargeChange = visibleRows;
                 scrollBar.SmallChange = 1;
                 updatingScrollBar = false;
             }
@@ -226,10 +243,84 @@ namespace SqlPrompter.Ssms
             return Math.Max(MinListWidth, Math.Min(MaxListWidth, widest + 70));
         }
 
+        /// <summary>Reads the size the user chose (rows, width; 0 = follows the items) so that a change in the settings window applies to the next list.</summary>
+        private void ReadSizeSettings()
+        {
+            var behavior = SettingsService.Current.Behavior;
+            visibleRows = Math.Max(MinRows, Math.Min(MaxRows, behavior.ListRows));
+            widthSetting = behavior.ListWidth > 0 ? Math.Max(MinWidth, Math.Min(MaxWidth, behavior.ListWidth)) : 0;
+            lastItemList = null;
+        }
+
+        /// <summary>The grip in the bottom-right corner: dragging changes the number of rows and the width; the size is kept in the settings.</summary>
+        private FrameworkElement CreateGrip()
+        {
+            var thumb = new System.Windows.Controls.Primitives.Thumb
+            {
+                Cursor = System.Windows.Input.Cursors.SizeNWSE,
+                Focusable = false,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Width = 16,
+                Height = GripHeight,
+                ToolTip = "Drag to resize the list",
+                Template = GripTemplate(),
+            };
+            thumb.DragStarted += (s, e) =>
+            {
+                dragRows = visibleRows;
+                dragWidth = listWidth;
+            };
+            thumb.DragDelta += (s, e) =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                dragRows += e.VerticalChange / RowHeight;
+                dragWidth += e.HorizontalChange;
+                visibleRows = Math.Max(MinRows, Math.Min(MaxRows, (int)Math.Round(dragRows)));
+                widthSetting = Math.Max(MinWidth, Math.Min(MaxWidth, dragWidth));
+                listWidth = widthSetting;
+                listGrid.Width = listWidth;
+                ApplyRows();
+            };
+            thumb.DragCompleted += (s, e) =>
+            {
+                var settings = SettingsService.Current.Clone();
+                settings.Behavior.ListRows = visibleRows;
+                settings.Behavior.ListWidth = (int)Math.Round(widthSetting);
+                SettingsService.Update(settings);
+                // The editor keeps the focus: the thumb is not focusable and the popup is not activated.
+            };
+            return thumb;
+        }
+
+        private static ControlTemplate GripTemplate()
+        {
+            var root = new FrameworkElementFactory(typeof(Grid));
+            root.SetValue(Panel.BackgroundProperty, Brushes.Transparent);
+            var triangle = new FrameworkElementFactory(typeof(System.Windows.Shapes.Polygon));
+            triangle.SetValue(System.Windows.Shapes.Polygon.PointsProperty, new PointCollection { new Point(14, 3), new Point(14, 13), new Point(4, 13) });
+            triangle.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, VsBrushes.ToolWindowBorderKey);
+            root.AppendChild(triangle);
+            return new ControlTemplate(typeof(System.Windows.Controls.Primitives.Thumb)) { VisualTree = root };
+        }
+
+        /// <summary>The number of rows changed while the list is open: scrollbar, offset and the rows shown follow.</summary>
+        private void ApplyRows()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            scrollBar.Visibility = items.Count > visibleRows ? Visibility.Visible : Visibility.Collapsed;
+            updatingScrollBar = true;
+            scrollBar.Maximum = Math.Max(0, items.Count - visibleRows);
+            scrollBar.ViewportSize = visibleRows;
+            scrollBar.LargeChange = visibleRows;
+            updatingScrollBar = false;
+            EnsureSelectedVisible();
+            Render();
+            descriptionPopup.HorizontalOffset = popup.HorizontalOffset + listWidth + 4;
+        }
         private void Scroll(int delta)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            offset = Math.Max(0, Math.Min(Math.Max(0, items.Count - VisibleRows), offset + delta));
+            offset = Math.Max(0, Math.Min(Math.Max(0, items.Count - visibleRows), offset + delta));
             Render();
         }
 
@@ -241,13 +332,13 @@ namespace SqlPrompter.Ssms
                 {
                     offset = selected;
                 }
-                else if (selected >= offset + VisibleRows)
+                else if (selected >= offset + visibleRows)
                 {
-                    offset = selected - VisibleRows + 1;
+                    offset = selected - visibleRows + 1;
                 }
             }
 
-            offset = Math.Max(0, Math.Min(Math.Max(0, items.Count - VisibleRows), offset));
+            offset = Math.Max(0, Math.Min(Math.Max(0, items.Count - visibleRows), offset));
         }
 
         private void Render()
@@ -265,7 +356,7 @@ namespace SqlPrompter.Ssms
             for (var i = 0; i < rows.Count; i++)
             {
                 var index = offset + i;
-                if (index < items.Count)
+                if (i < visibleRows && index < items.Count)
                 {
                     rows[i].Bind(items[index], index == selected, soft);
                 }
@@ -356,7 +447,7 @@ namespace SqlPrompter.Ssms
                 var span = presentation.ApplicableToSpan.GetSpan(view.TextSnapshot);
                 var line = view.GetTextViewLineContainingBufferPosition(span.Start);
                 var bounds = line.GetCharacterBounds(span.Start);
-                var height = (Math.Min(items.Count, VisibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + 2;
+                var height = (Math.Min(items.Count, visibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + GripHeight + 2;
                 var left = bounds.Left - view.ViewportLeft;
                 var below = bounds.Bottom - view.ViewportTop + 2;
                 var above = bounds.Top - view.ViewportTop - height - 2;

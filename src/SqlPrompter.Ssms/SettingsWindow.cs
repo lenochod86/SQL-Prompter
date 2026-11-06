@@ -134,6 +134,10 @@ namespace SqlPrompter.Ssms
             completion.Choice("Keyword case", "How keywords are inserted. \"Match what I typed\" inserts upper case, or lower case if you started typing in lower case.",
                 new[] { O(KeywordCase.MatchTyped, "Match what I typed"), O(KeywordCase.Upper, "UPPER CASE"), O(KeywordCase.Lower, "lower case") },
                 () => work.Behavior.KeywordCase, v => work.Behavior.KeywordCase = v, () => work.Behavior.SuggestionsEnabled);
+            completion.Heading("Size of the list");
+            completion.Help("Drag the triangle in the bottom-right corner of the list to resize it; the size is kept. Here you can type it or go back to the default.");
+            completion.Number("Rows", "How many suggestions are visible at once.", 4, 40, () => work.Behavior.ListRows, v => work.Behavior.ListRows = v, "rows", () => work.Behavior.SuggestionsEnabled);
+            completion.Number("Width", "0 makes the list as wide as its longest item.", 0, 1600, () => work.Behavior.ListWidth, v => work.Behavior.ListWidth = v, "pixels", () => work.Behavior.SuggestionsEnabled);
             completion.Heading("Insert the selected suggestion on");
             completion.Help("Enter and Tab always insert the selected suggestion. These keys insert it too, and are then typed as usual.");
             Func<bool> on = () => work.Behavior.SuggestionsEnabled;
