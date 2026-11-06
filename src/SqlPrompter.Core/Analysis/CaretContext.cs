@@ -164,6 +164,12 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>With <see cref="ContextKind.InsertColumns"/> for an index: the columns that are listed already and are not offered again.</summary>
         public IReadOnlyList<string> ExcludedColumns { get; internal set; } = Array.Empty<string>();
 
+        /// <summary>In a condition right after a column (or after a comparison operator that follows one): the name of the column as parts (qualifier first).</summary>
+        public IReadOnlyList<string> ConditionOperand { get; internal set; }
+
+        /// <summary>With <see cref="ConditionOperand"/>: the caret is after a comparison operator, where a value of the type of the column goes.</summary>
+        public bool AfterComparison { get; internal set; }
+
         /// <summary>The name follows JOIN, so tables related by a foreign key to the tables of the query can be offered first.</summary>
         public bool AfterJoin { get; internal set; }
 
