@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Microsoft.VisualStudio.Shell;
 using SqlPrompter.Core.Formatting;
 using SqlPrompter.Core.Settings;
 
@@ -36,6 +37,7 @@ namespace SqlPrompter.Ssms
             apply.Click += (s, e) => Apply();
             ok.Click += (s, e) =>
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 if (Apply())
                 {
                     DialogResult = DialogResult.OK;
@@ -47,6 +49,7 @@ namespace SqlPrompter.Ssms
             AcceptButton = null;
             CancelButton = cancel;
 
+            ThreadHelper.ThrowIfNotOnUIThread();
             BuildPages();
             foreach (var page in pages)
             {
@@ -196,6 +199,15 @@ namespace SqlPrompter.Ssms
             var snippets = Add("Snippets");
             snippets.Folder("Snippet folder", "Folder with the snippet files, one JSON file per snippet as in SQL Prompt's snippet folder. Empty uses %APPDATA%\\SqlPrompter\\Snippets.",
                 () => work.Snippets.Folder, v => work.Snippets.Folder = v ?? string.Empty);
+            snippets.Button("Edit snippets...", () =>
+            {
+                // The manager reads the folder of the saved settings, so a changed folder is applied first.
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (Apply())
+                {
+                    SqlPrompterPackage.OpenSnippetManager();
+                }
+            }, "Opens the snippet manager (the same window as SQL Prompter > Manage Snippets). The settings are applied first.");
 
             var analysis = Add("Code analysis", "Underlines suspicious code in the editor; the tooltip says what is wrong. The check runs in the background a moment after you stop typing.");
             analysis.Check("Mark problems in the editor", "A wavy line: orange for warnings, gray for hints.", () => work.Analysis.Enabled, v => work.Analysis.Enabled = v);
