@@ -211,6 +211,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "showDbDescriptions")]
         public bool ShowDbDescriptions { get; set; }
 
+        /// <summary>A tooltip over a name says what it is (alias, table, column, variable, function, procedure).</summary>
+        [DataMember(Name = "showHover")]
+        public bool ShowHover { get; set; }
+
         /// <summary>A note under the caret says that Tab expands a star in a select list.</summary>
         [DataMember(Name = "showStarHint")]
         public bool ShowStarHint { get; set; }
@@ -313,6 +317,7 @@ namespace SqlPrompter.Core.Settings
             QuickActionsOnCtrl = true;
             ShowStarHint = true;
             ShowDbDescriptions = true;
+            ShowHover = true;
             KeepHistory = true;
             HistoryDays = 0;
             RestoreTabs = true;
