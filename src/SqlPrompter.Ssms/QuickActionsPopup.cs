@@ -269,6 +269,8 @@ namespace SqlPrompter.Ssms
                 case QuickActionCatalog.RemoveBrackets: RefactorCommands.Run(view, Refactorings.RemoveBrackets, "square brackets removed"); break;
                 case QuickActionCatalog.InsertSemicolons: RefactorCommands.Run(view, Refactorings.InsertSemicolons, "semicolons inserted"); break;
                 case QuickActionCatalog.RemoveUnusedVariables: RefactorCommands.Run(view, Refactorings.RemoveUnusedVariables, "unused variables removed"); break;
+                case QuickActionCatalog.PreviewAsSelect: PreviewStatement.AsSelect(view); break;
+                case QuickActionCatalog.DryRun: PreviewStatement.DryRun(view); break;
                 case QuickActionCatalog.FixCodeIssues: RefactorCommands.Run(view, text => CodeFixes.Apply(text, SettingsService.Current.Analysis), "code analysis issues fixed"); break;
                 case QuickActionCatalog.AddNPrefix: RefactorCommands.Run(view, AliasRefactorings.AddNPrefix, "N prefix added to strings"); break;
                 case QuickActionCatalog.AddAs: RefactorCommands.Run(view, AliasRefactorings.AddAs, "AS added to aliases"); break;

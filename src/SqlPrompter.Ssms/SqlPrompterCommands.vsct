@@ -231,6 +231,18 @@
           <ButtonText>Fix Code Analysis Issues</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidPreviewAsSelect" priority="0x0104" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
+        <Strings>
+          <ButtonText>Preview UPDATE/DELETE As SELECT</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidDryRun" priority="0x0105" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
+        <Strings>
+          <ButtonText>Run And Roll Back (Dry Run)</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -271,6 +283,8 @@
       <IDSymbol name="cmdidInsertSemicolons" value="0x0114" />
       <IDSymbol name="cmdidRemoveUnusedVariables" value="0x0115" />
       <IDSymbol name="cmdidFixCodeIssues" value="0x0124" />
+      <IDSymbol name="cmdidPreviewAsSelect" value="0x0125" />
+      <IDSymbol name="cmdidDryRun" value="0x0126" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />

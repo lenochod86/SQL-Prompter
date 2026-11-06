@@ -30,6 +30,8 @@ namespace SqlPrompter.Core.Editing
         public const string InsertSemicolons = "insertSemicolons";
         public const string RemoveUnusedVariables = "removeUnusedVariables";
         public const string FixCodeIssues = "fixCodeIssues";
+        public const string PreviewAsSelect = "previewAsSelect";
+        public const string DryRun = "dryRun";
         public const string ExpandStars = "expandStars";
         public const string QualifyNames = "qualifyNames";
         public const string AddNPrefix = "addNPrefix";
@@ -51,6 +53,8 @@ namespace SqlPrompter.Core.Editing
                 new QuickAction(InsertSemicolons, "Insert Semicolons", "Ends the statements of " + scope + " with a semicolon."),
                 new QuickAction(RemoveUnusedVariables, "Remove Unused Variables", "Removes DECLAREs that nothing uses in " + scope + "."),
                 new QuickAction(FixCodeIssues, "Fix Code Analysis Issues", "Repairs = NULL, @@IDENTITY and types without a length in " + scope + "."),
+                new QuickAction(PreviewAsSelect, "Preview UPDATE/DELETE As SELECT", "Opens a SELECT of the rows that the statement of " + scope + " would change in a new window."),
+                new QuickAction(DryRun, "Run And Roll Back (Dry Run)", "Opens the statement of " + scope + " inside BEGIN TRANSACTION ... ROLLBACK with its row count in a new window."),
                 new QuickAction(AddNPrefix, "Add N Prefix To Strings", "Turns 'text' into N'text' in " + scope + "."),
                 new QuickAction(AddAs, "Add AS To Aliases", "Writes AS before every alias in " + scope + "."),
                 new QuickAction(RemoveAs, "Remove AS From Aliases", "Drops AS before the aliases in " + scope + "."),

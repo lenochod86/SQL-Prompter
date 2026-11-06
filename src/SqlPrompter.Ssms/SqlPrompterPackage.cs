@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 28)]
+    [ProvideMenuResource("Menus.ctmenu", 29)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
@@ -49,6 +49,8 @@ namespace SqlPrompter.Ssms
         public const int QualifyNamesId = 0x0117;
         public const int ScriptSummaryId = 0x0118;
         public const int FixCodeIssuesId = 0x0124;
+        public const int PreviewAsSelectId = 0x0125;
+        public const int DryRunId = 0x0126;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
@@ -86,6 +88,8 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.InsertSemicolons, "semicolons inserted"), new CommandID(CommandSet, InsertSemicolonsId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.RemoveUnusedVariables, "unused variables removed"), new CommandID(CommandSet, RemoveUnusedVariablesId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), text => SqlPrompter.Core.Editing.CodeFixes.Apply(text, SettingsService.Current.Analysis), "code analysis issues fixed"), new CommandID(CommandSet, FixCodeIssuesId)));
+                commands.AddCommand(new MenuCommand((s, e) => PreviewStatement.AsSelect(ActiveEditor.GetView()), new CommandID(CommandSet, PreviewAsSelectId)));
+                commands.AddCommand(new MenuCommand((s, e) => PreviewStatement.DryRun(ActiveEditor.GetView()), new CommandID(CommandSet, DryRunId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.ExpandStars(ActiveEditor.GetView()), new CommandID(CommandSet, ExpandStarsId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.QualifyNames(ActiveEditor.GetView()), new CommandID(CommandSet, QualifyNamesId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), true), new CommandID(CommandSet, FormatDocumentId)));
