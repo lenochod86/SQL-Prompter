@@ -70,7 +70,7 @@ namespace SqlPrompter.Core.Completion
         /// <summary>The picker for the caret, or null when the caret is not at a place where columns are picked or the columns are not known (yet).</summary>
         public static ColumnPicker TryBuild(string batch, int caret, CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
-            if (batch == null || context == null || metadata == null || (context.Kind != ContextKind.Expression && context.Kind != ContextKind.InsertColumns) || context.IndexColumns || context.Qualifier.Count > 0)
+            if (batch == null || context == null || metadata == null || (context.Kind != ContextKind.Expression && context.Kind != ContextKind.InsertColumns) || context.Qualifier.Count > 0)
             {
                 return null;
             }
@@ -95,8 +95,8 @@ namespace SqlPrompter.Core.Completion
                     return null;
                 }
 
-                var present = new HashSet<string>(ColumnClauses.ExistingInsertColumns(batch, caret), StringComparer.OrdinalIgnoreCase);
-                var insertable = InsertBuilder.InsertableColumns(all);
+                var present = new HashSet<string>(context.IndexColumns ? context.ExcludedColumns : ColumnClauses.ExistingInsertColumns(batch, caret), StringComparer.OrdinalIgnoreCase);
+                var insertable = context.IndexColumns ? all : InsertBuilder.InsertableColumns(all);
                 for (var i = 0; i < insertable.Count; i++)
                 {
                     if (!present.Contains(insertable[i].Name))

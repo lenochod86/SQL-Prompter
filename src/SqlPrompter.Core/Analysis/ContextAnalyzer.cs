@@ -254,6 +254,16 @@ namespace SqlPrompter.Core.Analysis
             }
 
             var sources = CollectSources(structure, scopes);
+            if (sources.Count == 0 && IndexDdl.IndexKeyword(tokens, statementStart) >= 0 && tokens[statementStart].IsWord("CREATE"))
+            {
+                // The filter predicate of CREATE INDEX: the columns of the table the index is on.
+                var indexTable = IndexTable(tokens, statementStart, tokens.Count, out _);
+                if (indexTable != null)
+                {
+                    sources.Add(new TableSource(TableSourceKind.Object, indexTable, null, 0));
+                }
+            }
+
             var operandBefore = IsOperand(anchor);
             var position = qualifier.Count == 0
                 ? KeywordMap.At(structure, block, nameStart, caretIndex + (word != null ? 1 : 0))
@@ -582,44 +592,11 @@ namespace SqlPrompter.Core.Analysis
                 open = j;
             }
 
-            // The table: the name after the first ON, before any parenthesis.
-            var on = -1;
-            for (var i = statementStart; i < open; i++)
-            {
-                if (tokens[i].Kind == TokenKind.OpenParen)
-                {
-                    break;
-                }
-
-                if (tokens[i].IsWord("ON"))
-                {
-                    on = i;
-                    break;
-                }
-            }
-
-            if (on < 0)
+            var parts = IndexTable(tokens, statementStart, open, out var k);
+            if (parts == null)
             {
                 return null;
             }
-
-            var parts = new List<string>();
-            var k = on + 1;
-            while (k < open && (tokens[k].IsNamePart || tokens[k].Kind == TokenKind.Dot))
-            {
-                if (tokens[k].IsNamePart)
-                {
-                    parts.Add(tokens[k].IdentifierValue);
-                }
-
-                k++;
-            }
-
-            if (parts.Count == 0 || parts.Count > 3)
-            {
-                return null;
-            }
-
             var excluded = new List<string>();
             if (k != open)
             {
@@ -641,6 +618,46 @@ namespace SqlPrompter.Core.Analysis
             return context;
         }
 
+        /// <summary>The table of CREATE INDEX name ON table: the name after the first ON, before any parenthesis and before <paramref name="limit"/>; null when there is none.</summary>
+        /// <param name="end">The index of the token after the name.</param>
+        private static List<string> IndexTable(List<Token> tokens, int statementStart, int limit, out int end)
+        {
+            end = -1;
+            var on = -1;
+            for (var i = statementStart; i < limit && i < tokens.Count; i++)
+            {
+                if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    break;
+                }
+
+                if (tokens[i].IsWord("ON"))
+                {
+                    on = i;
+                    break;
+                }
+            }
+
+            if (on < 0)
+            {
+                return null;
+            }
+
+            var parts = new List<string>();
+            var k = on + 1;
+            while (k < limit && k < tokens.Count && (tokens[k].IsNamePart || tokens[k].Kind == TokenKind.Dot))
+            {
+                if (tokens[k].IsNamePart)
+                {
+                    parts.Add(tokens[k].IdentifierValue);
+                }
+
+                k++;
+            }
+
+            end = k;
+            return parts.Count == 0 || parts.Count > 3 ? null : parts;
+        }
         /// <summary>The column names listed in the parentheses that open at <paramref name="open"/> (up to the token <paramref name="last"/> or the closing parenthesis).</summary>
         private static IEnumerable<string> ListedColumns(List<Token> tokens, int open, int last)
         {

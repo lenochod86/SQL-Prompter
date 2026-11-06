@@ -131,5 +131,42 @@ namespace SqlPrompter.Tests
             Assert.DoesNotContain(Items("CREATE INDEX ix ON dbo.Users (Id, |"), i => i.Kind == SuggestionKind.Column && i.InsertText == "Id");
             Assert.DoesNotContain(Items("CREATE INDEX ix ON dbo.Users (Id) INCLUDE (|"), i => i.Kind == SuggestionKind.Column && i.InsertText == "Id");
         }
+
+        [Theory]
+        [InlineData("CREATE INDEX ix ON dbo.Users (Id) WHERE |")]
+        [InlineData("CREATE INDEX ix ON dbo.Users (Id) INCLUDE (Email) WHERE Name = 'a' AND |")]
+        [InlineData("CREATE UNIQUE NONCLUSTERED INDEX ix ON dbo.Users (Id) WHERE Em|")]
+        public void TheFilterPredicateOffersTheColumnsOfTheTable(string sql)
+        {
+            var items = Items(sql);
+            foreach (var column in new[] { "Id", "Name", "Email" })
+            {
+                Assert.Contains(items, i => i.Kind == SuggestionKind.Column && i.InsertText == column);
+            }
+        }
+
+        private static ColumnPicker Picker(string marked)
+        {
+            var caret = marked.IndexOf('|');
+            var sql = marked.Remove(caret, 1);
+            var context = ContextAnalyzer.Analyze(sql, caret);
+            return ColumnPicker.TryBuild(sql, caret, context, SampleDatabase(), null, SuggestionOptions.Default);
+        }
+
+        [Fact]
+        public void ThePickerOffersAllColumnsOfTheKeyListWithoutThoseListed()
+        {
+            var picker = Picker("CREATE INDEX ix ON dbo.Users (Id, |");
+
+            Assert.Equal(new[] { "Name", "Email" }, picker.Columns.Select(c => c.InsertText).ToArray());
+        }
+
+        [Fact]
+        public void ThePickerOfIncludeLeavesOutTheKeyColumns()
+        {
+            var picker = Picker("CREATE INDEX ix ON dbo.Users (Id) INCLUDE (|");
+
+            Assert.Equal(new[] { "Name", "Email" }, picker.Columns.Select(c => c.InsertText).ToArray());
+        }
     }
 }
