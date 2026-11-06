@@ -13,8 +13,8 @@ namespace SqlPrompter.Core.Completion
     /// </summary>
     internal static class StatementFragments
     {
-        /// <summary>The group of these items: before everything else.</summary>
-        private const int Group = -1;
+        /// <summary>The group of these items: above the keywords (group -1), so that the fragments are not mixed with them alphabetically.</summary>
+        private const int Group = -10;
 
         public static IEnumerable<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
         {
@@ -91,7 +91,7 @@ namespace SqlPrompter.Core.Completion
                 foreach (var condition in JoinSuggestions.Conditions(joined, metadata, options))
                 {
                     yield return new Suggestion(SuggestionKind.JoinCondition, "ON " + condition.DisplayText, "ON " + condition.InsertText, "ON", condition.Suffix,
-                        condition.Description, Group);
+                        condition.Description, Group + condition.Group);
                 }
 
                 yield break;
