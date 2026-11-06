@@ -189,6 +189,36 @@
           <ButtonText>Reopen Closed Query Tab</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsInList" priority="0x0110" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Copy As IN List</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsValues" priority="0x0111" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Copy As VALUES</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsJson" priority="0x0112" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Copy As JSON</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsCsv" priority="0x0113" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Copy As CSV</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsMarkdown" priority="0x0114" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Copy As Markdown Table</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidFormatDocument" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
         <Strings>
@@ -320,6 +350,11 @@
       <IDSymbol name="cmdidFindInCode" value="0x012E" />
       <IDSymbol name="cmdidShowDependencies" value="0x012F" />
       <IDSymbol name="cmdidReopenClosedTab" value="0x0130" />
+      <IDSymbol name="cmdidCopyGridAsInList" value="0x0127" />
+      <IDSymbol name="cmdidCopyGridAsValues" value="0x0128" />
+      <IDSymbol name="cmdidCopyGridAsJson" value="0x0129" />
+      <IDSymbol name="cmdidCopyGridAsCsv" value="0x012A" />
+      <IDSymbol name="cmdidCopyGridAsMarkdown" value="0x012B" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />

@@ -60,12 +60,42 @@ namespace SqlPrompter.Ssms
 
                 position = Math.Max(1, Math.Min(position, bar.Controls.Count + 1));
                 command.AddControl(bar, position);
+                AddCopyAs(dte, bar, position + 1);
                 Log.Write("Grid menu: added \"" + CommandName + "\" at position " + position + ".");
             }
             catch (Exception ex)
             {
                 Log.Error("Adding the command to the results grid menu failed", ex);
             }
+        }
+
+        private static readonly int[] CopyIds =
+        {
+            SqlPrompterPackage.CopyGridAsInListId, SqlPrompterPackage.CopyGridAsValuesId, SqlPrompterPackage.CopyGridAsJsonId, SqlPrompterPackage.CopyGridAsCsvId, SqlPrompterPackage.CopyGridAsMarkdownId,
+        };
+
+        /// <summary>The submenu Copy as with the formats of #211.</summary>
+        private static void AddCopyAs(EnvDTE.DTE dte, CommandBar bar, int position)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            for (var i = 1; i <= bar.Controls.Count; i++)
+            {
+                if (string.Equals(bar.Controls[i].Caption, "Copy as", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            position = Math.Max(1, Math.Min(position, bar.Controls.Count + 1));
+            var popup = (CommandBarPopup)bar.Controls.Add(MsoControlType.msoControlPopup, Type.Missing, Type.Missing, position, true);
+            popup.Caption = "Copy as";
+            var index = 1;
+            foreach (var id in CopyIds)
+            {
+                dte.Commands.Item("{" + SqlPrompterPackage.CommandSet.ToString() + "}", id).AddControl(popup.CommandBar, index++);
+            }
+
+            Log.Write("Grid menu: added the submenu Copy as at position " + position + ".");
         }
     }
 }
