@@ -225,6 +225,12 @@
           <ButtonText>Remove Unused Variables</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidFixCodeIssues" priority="0x0103" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
+        <Strings>
+          <ButtonText>Fix Code Analysis Issues</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -264,6 +270,7 @@
       <IDSymbol name="cmdidRemoveBrackets" value="0x0113" />
       <IDSymbol name="cmdidInsertSemicolons" value="0x0114" />
       <IDSymbol name="cmdidRemoveUnusedVariables" value="0x0115" />
+      <IDSymbol name="cmdidFixCodeIssues" value="0x0124" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />

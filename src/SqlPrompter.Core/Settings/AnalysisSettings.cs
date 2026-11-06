@@ -37,6 +37,34 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "unexpectedEnd")]
         public bool UnexpectedEnd { get; set; }
 
+        /// <summary>A function on a column in WHERE / ON / HAVING (YEAR(d) = 2025, UPPER(c) = 'X'): the index on the column cannot be used.</summary>
+        [DataMember(Name = "functionOnColumn")]
+        public bool FunctionOnColumn { get; set; }
+
+        /// <summary>LIKE '%text': a leading wildcard cannot use an index.</summary>
+        [DataMember(Name = "leadingWildcard")]
+        public bool LeadingWildcard { get; set; }
+
+        /// <summary>SELECT TOP n without ORDER BY returns arbitrary rows.</summary>
+        [DataMember(Name = "topWithoutOrderBy")]
+        public bool TopWithoutOrderBy { get; set; }
+
+        /// <summary>@@IDENTITY (use SCOPE_IDENTITY()).</summary>
+        [DataMember(Name = "atAtIdentity")]
+        public bool AtAtIdentity { get; set; }
+
+        /// <summary>varchar, nvarchar, char ... without a length in DECLARE, CAST and CONVERT (the length is 1 or 30).</summary>
+        [DataMember(Name = "typeWithoutLength")]
+        public bool TypeWithoutLength { get; set; }
+
+        /// <summary>NOT IN (SELECT ...) returns nothing when the subquery returns a NULL.</summary>
+        [DataMember(Name = "notInSubquery")]
+        public bool NotInSubquery { get; set; }
+
+        /// <summary>FROM a, b WHERE a.x = b.x (use JOIN ... ON).</summary>
+        [DataMember(Name = "oldStyleJoin")]
+        public bool OldStyleJoin { get; set; }
+
         public AnalysisSettings Clone() => (AnalysisSettings)MemberwiseClone();
 
         [OnDeserializing]
@@ -53,6 +81,13 @@ namespace SqlPrompter.Core.Settings
             SelectStar = false;
             LockHint = false;
             UnexpectedEnd = true;
+            FunctionOnColumn = true;
+            LeadingWildcard = true;
+            TopWithoutOrderBy = true;
+            AtAtIdentity = true;
+            TypeWithoutLength = true;
+            NotInSubquery = true;
+            OldStyleJoin = true;
         }
     }
 }
