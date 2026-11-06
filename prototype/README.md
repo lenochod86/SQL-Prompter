@@ -90,3 +90,7 @@ Repeat for every authentication type available: Windows, SQL Server and Entra ID
 | Connection: SQL Server (password available?) | yes: data including the password available (`AuthenticationType=1`); own connection with the window's `Encrypt`/`TrustServerCertificate` OK in 91–114 ms | 22.11.3, 2026-11-02 |
 | Connection: Entra ID MFA (sign in again?) | not verified | |
 | Database change in the window is visible | yes, `AdvancedOptions[DATABASE]` follows the drop-down (`test` → `tempdb`) | 22.11.3, 2026-11-02 |
+
+## Language client probe (architecture review, #183)
+
+`SqlPrompter.LspProbe` (a VSIX with a `[ContentType("SQL")]` `ILanguageClient`) and `SqlPrompter.LspProbe.Server` (a minimal language server over stdio that logs every message to `%LOCALAPPDATA%\SqlPrompter\lspprobe.log`) check whether the Visual Studio language client can be used in SSMS 22. Result on SSMS 22.11 (2026-11-06): the part was composed into the MEF catalog, but the client was never instantiated (see `docs/architecture-review.md`). To repeat it: build both projects, copy the server output to `%LOCALAPPDATA%\SqlPrompter\lspprobe\`, install the VSIX, open a SQL window and read `lspprobe-client.log`; uninstall with `VSIXInstaller.exe /uninstall:SqlPrompter.LspProbe.4f1d2c3e-7a55-4a0e-9f0b-2b6a1d9c0e11`.
