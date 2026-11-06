@@ -68,6 +68,10 @@ namespace SqlPrompter.Ssms
         private readonly Popup descriptionPopup;
         private readonly TextBlock descriptionText;
         private readonly TextBlock definitionText;
+        private readonly Grid definitionHeader = new Grid { Visibility = Visibility.Collapsed, Margin = new Thickness(8, 0, 4, 2) };
+        private readonly TextBlock definitionName = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
+        private DefinitionRef definitionReference;
+        private string definitionScript;
         private CompletionItem definitionItem;
         private DispatcherTimer definitionTimer;
         private readonly StackPanel rowPanel = new StackPanel();
@@ -150,8 +154,20 @@ namespace SqlPrompter.Ssms
                 Visibility = Visibility.Collapsed,
             };
             definitionText.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+            definitionName.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+            definitionHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            definitionHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            definitionHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var copyButton = HeaderButton("Copy", "Copy the whole script", CopyDefinition);
+            var pinButton = HeaderButton("Pin", "Keep the definition in a window of its own", PinDefinition);
+            Grid.SetColumn(copyButton, 1);
+            Grid.SetColumn(pinButton, 2);
+            definitionHeader.Children.Add(definitionName);
+            definitionHeader.Children.Add(copyButton);
+            definitionHeader.Children.Add(pinButton);
             var detailPanel = new StackPanel();
             detailPanel.Children.Add(descriptionText);
+            detailPanel.Children.Add(definitionHeader);
             detailPanel.Children.Add(definitionText);
             descriptionPopup = CreatePopup(detailPanel);
             PopupWindows.Attach(descriptionPopup, () => view.VisualElement);
@@ -400,6 +416,8 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
+            definitionReference = reference;
+
             if (DefinitionPreview.TryGetCached(reference, out var cached))
             {
                 ShowDefinition(cached);
@@ -426,18 +444,112 @@ namespace SqlPrompter.Ssms
 
         private void ShowDefinition(string script)
         {
+            definitionScript = script;
             if (string.IsNullOrWhiteSpace(script))
             {
-                definitionText.Text = string.Empty;
+                definitionText.Inlines.Clear();
                 definitionText.Visibility = Visibility.Collapsed;
+                definitionHeader.Visibility = Visibility.Collapsed;
                 return;
             }
 
             var lines = script.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\t", "    ").Split('\n');
             var shown = lines.Take(DefinitionLines).Select(l => l.Length > 110 ? l.Substring(0, 110) + "..." : l);
-            definitionText.Text = string.Join("\n", shown) + (lines.Length > DefinitionLines ? "\n..." : string.Empty);
+            var text = string.Join("\n", shown) + (lines.Length > DefinitionLines ? "\n..." : string.Empty);
+            FillColored(definitionText, text);
+            definitionName.Inlines.Clear();
+            if (definitionReference != null)
+            {
+                if (!string.IsNullOrEmpty(definitionReference.Schema))
+                {
+                    definitionName.Inlines.Add(new System.Windows.Documents.Run(definitionReference.Schema + ".") { Foreground = DimBrush() });
+                }
+
+                definitionName.Inlines.Add(new System.Windows.Documents.Run(definitionReference.Name));
+            }
+
             definitionText.Visibility = Visibility.Visible;
+            definitionHeader.Visibility = Visibility.Visible;
             descriptionPopup.IsOpen = popup.IsOpen;
+        }
+
+        private static Brush DimBrush()
+        {
+            var dark = BackgroundColor.R + BackgroundColor.G + BackgroundColor.B < 384;
+            var brush = new SolidColorBrush(dark ? Color.FromRgb(0xB0, 0xB0, 0xB0) : Color.FromRgb(0x70, 0x70, 0x70));
+            brush.Freeze();
+            return brush;
+        }
+
+        /// <summary>The script colored as SQL (keywords, strings, comments, variables) for the light or the dark theme.</summary>
+        private static void FillColored(TextBlock block, string text)
+        {
+            var dark = BackgroundColor.R + BackgroundColor.G + BackgroundColor.B < 384;
+            var colors = new Color?[]
+            {
+                null,
+                dark ? Color.FromRgb(0x56, 0x9C, 0xD6) : Color.FromRgb(0x00, 0x00, 0xFF),
+                dark ? Color.FromRgb(0xD6, 0x9D, 0x85) : Color.FromRgb(0xA3, 0x15, 0x15),
+                dark ? Color.FromRgb(0x57, 0xA6, 0x4A) : Color.FromRgb(0x00, 0x80, 0x00),
+                dark ? Color.FromRgb(0x9C, 0xDC, 0xFE) : Color.FromRgb(0x1F, 0x37, 0x7F),
+                null,
+            };
+            var kinds = SqlPrompter.Core.Snippets.SnippetHighlighter.Classify(text);
+            block.Inlines.Clear();
+            var i = 0;
+            while (i < text.Length)
+            {
+                var kind = Math.Min(kinds[i], colors.Length - 1);
+                var j = i;
+                while (j < text.Length && Math.Min(kinds[j], colors.Length - 1) == kind)
+                {
+                    j++;
+                }
+
+                var run = new System.Windows.Documents.Run(text.Substring(i, j - i));
+                if (colors[kind].HasValue)
+                {
+                    run.Foreground = new SolidColorBrush(colors[kind].Value);
+                }
+
+                block.Inlines.Add(run);
+                i = j;
+            }
+        }
+
+        private static Button HeaderButton(string text, string tip, Action click)
+        {
+            var button = new Button { Content = text, ToolTip = tip, Focusable = false, Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(4, 0, 0, 0), FontSize = 11 };
+            button.Click += (s, e) => click();
+            return button;
+        }
+
+        private void CopyDefinition()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(definitionScript))
+                {
+                    Clipboard.SetText(definitionScript);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Copying the definition failed", ex);
+            }
+        }
+
+        /// <summary>Opens the definition in a window that stays when the list closes.</summary>
+        private void PinDefinition()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (string.IsNullOrEmpty(definitionScript))
+            {
+                return;
+            }
+
+            var title = definitionReference == null ? "Definition" : (string.IsNullOrEmpty(definitionReference.Schema) ? string.Empty : definitionReference.Schema + ".") + definitionReference.Name;
+            DefinitionWindow.Open(title, definitionScript);
         }
 
         private void Position(CompletionPresentationViewModel presentation)
