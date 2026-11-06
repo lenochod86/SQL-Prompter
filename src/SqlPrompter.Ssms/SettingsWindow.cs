@@ -129,6 +129,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.SuggestAfterComma, v => work.Behavior.SuggestAfterComma = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Show a hint for expanding *", "While the caret is right behind a * in a select list that Tab can expand, a small note under it says \"Tab: expand columns\".",
                 () => work.Behavior.ShowStarHint, v => work.Behavior.ShowStarHint = v, () => work.Behavior.SuggestionsEnabled);
+            completion.Check("Show descriptions from the database", "The description area also shows the MS_Description extended properties of the selected table, view, procedure or function and of its columns (read in the background, nothing is shown when there are none).",
+                () => work.Behavior.ShowDbDescriptions, v => work.Behavior.ShowDbDescriptions = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Mark items with \"SQL Prompter\"", "Shows \"SQL Prompter\" on the right of every item so that it is obvious the list is ours and not the built-in one.",
                 () => work.Behavior.MarkItems, v => work.Behavior.MarkItems = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Match initials and loose characters", "Besides a prefix or a part of the name the typed text may pick the capital letters or the words of a name (BKT finds BurzaKlientTyp, kt finds Burza_Klient_Typ) or its characters in order (bzkl). Exact and prefix matches stay first, loose matches last.",

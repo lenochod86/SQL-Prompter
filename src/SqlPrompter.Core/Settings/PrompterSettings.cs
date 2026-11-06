@@ -207,6 +207,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "suggestAfterComma")]
         public bool SuggestAfterComma { get; set; }
 
+        /// <summary>The description area shows the descriptions that the database keeps (extended property MS_Description) for the selected object and its columns.</summary>
+        [DataMember(Name = "showDbDescriptions")]
+        public bool ShowDbDescriptions { get; set; }
+
         /// <summary>A note under the caret says that Tab expands a star in a select list.</summary>
         [DataMember(Name = "showStarHint")]
         public bool ShowStarHint { get; set; }
@@ -304,6 +308,7 @@ namespace SqlPrompter.Core.Settings
             ListWidth = 0;
             QuickActionsOnCtrl = true;
             ShowStarHint = true;
+            ShowDbDescriptions = true;
             KeepHistory = true;
             HistoryDays = 0;
             RestoreTabs = true;
