@@ -243,6 +243,8 @@ namespace SqlPrompter.Ssms
         public void Update(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            CheckedItems = null;
+            SetFooter(SessionFooter(session));
             Present(presentation.ItemList, presentation.ItemList, presentation.SelectedItemIndex, presentation.UseSoftSelection,
                 presentation.DisplaySuggestionItem && presentation.SuggestionItem != null, presentation.SuggestionItem, presentation.SelectSuggestionItem, presentation.ApplicableToSpan);
         }
@@ -285,6 +287,40 @@ namespace SqlPrompter.Ssms
             {
                 descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
             }
+        }
+
+        /// <summary>The status bar of the editor's own list: where columns are picked, the tabs and the hint that lead to the column picker.</summary>
+        private ListFooter SessionFooter(IAsyncCompletionSession session)
+        {
+            if (!session.Properties.TryGetProperty(SqlCompletionSource.PickerAvailableKey, out bool available) || !available)
+            {
+                return null;
+            }
+
+            var shownHint = SettingsService.Current.Behavior.ShowColumnPickerHint;
+            return new ListFooter
+            {
+                PickerAvailable = true,
+                Hint = shownHint ? "Ctrl+Left: column picker" : null,
+                HideHint = shownHint ? new Action(() =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    var settings = SettingsService.Current.Clone();
+                    settings.Behavior.ShowColumnPickerHint = false;
+                    SettingsService.Update(settings);
+                    SetFooter(SessionFooter(session));
+                }) : null,
+                ShowPicker = () =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    if (InvokedList.CanPick(view))
+                    {
+                        session.Dismiss();
+                        InvokedList.Open(view, picker: true);
+                    }
+                },
+                ShowAll = () => { },
+            };
         }
 
         /// <summary>Sets what the status bar shows (null for none) and draws it.</summary>
