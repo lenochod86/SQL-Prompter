@@ -19,27 +19,28 @@ namespace SqlPrompter.Core.Completion
                 .ToList();
 
         /// <summary>
-        /// The items whose filter text contains the typed text (case-insensitive), those that start with it first; the order of the input is kept
-        /// within both parts. Everything for no typed text.
+        /// The items that match the typed text (see <see cref="NameMatcher"/>): exact, then prefix, then the humps and words of the name, then the substring,
+        /// then the characters in order; the order of the input is kept within each kind. Everything for no typed text.
         /// </summary>
-        public static IReadOnlyList<T> Filter<T>(IEnumerable<T> items, string typed, Func<T, string> filterText)
+        /// <param name="loose">The humps, words and characters in order match too; without it only the prefix and the substring.</param>
+        public static IReadOnlyList<T> Filter<T>(IEnumerable<T> items, string typed, Func<T, string> filterText, bool loose = true)
         {
             if (string.IsNullOrEmpty(typed))
             {
                 return items.ToList();
             }
 
-            var matches = items
-                .Select(item => new { item, text = filterText(item) ?? string.Empty })
-                .Where(x => x.text.IndexOf(typed, StringComparison.OrdinalIgnoreCase) >= 0)
-                .ToList();
-            return matches.Where(x => x.text.StartsWith(typed, StringComparison.OrdinalIgnoreCase)).Concat(matches.Where(x => !x.text.StartsWith(typed, StringComparison.OrdinalIgnoreCase)))
+            return items
+                .Select((item, index) => new { item, index, match = NameMatcher.Match(filterText(item), typed, loose) })
+                .Where(x => x.match != null)
+                .OrderBy(x => (int)x.match.Kind)
+                .ThenBy(x => x.index)
                 .Select(x => x.item)
                 .ToList();
         }
 
         /// <summary>True when the item matches the typed text (also for none).</summary>
-        public static bool Matches(string filterText, string typed) =>
-            string.IsNullOrEmpty(typed) || (filterText ?? string.Empty).IndexOf(typed, StringComparison.OrdinalIgnoreCase) >= 0;
+        public static bool Matches(string filterText, string typed, bool loose = true) =>
+            string.IsNullOrEmpty(typed) || NameMatcher.Match(filterText, typed, loose) != null;
     }
 }
