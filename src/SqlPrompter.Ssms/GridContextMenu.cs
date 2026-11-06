@@ -49,6 +49,8 @@ namespace SqlPrompter.Ssms
                     var caption = bar.Controls[i].Caption ?? string.Empty;
                     if (caption.IndexOf("Script Results Grid Selection", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
+                        // The command stays in the menu from an earlier start; the submenu is added next to it all the same.
+                        AddCopyAs(dte, bar, i + 1);
                         return;
                     }
 
