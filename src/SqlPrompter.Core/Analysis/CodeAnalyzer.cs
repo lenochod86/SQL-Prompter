@@ -15,6 +15,13 @@ namespace SqlPrompter.Core.Analysis
         SelectStar,
         LockHint,
         UnexpectedEnd,
+        FunctionOnColumn,
+        LeadingWildcard,
+        TopWithoutOrderBy,
+        AtAtIdentity,
+        TypeWithoutLength,
+        NotInSubquery,
+        OldStyleJoin,
     }
 
     public enum CodeIssueSeverity
@@ -23,11 +30,29 @@ namespace SqlPrompter.Core.Analysis
         Warning,
     }
 
+    /// <summary>The text that repairs an issue: <see cref="Length"/> characters at <see cref="Start"/> are replaced by <see cref="Replacement"/> (an insertion has a length of 0).</summary>
+    public sealed class CodeFix
+    {
+        public CodeFix(int start, int length, string replacement)
+        {
+            Start = start;
+            Length = length;
+            Replacement = replacement;
+        }
+
+        public int Start { get; }
+
+        public int Length { get; }
+
+        public string Replacement { get; }
+    }
+
     /// <summary>A problem found in the script: the stretch of text to underline and what to tell the user.</summary>
     public sealed class CodeIssue
     {
-        public CodeIssue(CodeIssueKind kind, CodeIssueSeverity severity, int start, int length, string message)
+        public CodeIssue(CodeIssueKind kind, CodeIssueSeverity severity, int start, int length, string message, CodeFix fix = null)
         {
+            Fix = fix;
             Kind = kind;
             Severity = severity;
             Start = start;
@@ -45,6 +70,9 @@ namespace SqlPrompter.Core.Analysis
 
         public string Message { get; }
 
+        /// <summary>The repair, or null when the issue has none (the message says what to do).</summary>
+        public CodeFix Fix { get; }
+
         public override string ToString() => Kind + "@" + Start + ": " + Message;
     }
 
@@ -53,7 +81,7 @@ namespace SqlPrompter.Core.Analysis
     /// list, unused variables, <c>SELECT *</c> and lock hints. Comments and strings are never inspected. Each rule is switched by
     /// <see cref="AnalysisSettings"/>.
     /// </summary>
-    public static class CodeAnalyzer
+    public static partial class CodeAnalyzer
     {
         private static readonly HashSet<string> StopsJoin = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -114,6 +142,8 @@ namespace SqlPrompter.Core.Analysis
             {
                 FindLockHints(tokens, issues);
             }
+
+            FindMoreIssues(tokens, settings, issues);
 
             return issues.OrderBy(i => i.Start).ToList();
         }
@@ -191,12 +221,15 @@ namespace SqlPrompter.Core.Analysis
                     if ((next != null && next.IsWord("NULL")) || (previous != null && previous.IsWord("NULL")))
                     {
                         var negated = text != "=";
+                        // x = NULL has a repair: the operator and the NULL after it become IS [NOT] NULL.
+                        var fix = next != null && next.IsWord("NULL") ? new CodeFix(token.Start, next.End - token.Start, "IS " + (negated ? "NOT " : string.Empty) + "NULL") : null;
                         issues.Add(new CodeIssue(
                             CodeIssueKind.EqualsNull,
                             CodeIssueSeverity.Warning,
                             token.Start,
                             tokens[last].End - token.Start,
-                            "Comparing with NULL using " + text + " is never true; use IS " + (negated ? "NOT " : string.Empty) + "NULL."));
+                            "Comparing with NULL using " + text + " is never true; use IS " + (negated ? "NOT " : string.Empty) + "NULL.",
+                            fix));
                     }
 
                     i = last;

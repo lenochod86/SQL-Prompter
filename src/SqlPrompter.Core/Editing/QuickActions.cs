@@ -29,6 +29,7 @@ namespace SqlPrompter.Core.Editing
         public const string RemoveBrackets = "removeBrackets";
         public const string InsertSemicolons = "insertSemicolons";
         public const string RemoveUnusedVariables = "removeUnusedVariables";
+        public const string FixCodeIssues = "fixCodeIssues";
         public const string ExpandStars = "expandStars";
         public const string QualifyNames = "qualifyNames";
         public const string AddNPrefix = "addNPrefix";
@@ -49,6 +50,7 @@ namespace SqlPrompter.Core.Editing
                 new QuickAction(RemoveBrackets, "Remove Square Brackets", "Removes brackets that are not needed in " + scope + "."),
                 new QuickAction(InsertSemicolons, "Insert Semicolons", "Ends the statements of " + scope + " with a semicolon."),
                 new QuickAction(RemoveUnusedVariables, "Remove Unused Variables", "Removes DECLAREs that nothing uses in " + scope + "."),
+                new QuickAction(FixCodeIssues, "Fix Code Analysis Issues", "Repairs = NULL, @@IDENTITY and types without a length in " + scope + "."),
                 new QuickAction(AddNPrefix, "Add N Prefix To Strings", "Turns 'text' into N'text' in " + scope + "."),
                 new QuickAction(AddAs, "Add AS To Aliases", "Writes AS before every alias in " + scope + "."),
                 new QuickAction(RemoveAs, "Remove AS From Aliases", "Drops AS before the aliases in " + scope + "."),
