@@ -26,7 +26,8 @@ namespace SqlPrompter.Metadata
             IReadOnlyList<DbForeignKey> foreignKeys = null,
             IReadOnlyDictionary<int, IReadOnlyList<string>> primaryKeys = null,
             IReadOnlyList<DbProcedure> procedures = null,
-            IReadOnlyDictionary<int, IReadOnlyList<DbParameter>> functionParameters = null)
+            IReadOnlyDictionary<int, IReadOnlyList<DbParameter>> functionParameters = null,
+            IReadOnlyList<DbTrigger> triggers = null)
         {
             DatabaseName = databaseName ?? string.Empty;
             DefaultSchema = string.IsNullOrEmpty(defaultSchema) ? "dbo" : defaultSchema;
@@ -36,6 +37,7 @@ namespace SqlPrompter.Metadata
             LinkedServers = linkedServers ?? Array.Empty<string>();
             ForeignKeys = foreignKeys ?? Array.Empty<DbForeignKey>();
             Procedures = procedures ?? Array.Empty<DbProcedure>();
+            Triggers = triggers ?? Array.Empty<DbTrigger>();
             this.functionParameters = functionParameters ?? new Dictionary<int, IReadOnlyList<DbParameter>>();
             this.primaryKeys = primaryKeys ?? new Dictionary<int, IReadOnlyList<string>>();
             Version = version;
@@ -58,6 +60,7 @@ namespace SqlPrompter.Metadata
             LinkedServers = source.LinkedServers;
             ForeignKeys = source.ForeignKeys;
             Procedures = source.Procedures;
+            Triggers = source.Triggers;
             functionParameters = source.functionParameters;
             primaryKeys = source.primaryKeys;
             Version = source.Version;
@@ -81,6 +84,8 @@ namespace SqlPrompter.Metadata
         public IReadOnlyList<DbForeignKey> ForeignKeys { get; }
 
         public IReadOnlyList<DbProcedure> Procedures { get; }
+
+        public IReadOnlyList<DbTrigger> Triggers { get; }
 
         public IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function) =>
             function != null && functionParameters.TryGetValue(function.Id, out var list) ? list : Array.Empty<DbParameter>();

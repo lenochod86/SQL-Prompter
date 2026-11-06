@@ -201,6 +201,17 @@ namespace SqlPrompter.Core.Analysis
                 }
             }
 
+            // ALTER PROCEDURE |, CREATE OR ALTER VIEW |, DROP TRIGGER |: the modules of that kind only.
+            if (qualifier.Count <= 1 && TryModuleTarget(tokens, statementStart, anchorIndex, out var moduleKind, out var moduleAction))
+            {
+                var module = Make(ContextKind.ObjectName);
+                module.Module = moduleKind;
+                module.ModuleAction = moduleAction;
+                module.ModuleHeaderStart = tokens[statementStart].Start;
+                module.PreferredKeywords = Array.Empty<string>();
+                return module;
+            }
+
             // 1. Object name after FROM, JOIN, UPDATE, INTO …
             var objectKeywords = ObjectNameAnchor(tokens, anchorIndex, statementStart);
             var commaInFrom = anchor.Kind == TokenKind.Comma && anchorAtBlockLevel && clauseState.InFrom && clauseState.Clause == Clause.From;
@@ -720,6 +731,47 @@ namespace SqlPrompter.Core.Analysis
             context.Sources = new[] { new TableSource(TableSourceKind.Object, parts, null, 0) };
             context.FirstInsertColumn = tokens[anchorIndex].Kind == TokenKind.OpenParen;
             return context;
+        }
+
+        /// <summary>The caret is where the name of a procedure, function, view or trigger goes after ALTER, CREATE OR ALTER or DROP.</summary>
+        private static bool TryModuleTarget(List<Token> tokens, int statementStart, int anchorIndex, out ModuleKind kind, out ModuleAction action)
+        {
+            kind = ModuleKind.None;
+            action = ModuleAction.None;
+            switch (tokens[anchorIndex].Upper)
+            {
+                case "PROCEDURE":
+                case "PROC":
+                    kind = ModuleKind.Procedure;
+                    break;
+                case "FUNCTION":
+                    kind = ModuleKind.Function;
+                    break;
+                case "VIEW":
+                    kind = ModuleKind.View;
+                    break;
+                case "TRIGGER":
+                    kind = ModuleKind.Trigger;
+                    break;
+                default:
+                    return false;
+            }
+
+            var head = tokens[statementStart].Upper;
+            if (head == "ALTER" && anchorIndex == statementStart + 1)
+            {
+                action = ModuleAction.Alter;
+            }
+            else if (head == "CREATE" && anchorIndex == statementStart + 3 && tokens[statementStart + 1].IsWord("OR") && tokens[statementStart + 2].IsWord("ALTER"))
+            {
+                action = ModuleAction.CreateOrAlter;
+            }
+            else if (head == "DROP" && anchorIndex == statementStart + 1)
+            {
+                action = ModuleAction.Drop;
+            }
+
+            return action != ModuleAction.None;
         }
 
         /// <summary>
