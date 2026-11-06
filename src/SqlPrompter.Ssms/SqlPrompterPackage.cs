@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 24)]
+    [ProvideMenuResource("Menus.ctmenu", 25)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
@@ -24,6 +24,7 @@ namespace SqlPrompter.Ssms
         public const int OpenLogId = 0x0101;
         public const int SettingsId = 0x011F;
         public const int FormattingStylesId = 0x0120;
+        public const int ShowSuggestionsId = 0x0121;
         public const int FormatDocumentId = 0x011A;
         public const int FormatSelectionId = 0x011B;
         public const int AddNPrefixId = 0x011C;
@@ -67,6 +68,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenSettings(), new CommandID(CommandSet, SettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => FormattingStylesWindow.Open(), new CommandID(CommandSet, FormattingStylesId)));
+                commands.AddCommand(new MenuCommand((s, e) => ShowSuggestions(), new CommandID(CommandSet, ShowSuggestionsId)));
                 commands.AddCommand(new MenuCommand((s, e) => SurroundSelection(), new CommandID(CommandSet, SurroundWithSnippetId)));
                 commands.AddCommand(new MenuCommand((s, e) => NewSnippetFromSelection(), new CommandID(CommandSet, NewSnippetFromSelectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
@@ -307,6 +309,19 @@ namespace SqlPrompter.Ssms
 
         private static bool AskYesNo(string text) =>
             System.Windows.Forms.MessageBox.Show(text, "SQL Prompter", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question, System.Windows.Forms.MessageBoxDefaultButton.Button2) == System.Windows.Forms.DialogResult.Yes;
+        /// <summary>
+        /// Opens the suggestion list at the caret (Ctrl+Space). The key (Edit.CompleteWord) does not reach the command handlers of the SQL editor and a
+        /// session started from outside never asks our source for items (#144), so Ctrl+Space is bound to this command and the list is run by
+        /// <see cref="InvokedList"/>, which uses the same source, presenter and commit code.
+        /// </summary>
+        private void ShowSuggestions()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view)
+            {
+                InvokedList.Open(view);
+            }
+        }
         private void OpenLog()
         {
             ThreadHelper.ThrowIfNotOnUIThread();

@@ -1,4 +1,5 @@
 using System;
+using Microsoft.VisualStudio.Text;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
@@ -207,11 +208,24 @@ namespace SqlPrompter.Ssms
         public void Update(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            soft = presentation.UseSoftSelection;
-            if (!ReferenceEquals(lastItemList, presentation.ItemList))
+            Present(presentation.ItemList, presentation.ItemList, presentation.SelectedItemIndex, presentation.UseSoftSelection,
+                presentation.DisplaySuggestionItem && presentation.SuggestionItem != null, presentation.SuggestionItem, presentation.SelectSuggestionItem, presentation.ApplicableToSpan);
+        }
+
+        /// <summary>
+        /// Shows the list in the popup (opens it when it is closed). Used by the editor's completion session (through <see cref="Update"/>) and by the list
+        /// that SQL Prompter runs itself (<see cref="InvokedList"/>); the popup does not care who drives it. <paramref name="listKey"/> identifies the
+        /// list: while it stays the same object only the selection moves, a new one resets the scroll position and the width.
+        /// </summary>
+        public void Present(IEnumerable<CompletionItemWithHighlight> list, object listKey, int selectedIndex, bool useSoftSelection, bool displaySuggestionItem,
+            CompletionItem suggestion, bool suggestionIsSelected, ITrackingSpan applicableToSpan)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            soft = useSoftSelection;
+            if (!ReferenceEquals(lastItemList, listKey))
             {
-                lastItemList = presentation.ItemList;
-                items = presentation.ItemList.ToList();
+                lastItemList = listKey;
+                items = list.ToList();
                 listWidth = widthSetting > 0 ? widthSetting : MeasureWidth(items);
                 listGrid.Width = listWidth;
                 offset = 0;
@@ -225,17 +239,29 @@ namespace SqlPrompter.Ssms
                 updatingScrollBar = false;
             }
 
-            showSuggestion = presentation.DisplaySuggestionItem && presentation.SuggestionItem != null;
-            suggestionSelected = showSuggestion && presentation.SelectSuggestionItem;
-            selected = suggestionSelected ? -1 : presentation.SelectedItemIndex;
-            suggestionItem = presentation.SuggestionItem;
+            showSuggestion = displaySuggestionItem && suggestion != null;
+            suggestionSelected = showSuggestion && suggestionIsSelected;
+            selected = suggestionSelected ? -1 : selectedIndex;
+            suggestionItem = suggestion;
             EnsureSelectedVisible();
             Render();
-            Position(presentation);
+            Position(applicableToSpan);
             if (popup.IsOpen)
             {
                 descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
             }
+        }
+
+        /// <summary>True while the popup is shown.</summary>
+        public bool IsOpen => popup.IsOpen;
+
+        /// <summary>Opens the popup for a list given with <see cref="Present"/> (the editor's session opens it through <see cref="Open"/>).</summary>
+        public void Show()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            ReadSizeSettings();
+            popup.IsOpen = true;
+            descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
         }
 
         public void Close()
@@ -646,11 +672,11 @@ namespace SqlPrompter.Ssms
             DefinitionWindow.Open(title, definitionScript, definitionSummary, showingSummary);
         }
 
-        private void Position(CompletionPresentationViewModel presentation)
+        private void Position(ITrackingSpan applicableToSpan)
         {
             try
             {
-                var span = presentation.ApplicableToSpan.GetSpan(view.TextSnapshot);
+                var span = applicableToSpan.GetSpan(view.TextSnapshot);
                 var line = view.GetTextViewLineContainingBufferPosition(span.Start);
                 var bounds = line.GetCharacterBounds(span.Start);
                 var height = (Math.Min(items.Count, visibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + GripHeight + 2;
