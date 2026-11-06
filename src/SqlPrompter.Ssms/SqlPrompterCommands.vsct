@@ -159,6 +159,12 @@
           <ButtonText>Script Results Grid Selection As Temp Table</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidScriptOutline" priority="0x0118" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Script Outline</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidFormatDocument" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
         <Strings>
@@ -285,6 +291,7 @@
       <IDSymbol name="cmdidFixCodeIssues" value="0x0124" />
       <IDSymbol name="cmdidPreviewAsSelect" value="0x0125" />
       <IDSymbol name="cmdidDryRun" value="0x0126" />
+      <IDSymbol name="cmdidScriptOutline" value="0x012C" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />
