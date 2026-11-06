@@ -133,6 +133,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "showStarHint")]
         public bool ShowStarHint { get; set; }
 
+        /// <summary>Pressing and releasing Ctrl on its own opens the quick actions popup.</summary>
+        [DataMember(Name = "quickActionsOnCtrl")]
+        public bool QuickActionsOnCtrl { get; set; }
+
         /// <summary>The other places of the name under the caret are highlighted.</summary>
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
@@ -191,6 +195,7 @@ namespace SqlPrompter.Core.Settings
             AutoClose = true;
             SuggestAfterComma = true;
             HighlightMatches = true;
+            QuickActionsOnCtrl = true;
             ShowStarHint = true;
             KeepHistory = true;
             HistoryDays = 0;

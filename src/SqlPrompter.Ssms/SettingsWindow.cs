@@ -249,6 +249,8 @@ namespace SqlPrompter.Ssms
             var editor = Add("Editor helpers");
             editor.Check("Auto-close quotes, brackets and parentheses", "Typing ' [ or ( also inserts the closing character; typing it again steps over it, and Backspace between an empty pair removes both. Nothing is closed inside strings, comments and bracketed names.",
                 () => work.Behavior.AutoClose, v => work.Behavior.AutoClose = v);
+            editor.Check("Quick actions on a tap of Ctrl", "Pressing and releasing the Ctrl key on its own opens a popup at the left of the editor with the actions of the SQL Prompter menu and the snippets that fit (type to filter, Enter runs, Esc closes). Ctrl together with another key or the mouse does not open it.",
+                () => work.Behavior.QuickActionsOnCtrl, v => work.Behavior.QuickActionsOnCtrl = v);
             editor.Check("Highlight matching names", "Highlights the other places of the script where the name under the caret appears (compared by name, ignoring case and brackets).",
                 () => work.Behavior.HighlightMatches, v => work.Behavior.HighlightMatches = v);
 

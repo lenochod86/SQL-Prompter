@@ -167,6 +167,7 @@ The user uses almost all of them. Agreed order (decision 16): #52 editor helpers
   - [x] remove square brackets
   - [x] unused variables
   - [x] script summary
+- [x] Quick actions popup on a tap of Ctrl (#125): filter box and list of the menu actions (for the selection or the whole script) and the snippets that fit; verified in SSMS 22 (`brackets` + Enter removed the brackets)
 - [x] Execution warnings: `DELETE` or `UPDATE` without `WHERE` ask for confirmation (#106)
 - [ ] Code analysis (#51)
   - [x] squiggles with tooltips, analysis in the background: `= NULL`, JOIN without ON, INSERT without columns, unused variable, SELECT *, lock hints (first step, text only)
