@@ -179,7 +179,9 @@ namespace SqlPrompter.Core.Completion
                 case ContextKind.Keyword:
                     return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0)).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
-                    return ObjectSuggestions(context, metadata, script, options).Concat(SnippetSuggestions(context, options)).ToList();
+                    return context.Module != ModuleKind.None
+                        ? ObjectSuggestions(context, metadata, script, options).Concat(context.ModuleAction == ModuleAction.Drop ? KeywordSuggestions(context, 1) : Enumerable.Empty<Suggestion>()).ToList()
+                        : ObjectSuggestions(context, metadata, script, options).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.InsertColumns:
                     return InsertColumnSuggestions(context, metadata, options).ToList();
                 case ContextKind.Expression:
@@ -340,8 +342,70 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
+        /// <summary>
+        /// After ALTER PROCEDURE, FUNCTION, VIEW or TRIGGER (also CREATE OR ALTER and DROP): the modules of that kind only. For ALTER and CREATE OR ALTER
+        /// the item carries a <see cref="ModuleScript"/>: its commit replaces the statement with the definition of the module.
+        /// </summary>
+        private static IEnumerable<Suggestion> ModuleSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        {
+            if (metadata == null || context.Qualifier.Count > 1)
+            {
+                yield break;
+            }
+
+            var quote = context.QuoteIdentifiers;
+            string schemaFilter = context.Qualifier.Count == 1
+                ? (context.Qualifier[0].Length == 0 ? metadata.DefaultSchema : context.Qualifier[0])
+                : null;
+            var modules = new List<(string Schema, string Name, SuggestionKind Kind, string Description, string Suffix)>();
+            switch (context.Module)
+            {
+                case ModuleKind.Procedure:
+                    modules.AddRange(metadata.Procedures.Select(p => (p.Schema, p.Name, SuggestionKind.Procedure, "procedure " + p, (string)p.Schema)));
+                    break;
+                case ModuleKind.View:
+                    modules.AddRange(metadata.Objects.Where(o => o.Kind == DbObjectKind.View && !o.IsSystem).Select(o => (o.Schema, o.Name, SuggestionKind.View, "view " + o, (string)o.Schema)));
+                    break;
+                case ModuleKind.Function:
+                    modules.AddRange(metadata.Objects.Where(o => (o.Kind == DbObjectKind.ScalarFunction || o.Kind == DbObjectKind.TableFunction) && !o.IsSystem)
+                        .Select(o => (o.Schema, o.Name, o.Kind == DbObjectKind.ScalarFunction ? SuggestionKind.ScalarFunction : SuggestionKind.TableFunction,
+                            (o.Kind == DbObjectKind.ScalarFunction ? "scalar function " : "table function ") + o, (string)o.Schema)));
+                    break;
+                case ModuleKind.Trigger:
+                    modules.AddRange(metadata.Triggers.Select(t => (t.Schema, t.Name, SuggestionKind.Procedure,
+                        t.ParentName == null ? "database trigger " + t.Name : "trigger " + t + " on " + t.ParentName, t.ParentName ?? "database")));
+                    break;
+            }
+
+            foreach (var module in modules)
+            {
+                if (schemaFilter != null && !string.Equals(module.Schema, schemaFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var name = SqlIdentifier.Quote(module.Name, quote);
+                var insert = module.Schema == null || schemaFilter != null ? name : SqlIdentifier.Quote(module.Schema, quote) + "." + name;
+                var tag = context.ModuleAction == ModuleAction.Drop
+                    ? null
+                    : new ModuleScript(context.Module, module.Schema, module.Name, context.ModuleAction == ModuleAction.CreateOrAlter, context.ModuleHeaderStart);
+                yield return new Suggestion(module.Kind, module.Name, insert, module.Name, module.Suffix, module.Description, 0, tag: tag)
+                    .WithDefinition(module.Schema, module.Name);
+            }
+        }
+
         private static IEnumerable<Suggestion> ObjectSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
+            if (context.Module != ModuleKind.None)
+            {
+                foreach (var suggestion in ModuleSuggestions(context, metadata))
+                {
+                    yield return suggestion;
+                }
+
+                yield break;
+            }
+
             if (context.ProcedureName)
             {
                 foreach (var suggestion in ProcedureSuggestions(context, metadata, options))

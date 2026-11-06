@@ -67,6 +67,72 @@ namespace SqlPrompter.Core.Navigation
             return definition;
         }
 
+        /// <summary>
+        /// Turns the stored text of a procedure, view, function or trigger into ALTER (or, with <paramref name="createOrAlter"/>, CREATE OR ALTER): the first
+        /// CREATE (outside comments), with an OR ALTER after it when there is one, is replaced; comments, the case of the other words and the rest of
+        /// the text are kept. A text that does not start with CREATE is returned unchanged.
+        /// </summary>
+        public static string ToAlter(string definition, bool createOrAlter = false)
+        {
+            if (createOrAlter || string.IsNullOrEmpty(definition))
+            {
+                return createOrAlter ? ToCreateOrAlter(definition) : definition ?? string.Empty;
+            }
+
+            var tokens = Lexer.Tokenize(definition);
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Kind == TokenKind.Comment)
+                {
+                    continue;
+                }
+
+                if (!tokens[i].IsWord("CREATE"))
+                {
+                    return definition;
+                }
+
+                var end = tokens[i].End;
+                if (i + 2 < tokens.Count && tokens[i + 1].IsWord("OR") && tokens[i + 2].IsWord("ALTER"))
+                {
+                    end = tokens[i + 2].End;
+                }
+
+                var alter = tokens[i].Text == tokens[i].Text.ToLowerInvariant() ? "alter" : "ALTER";
+                return definition.Substring(0, tokens[i].Start) + alter + definition.Substring(end);
+            }
+
+            return definition;
+        }
+
+        /// <summary>
+        /// Where the caret goes in a module script: the start of the line after the first AS of the header (not the AS of a parameter type);
+        /// the end of the text when there is none.
+        /// </summary>
+        public static int BodyStart(string script)
+        {
+            script = script ?? string.Empty;
+            var tokens = Lexer.Tokenize(script);
+            var depth = 0;
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    depth++;
+                }
+                else if (tokens[i].Kind == TokenKind.CloseParen)
+                {
+                    depth--;
+                }
+                else if (depth == 0 && tokens[i].IsWord("AS") && (i == 0 || tokens[i - 1].Kind != TokenKind.Variable))
+                {
+                    var newLine = script.IndexOf('\n', tokens[i].End);
+                    return newLine < 0 ? script.Length : newLine + 1;
+                }
+            }
+
+            return script.Length;
+        }
         /// <summary>A CREATE TABLE script with the columns and the primary key; indexes, defaults and foreign keys are not included.</summary>
         public static string ForTable(string schema, string name, IReadOnlyList<ScriptTableColumn> columns, string primaryKeyName, IReadOnlyList<string> primaryKeyColumns)
         {

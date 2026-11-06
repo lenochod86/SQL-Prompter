@@ -128,6 +128,27 @@ namespace SqlPrompter.Core.Model
         public override string ToString() => Schema + "." + Name;
     }
 
+    /// <summary>A trigger: a DML trigger on a table or view (<see cref="ParentName"/>), or a database DDL trigger (no parent).</summary>
+    public sealed class DbTrigger
+    {
+        public DbTrigger(string schema, string name, string parentName)
+        {
+            Schema = schema;
+            Name = name;
+            ParentName = parentName;
+        }
+
+        /// <summary>The schema of the trigger (of its parent for a DML trigger); null for a database DDL trigger.</summary>
+        public string Schema { get; }
+
+        public string Name { get; }
+
+        /// <summary>The table or view the trigger is on, as schema.name; null for a database DDL trigger.</summary>
+        public string ParentName { get; }
+
+        public override string ToString() => Schema == null ? Name : Schema + "." + Name;
+    }
+
     /// <summary>One column pair of a foreign key: the column of the referencing (child) table and the column it points to.</summary>
     public sealed class DbForeignKeyColumn
     {
@@ -189,6 +210,9 @@ namespace SqlPrompter.Core.Model
 
         /// <summary>User stored procedures with their parameters; empty if unknown.</summary>
         IReadOnlyList<DbProcedure> Procedures { get; }
+
+        /// <summary>User triggers (DML and database DDL); empty if unknown.</summary>
+        IReadOnlyList<DbTrigger> Triggers { get; }
 
         /// <summary>The parameters of a user function in the order of the declaration; empty if it has none or they are not known.</summary>
         IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function);

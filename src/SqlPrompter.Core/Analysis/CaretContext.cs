@@ -16,6 +16,24 @@ namespace SqlPrompter.Core.Analysis
         When,
     }
 
+    /// <summary>The kind of programmable object after ALTER, CREATE OR ALTER or DROP.</summary>
+    public enum ModuleKind
+    {
+        None,
+        Procedure,
+        Function,
+        View,
+        Trigger,
+    }
+
+    public enum ModuleAction
+    {
+        None,
+        Alter,
+        CreateOrAlter,
+        Drop,
+    }
+
     public enum ContextKind
     {
         /// <summary>No completion: string, comment, number.</summary>
@@ -173,6 +191,15 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>With <see cref="ContextKind.InsertColumns"/>: the column list of an index (key columns or INCLUDE) of CREATE INDEX, where every column of the table fits.</summary>
         public bool IndexColumns { get; internal set; }
 
+        /// <summary>With <see cref="ContextKind.ObjectName"/> after ALTER / CREATE OR ALTER / DROP PROCEDURE, FUNCTION, VIEW or TRIGGER: only modules of this kind are offered.</summary>
+        public ModuleKind Module { get; internal set; }
+
+        /// <summary>With <see cref="Module"/>: what the statement is.</summary>
+        public ModuleAction ModuleAction { get; internal set; }
+
+        /// <summary>With <see cref="Module"/>: the offset where the statement (ALTER, CREATE OR ALTER, DROP) starts.</summary>
+        public int ModuleHeaderStart { get; internal set; }
+
         /// <summary>With <see cref="ContextKind.InsertColumns"/> for an index: the columns that are listed already and are not offered again.</summary>
         public IReadOnlyList<string> ExcludedColumns { get; internal set; } = Array.Empty<string>();
 
@@ -288,6 +315,9 @@ namespace SqlPrompter.Core.Analysis
             ProcedureName = ProcedureName,
             FirstInsertColumn = FirstInsertColumn,
             IndexColumns = IndexColumns,
+            Module = Module,
+            ModuleAction = ModuleAction,
+            ModuleHeaderStart = ModuleHeaderStart,
             ExcludedColumns = ExcludedColumns,
             InOtherDatabase = inOtherDatabase,
         };

@@ -102,7 +102,15 @@ ORDER BY p.object_id, p.parameter_id;
 SELECT m.object_id, LEFT(m.definition, 4000)
 FROM sys.sql_modules AS m
 WHERE m.object_id IN (SELECT p.object_id FROM sys.parameters AS p JOIN sys.procedures AS o ON o.object_id = p.object_id
-                      WHERE o.is_ms_shipped = 0 AND p.parameter_id > 0);";
+                      WHERE o.is_ms_shipped = 0 AND p.parameter_id > 0);
+
+-- User triggers: DML triggers with their parent table or view, and database DDL triggers.
+SELECT ps.name, t.name, ps.name, p.name
+FROM sys.triggers AS t
+LEFT JOIN sys.objects AS p ON p.object_id = t.parent_id AND t.parent_class = 1
+LEFT JOIN sys.schemas AS ps ON ps.schema_id = p.schema_id
+WHERE t.is_ms_shipped = 0
+ORDER BY t.name;";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -216,10 +224,17 @@ FROM sys.objects;";
 
                     var (procedures, functionParameters) = await ReadProceduresAsync(reader, cancellationToken).ConfigureAwait(false);
 
+                    var triggers = new List<DbTrigger>();
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        triggers.Add(new DbTrigger(reader.IsDBNull(0) ? null : reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2) + "." + reader.GetString(3)));
+                    }
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
                     return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers, foreignKeys,
-                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures, functionParameters);
+                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures, functionParameters, triggers);
                 }
             }
         }

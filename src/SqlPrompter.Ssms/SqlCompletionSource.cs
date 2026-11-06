@@ -59,6 +59,7 @@ namespace SqlPrompter.Ssms
         internal const string FromEditKey = "SqlPrompter.FromEdit";
         internal const string CaretBackKey = "SqlPrompter.CaretBack";
         internal const string BlockKey = "SqlPrompter.Block";
+        internal const string ModuleKey = "SqlPrompter.Module";
         internal const string UsageKeyKey = "SqlPrompter.UsageKey";
         internal const string DefinitionKey = "SqlPrompter.Definition";
         internal const string BeforeLineKey = "SqlPrompter.BeforeLine";
@@ -395,6 +396,11 @@ namespace SqlPrompter.Ssms
                 item.Properties.AddProperty(SnippetKey, snippet);
             }
 
+            if (suggestion.Tag is SqlPrompter.Core.Completion.ModuleScript module)
+            {
+                item.Properties.AddProperty(ModuleKey, new ModuleEdit(prepared.Snapshot.CreateTrackingPoint(prepared.BatchStart + module.HeaderStart, PointTrackingMode.Negative), module, prepared.Metadata?.DatabaseName));
+            }
+
             if (suggestion.Key != KeyKind.None)
             {
                 item.Properties.AddProperty(KeyKey, suggestion.Key);
@@ -600,6 +606,20 @@ namespace SqlPrompter.Ssms
                     SnippetInserter.TryInsert(view, applicable, buffer, snippetToExpand))
                 {
                     return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
+                }
+
+                // ALTER PROCEDURE name: the name is inserted, and the statement is replaced by the definition once it has been read.
+                if (item.Properties.TryGetProperty(SqlCompletionSource.ModuleKey, out ModuleEdit moduleEdit))
+                {
+                    try
+                    {
+                        ModuleScriptInserter.Insert(view, applicable, buffer, item, moduleEdit);
+                        return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Inserting the module script failed", ex);
+                    }
                 }
 
                 // SELECT without FROM: the column is inserted and the missing FROM goes to the end of the select list.
