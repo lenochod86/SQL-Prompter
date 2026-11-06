@@ -121,7 +121,6 @@ namespace SqlPrompter.Ssms
 
         private void BuildPages()
         {
-            var caseStyles = new[] { O(CaseStyle.Keep, "Keep as typed"), O(CaseStyle.Upper, "UPPER CASE"), O(CaseStyle.Lower, "lower case") };
 
             var completion = Add("Completion", "When the suggestion list appears and which keys insert the selected item.");
             completion.Check("Enable suggestions", "When off, SQL Prompter stays out of the way and the built-in SSMS list is shown.",
@@ -224,28 +223,18 @@ namespace SqlPrompter.Ssms
             analysis.Check("NOLOCK and READUNCOMMITTED", "Lock hints that can return uncommitted, missing or duplicated rows. Off by default.", () => work.Analysis.LockHint, v => work.Analysis.LockHint = v, checks, 1);
 
             var formatting = Add("Formatting", "Used by Format Document and Format Selection, and by the lists and keywords SQL Prompter inserts.");
-            formatting.Button("Import a SQL Prompt style...", () => { if (SettingsFiles.ImportFormatStyle(this)) { Imported(); } }, "Reads a style exported from SQL Prompt (.json) and applies the options this formatter has.");
-            formatting.Preview("Preview (sample SQL formatted with the style above)", () => SqlFormatter.Format(FormatSample.Text, work.Formatting).Text);
-            formatting.Heading("Casing");
-            formatting.Choice("Keywords", "SELECT, FROM, WHERE and the other reserved words.", caseStyles, () => work.Formatting.KeywordCase, v => work.Formatting.KeywordCase = v);
-            formatting.Choice("Built-in functions", "COUNT, ISNULL, DATEADD and so on (only when followed by a parenthesis).", caseStyles, () => work.Formatting.FunctionCase, v => work.Formatting.FunctionCase = v);
-            formatting.Choice("Data types", "int, varchar and so on where a type is expected (after a variable, in CAST and CONVERT, in table definitions).", caseStyles, () => work.Formatting.DataTypeCase, v => work.Formatting.DataTypeCase = v);
-            formatting.Check("Case keywords while typing", "A reserved word you type gets the keyword case as soon as you type a space, parenthesis, comma or semicolon after it. Off by default.",
-                () => work.Formatting.CaseKeywordsWhileTyping, v => work.Formatting.CaseKeywordsWhileTyping = v);
-            formatting.Heading("Layout");
-            formatting.Check("Use tabs", "Indentation and alignment are made of tabs where a whole tab fits.", () => work.Formatting.UseTabs, v => work.Formatting.UseTabs = v);
-            formatting.Number("Tab width", "The width of one indent level.", 1, 16, () => work.Formatting.TabWidth, v => work.Formatting.TabWidth = v, "characters");
-            formatting.Check("Commas before items", "Lists put the comma at the start of the next line (, item) instead of the end of the line.", () => work.Formatting.CommaBeforeItems, v => work.Formatting.CommaBeforeItems = v);
-            formatting.Check("AND / OR start the line", "Conditions on several lines begin with AND or OR instead of ending with them.", () => work.Formatting.AndOrBeforeConditions, v => work.Formatting.AndOrBeforeConditions = v);
-            formatting.Check("Conditions on separate lines", "The conditions of WHERE and HAVING each get a line when there are several.", () => work.Formatting.ConditionsOnSeparateLines, v => work.Formatting.ConditionsOnSeparateLines = v);
-            formatting.Check("Line break after DISTINCT and TOP", "SELECT TOP 10 / SELECT DISTINCT end the line; the first item starts the next one.", () => work.Formatting.NewLineAfterDistinctAndTop, v => work.Formatting.NewLineAfterDistinctAndTop = v);
-            formatting.Check("Indent BEGIN ... END", "The statements between BEGIN and END are indented.", () => work.Formatting.IndentBlocks, v => work.Formatting.IndentBlocks = v);
-            formatting.Check("Keep one blank line", "A blank line between statements stays (as one line); otherwise blank lines are removed.", () => work.Formatting.KeepBlankLines, v => work.Formatting.KeepBlankLines = v);
-            formatting.Heading("Short statements");
-            formatting.Number("Keep statements shorter than", "A SELECT, INSERT, UPDATE or DELETE that fits in fewer characters stays on one line. 0 turns it off.", 0, 1000, () => work.Formatting.CollapseStatementsShorterThan, v => work.Formatting.CollapseStatementsShorterThan = v, "characters");
-            formatting.Number("Keep subqueries shorter than", "A subquery or CTE that fits in fewer characters stays on the line of its item. 0 turns it off.", 0, 1000, () => work.Formatting.CollapseSubqueriesShorterThan, v => work.Formatting.CollapseSubqueriesShorterThan = v, "characters");
-            formatting.Number("Keep CREATE TABLE shorter than", "A CREATE TABLE that fits in fewer characters stays on one line. 0 turns it off.", 0, 1000, () => work.Formatting.CollapseDdlShorterThan, v => work.Formatting.CollapseDdlShorterThan = v, "characters");
-
+            formatting.Info(() => "Active style: " + work.ActiveStyle.Name + "   (" + work.FormattingStyles.Count + (work.FormattingStyles.Count == 1 ? " style)" : " styles)"));
+            formatting.Button("Edit formatting styles...", () =>
+            {
+                // The styles window starts from the saved settings and saves them itself, so the changes of this window are applied first.
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (Apply())
+                {
+                    FormattingStylesWindow.Open();
+                    Imported();
+                }
+            }, "Several named styles with one active, a tree of the options with a search box and a preview of a sample for every group (or of your current query).");
+            formatting.Button("Import a SQL Prompt style...", () => { if (SettingsFiles.ImportFormatStyle(this)) { Imported(); } }, "Reads a style exported from SQL Prompt (.json) and applies the options this formatter has to the active style.");
             var coloringPage = Add("Coloring", "Colors the tab, frame and status bar of a query window by its server and database.");
             var coloring = new ColoringEditor();
             coloringPage.Host(coloring, () => coloring.ShowSettings(work.Coloring), () => work.Coloring = coloring.ToSettings(), () => coloring.CurrentProblems);
