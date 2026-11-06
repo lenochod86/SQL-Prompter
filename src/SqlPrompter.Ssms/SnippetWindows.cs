@@ -269,7 +269,12 @@ namespace SqlPrompter.Ssms
             buttons.Children.Add(SnippetUi.Button("Save", Save));
             buttons.Children.Add(SnippetUi.Button("Delete", Delete));
             buttons.Children.Add(SnippetUi.Button("Close", Close));
+            var more = new StackPanel { Orientation = Orientation.Horizontal };
+            more.Children.Add(SnippetUi.Button("Import...", () => { ThreadHelper.ThrowIfNotOnUIThread(); SqlPrompterPackage.ImportSnippets(); Reload(editing?.Id); }));
+            more.Children.Add(SnippetUi.Button("Open folder", SqlPrompterPackage.OpenSnippetsFolder));
+            more.Children.Add(SnippetUi.Button("Reload", () => { SnippetService.Reload(); Reload(editing?.Id); }));
             var bottom = new StackPanel();
+            bottom.Children.Add(more);
             bottom.Children.Add(buttons);
             bottom.Children.Add(status);
             Grid.SetRow(bottom, 6);
