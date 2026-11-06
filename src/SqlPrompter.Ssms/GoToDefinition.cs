@@ -80,7 +80,7 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>Opens the script of a named object of the database of the window in a new window (quick open, #223).</summary>
-        public static void OpenObject(ITextView view, string schema, string name)
+        public static void OpenObject(ITextView view, string schema, string name, int line = 0)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             try
@@ -99,7 +99,7 @@ namespace SqlPrompter.Ssms
                 var reference = new ObjectReference(database, schema, name);
                 SetStatus("SQL Prompter: loading " + reference + "...");
 #pragma warning disable VSSDK007 // fire and forget on purpose
-                ThreadHelper.JoinableTaskFactory.RunAsync(() => OpenAsync(loader, reference, database)).Task.FileAndForget("sqlprompter/quickopen");
+                ThreadHelper.JoinableTaskFactory.RunAsync(() => OpenAsync(loader, reference, database, line)).Task.FileAndForget("sqlprompter/quickopen");
 #pragma warning restore VSSDK007
             }
             catch (Exception ex)
@@ -108,7 +108,7 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private static async Task OpenAsync(DefinitionLoader loader, ObjectReference reference, string database)
+        private static async Task OpenAsync(DefinitionLoader loader, ObjectReference reference, string database, int line = 0)
         {
             ObjectDefinition definition = null;
             try
@@ -133,6 +133,19 @@ namespace SqlPrompter.Ssms
             if (SsmsConnection.OpenNewWindow(database, definition.Script))
             {
                 SetStatus("SQL Prompter: opened " + definition.Schema + "." + definition.Name + ".");
+                if (line > 1)
+                {
+                    await Task.Delay(600);
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    var opened = ActiveEditor.GetView();
+                    if (opened != null && line <= opened.TextSnapshot.LineCount)
+                    {
+                        var start = opened.TextSnapshot.GetLineFromLineNumber(line - 1).Start;
+                        opened.Caret.MoveTo(start);
+                        opened.ViewScroller.EnsureSpanVisible(new Microsoft.VisualStudio.Text.SnapshotSpan(start, 0), Microsoft.VisualStudio.Text.Editor.EnsureSpanVisibleOptions.AlwaysCenter);
+                    }
+                }
+
                 Log.Write("Go to definition: " + definition.Schema + "." + definition.Name + " (" + definition.TypeCode + ") in " + database + ".");
             }
             else

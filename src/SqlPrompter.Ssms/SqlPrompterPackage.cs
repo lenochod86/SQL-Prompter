@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 32)]
+    [ProvideMenuResource("Menus.ctmenu", 33)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
@@ -53,6 +53,7 @@ namespace SqlPrompter.Ssms
         public const int DryRunId = 0x0126;
         public const int ScriptOutlineId = 0x012C;
         public const int QuickOpenId = 0x012D;
+        public const int FindInCodeId = 0x012E;
 
         /// <summary>Kept so that its DTE events stay subscribed.</summary>
         private SchemaChangeWatcher schemaChangeWatcher;
@@ -94,6 +95,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => PreviewStatement.DryRun(ActiveEditor.GetView()), new CommandID(CommandSet, DryRunId)));
                 commands.AddCommand(new MenuCommand((s, e) => { var view = ActiveEditor.GetView(); if (view != null) { QuickActionsPopup.ShowOutline(view); } }, new CommandID(CommandSet, ScriptOutlineId)));
                 commands.AddCommand(new MenuCommand((s, e) => { var view = ActiveEditor.GetView(); if (view != null) { QuickActionsPopup.ShowObjects(view); } }, new CommandID(CommandSet, QuickOpenId)));
+                commands.AddCommand(new MenuCommand((s, e) => FindInCode.Run(ActiveEditor.GetView()), new CommandID(CommandSet, FindInCodeId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.ExpandStars(ActiveEditor.GetView()), new CommandID(CommandSet, ExpandStarsId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.QualifyNames(ActiveEditor.GetView()), new CommandID(CommandSet, QualifyNamesId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), true), new CommandID(CommandSet, FormatDocumentId)));
