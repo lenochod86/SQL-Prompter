@@ -136,6 +136,8 @@ namespace SqlPrompter.Ssms
             completion.Choice("Keyword case", "How keywords are inserted. \"Match what I typed\" inserts upper case, or lower case if you started typing in lower case.",
                 new[] { O(KeywordCase.MatchTyped, "Match what I typed"), O(KeywordCase.Upper, "UPPER CASE"), O(KeywordCase.Lower, "lower case") },
                 () => work.Behavior.KeywordCase, v => work.Behavior.KeywordCase = v, () => work.Behavior.SuggestionsEnabled);
+            completion.Check("Show the column picker hint", "A line under the list that says Ctrl+Left switches to the column picker (Ctrl+Space opens the list).",
+                () => work.Behavior.ShowColumnPickerHint, v => work.Behavior.ShowColumnPickerHint = v, () => work.Behavior.SuggestionsEnabled);
             completion.Button("Reset usage statistics...", () => SqlPrompterPackage.ResetUsage(this), "Forgets which suggestions you chose how often; the list goes back to its plain order.");
             completion.Heading("Size of the list");
             completion.Help("Drag the triangle in the bottom-right corner of the list to resize it; the size is kept. Here you can type it or go back to the default.");

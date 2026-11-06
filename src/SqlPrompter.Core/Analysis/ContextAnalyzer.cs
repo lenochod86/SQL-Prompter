@@ -69,6 +69,18 @@ namespace SqlPrompter.Core.Analysis
 
         public static CaretContext Analyze(string text, int caret)
         {
+            var context = AnalyzeCore(text, caret);
+            if (!ReferenceEquals(context, CaretContext.None))
+            {
+                context.Text = text;
+                context.Caret = caret;
+            }
+
+            return context;
+        }
+
+        private static CaretContext AnalyzeCore(string text, int caret)
+        {
             if (text == null || caret < 0 || caret > text.Length)
             {
                 return CaretContext.None;

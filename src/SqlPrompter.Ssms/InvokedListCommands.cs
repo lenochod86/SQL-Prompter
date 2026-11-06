@@ -47,6 +47,7 @@ namespace SqlPrompter.Ssms
 
         public CommandState GetCommandState(TypeCharCommandArgs args) => CommandState.Unspecified;
 
+
         public bool ExecuteCommand(DownKeyCommandArgs args, CommandExecutionContext context) { ThreadHelper.ThrowIfNotOnUIThread(); return Key(args.TextView, System.Windows.Input.Key.Down); }
 
         public bool ExecuteCommand(UpKeyCommandArgs args, CommandExecutionContext context) { ThreadHelper.ThrowIfNotOnUIThread(); return Key(args.TextView, System.Windows.Input.Key.Up); }

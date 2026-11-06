@@ -31,6 +31,8 @@ namespace SqlPrompter.Ssms
                 Set(dte, "SQLPrompter.RunStatementAtCaret", "SQL Query Editor::Shift+F5");
                 Set(dte, "SQLPrompter.ParameterInfo", "SQL Query Editor::Ctrl+Shift+Space");
                 Set(dte, "SQLPrompter.ShowSuggestions", "SQL Query Editor::Ctrl+Space");
+                Set(dte, "SQLPrompter.PickerLeft", "SQL Query Editor::Ctrl+Left Arrow");
+                Set(dte, "SQLPrompter.PickerRight", "SQL Query Editor::Ctrl+Right Arrow");
                 Set(dte, "SQLPrompter.FormatDocument", "SQL Query Editor::Ctrl+K, Y");
             }
             catch (Exception ex)

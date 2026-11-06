@@ -65,6 +65,8 @@ namespace SqlPrompter.Ssms
         internal const string DetailKey = "SqlPrompter.Detail";
         internal const string KeyKey = "SqlPrompter.Key";
         /// <summary>Session property: true when Enter may insert the selected suggestion (not a place where a name of the user's own is typed).</summary>
+        /// <summary>Item property: the item is a heading of the column picker (the value is the text of the heading); it cannot be chosen.</summary>
+        internal const string PickerHeaderKey = "SqlPrompter.PickerHeader";
         internal const string HardSelectionKey = "SqlPrompter.HardSelection";
         internal const string SnippetKey = "SqlPrompter.Snippet";
         internal const string DescriptionPropertyKey = DescriptionKey;
@@ -150,11 +152,14 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private ImmutableArray<CompletionItem> BuildItems(Prepared prepared)
+        private ImmutableArray<CompletionItem> BuildItems(Prepared prepared) => BuildItems(prepared, out _, out _);
+
+        private ImmutableArray<CompletionItem> BuildItems(Prepared prepared, out ScriptModel script, out SuggestionOptions options)
         {
-            var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
+            script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
             RequestScriptColumns(prepared, script);
-            return SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor)).Select(s => ToItem(s, prepared)).ToImmutableArray();
+            options = SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor);
+            return SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, options).Select(s => ToItem(s, prepared)).ToImmutableArray();
         }
 
         /// <summary>
@@ -173,7 +178,9 @@ namespace SqlPrompter.Ssms
                     return null;
                 }
 
-                return new InvokedSuggestions(BuildItems(prepared), location.Snapshot.CreateTrackingSpan(start.ApplicableToSpan, SpanTrackingMode.EdgeInclusive), prepared.Context.SoftSelection);
+                var items = BuildItems(prepared, out var script, out var options);
+                var picker = ColumnPicker.TryBuild(prepared.Batch, prepared.CaretInBatch, prepared.Context, prepared.Metadata, script, options);
+                return new InvokedSuggestions(items, location.Snapshot.CreateTrackingSpan(start.ApplicableToSpan, SpanTrackingMode.EdgeInclusive), prepared.Context.SoftSelection, picker, options, this);
             }
             catch (Exception ex)
             {
@@ -371,6 +378,31 @@ namespace SqlPrompter.Ssms
 
             return item;
         }
+
+        /// <summary>The item of a column in the column picker.</summary>
+        internal CompletionItem PickerItem(PickerColumn column)
+        {
+            var item = new CompletionItem(column.Name, this, Icon(KnownMonikers.Column, "Column"), Filters, column.Owner, column.InsertText, column.Name, column.Name, ImmutableArray<ImageElement>.Empty);
+            item.Properties.AddProperty(DetailKey, column.Column.TypeName + (column.Column.IsNullable ? " null" : " not null"));
+            if (column.Key != KeyKind.None)
+            {
+                item.Properties.AddProperty(KeyKey, column.Key);
+            }
+
+            return item;
+        }
+
+        /// <summary>The heading of a source in the column picker.</summary>
+        internal CompletionItem PickerHeader(string group, string owner)
+        {
+            var item = new CompletionItem(group, this, Icon(KnownMonikers.Table, "Table"), Filters, owner ?? string.Empty, group, group, group, ImmutableArray<ImageElement>.Empty);
+            item.Properties.AddProperty(PickerHeaderKey, group);
+            return item;
+        }
+
+        /// <summary>The first item of the column picker in GROUP BY: all the non-aggregated items of the select list.</summary>
+        internal CompletionItem PickerNonAggregated(string text) =>
+            new CompletionItem("All non-aggregated columns", this, Icon(KnownMonikers.Column, "Column"), Filters, "select list", text, " ", "All non-aggregated columns", ImmutableArray<ImageElement>.Empty);
 
         private static ImageElement Icon(ImageMoniker moniker, string name) => new ImageElement(new ImageId(moniker.Guid, moniker.Id), name);
 
