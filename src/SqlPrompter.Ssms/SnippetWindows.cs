@@ -301,10 +301,13 @@ namespace SqlPrompter.Ssms
         private void Reload(string selectId)
         {
             var result = store.Load();
+            var shared = SettingsService.Current.Snippets.SharedFolderList().Select(f => (IEnumerable<Snippet>)new SnippetStore(Environment.ExpandEnvironmentVariables(f)).Load().Snippets).ToList();
+            var all = SnippetMerge.Merge(result.Snippets, shared);
             list.Items.Clear();
-            foreach (var snippet in result.Snippets)
+            foreach (var snippet in all)
             {
-                var item = new ListBoxItem { Content = snippet.Prefix, Tag = snippet };
+                // A shared snippet is copied to the personal folder when it is saved here; the personal copy then wins.
+                var item = new ListBoxItem { Content = snippet.IsShared ? snippet.Prefix + "  (shared)" : snippet.Prefix, Tag = snippet };
                 list.Items.Add(item);
                 if (snippet.Id == selectId)
                 {
@@ -312,7 +315,7 @@ namespace SqlPrompter.Ssms
                 }
             }
 
-            status.Text = result.Snippets.Count + " snippets" + (result.Errors.Count > 0 ? "; not readable: " + string.Join(", ", result.Errors.Select(e => e.Split(':')[0])) : string.Empty);
+            status.Text = all.Count + " snippets" + (all.Any(s => s.IsShared) ? " (shared ones are copied to your folder when you save them)" : string.Empty) + (result.Errors.Count > 0 ? "; not readable: " + string.Join(", ", result.Errors.Select(e => e.Split(':')[0])) : string.Empty);
         }
 
 

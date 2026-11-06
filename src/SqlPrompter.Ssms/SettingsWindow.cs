@@ -207,6 +207,8 @@ namespace SqlPrompter.Ssms
             var snippets = Add("Snippets");
             snippets.Folder("Snippet folder", "Folder with the snippet files, one JSON file per snippet as in SQL Prompt's snippet folder. Empty uses %APPDATA%\\SqlPrompter\\Snippets.",
                 () => work.Snippets.Folder, v => work.Snippets.Folder = v ?? string.Empty);
+            snippets.Folder("Shared snippet folders", "Folders with snippet files that are read in addition to the personal folder, separated by semicolons (a folder in a git repository or on a network share). A personal snippet with the same prefix wins. The folders are watched for changes.",
+                () => work.Snippets.SharedFolders, v => work.Snippets.SharedFolders = v ?? string.Empty);
             snippets.Check("Install the built-in snippets", "Puts the snippets that ship with SQL Prompter (top100, upd, merge, cp, tran and more) into the snippet folder, each one once. Snippets you edit or delete are not touched again.",
                 () => work.Snippets.InstallBuiltIn, v => work.Snippets.InstallBuiltIn = v);
             snippets.Button("Edit snippets...", () =>
