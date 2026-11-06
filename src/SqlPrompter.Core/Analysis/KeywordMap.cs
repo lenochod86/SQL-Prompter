@@ -631,10 +631,17 @@ namespace SqlPrompter.Core.Analysis
                         (part[part.Count - 2].IsWord("AS") || (IsOperandToken(part[part.Count - 2]) && part[part.Count - 2].Kind != TokenKind.Dot));
                     if (followingFrom)
                     {
-                        return aliased ? KeywordPosition.None : Of(new[] { "AS" });
+                        var rankingCall = anchor.Kind == TokenKind.CloseParen && part.Count >= 3 && part[part.Count - 2].Kind == TokenKind.Word && Keywords.RequiresOver(part[part.Count - 2].Text);
+                        return aliased ? KeywordPosition.None : rankingCall ? Of(new[] { "OVER" }) : Of(new[] { "AS" });
                     }
 
                     var overHint = anchor.Kind == TokenKind.CloseParen && part.Count >= 3 && part[part.Count - 2].Kind == TokenKind.Word && !Keywords.IsReserved(part[part.Count - 2].Text) ? new[] { "OVER" } : null;
+                    // A ranking or analytic function is no function without OVER: it comes first, preselected.
+                    if (!aliased && overHint != null && Keywords.RequiresOver(part[part.Count - 2].Text))
+                    {
+                        return Of(overHint);
+                    }
+
                     return aliased ? Of(new[] { "FROM", "INTO" }) : Of(new[] { "FROM", "AS", "INTO" }, overHint);
 
                 case "INTO":
