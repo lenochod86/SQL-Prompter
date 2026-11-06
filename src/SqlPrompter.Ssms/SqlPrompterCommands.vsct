@@ -54,6 +54,12 @@
           <ButtonText>Refresh Metadata</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidSettings" priority="0x0099" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
+        <Strings>
+          <ButtonText>Settings...</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidExportSettings" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
         <Strings>
@@ -276,6 +282,7 @@
       <IDSymbol name="cmdidSurroundWithSnippet" value="0x0107" />
       <IDSymbol name="cmdidNewSnippetFromSelection" value="0x0108" />
       <IDSymbol name="cmdidManageSnippets" value="0x0109" />
+      <IDSymbol name="cmdidSettings" value="0x011F" />
       <IDSymbol name="cmdidExportSettings" value="0x0102" />
       <IDSymbol name="cmdidImportSettings" value="0x0103" />
       <IDSymbol name="cmdidImportFormatStyle" value="0x0119" />
