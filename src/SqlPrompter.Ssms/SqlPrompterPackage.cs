@@ -233,7 +233,14 @@ namespace SqlPrompter.Ssms
                 ActiveEditor.SetOwner(window);
                 window.ShowDialog();
                 var chosen = window.Chosen;
-                if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login))
+                if (chosen != null && window.MakeSnippet)
+                {
+                    var draft = SqlPrompter.Core.Snippets.Snippet.Create(string.Empty, string.Empty, SqlPrompter.Core.Snippets.SnippetText.BodyFromSelection(chosen.Text));
+                    var manager = new SnippetManagerWindow(new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder), draft);
+                    ActiveEditor.SetOwner(manager);
+                    manager.ShowDialog();
+                }
+                else if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login))
                 {
                     ShowMessage("Open a query window connected to a server first; the new tab is opened like it.");
                 }

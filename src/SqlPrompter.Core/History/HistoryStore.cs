@@ -41,6 +41,9 @@ namespace SqlPrompter.Core.History
 
         /// <summary>When the query tab was closed; null while it is open (or when SSMS ended without telling).</summary>
         public DateTime? ClosedAtUtc { get; internal set; }
+
+        /// <summary>A favourite: it is never removed by the retention and is listed first (#225).</summary>
+        public bool Pinned { get; internal set; }
     }
 
     /// <summary>
@@ -88,9 +91,17 @@ namespace SqlPrompter.Core.History
 
                     if (record.Text == null)
                     {
-                        if (byId.TryGetValue(record.Id, out var known) && TryParseTime(record.Closed, out var closed))
+                        if (byId.TryGetValue(record.Id, out var known))
                         {
-                            known.ClosedAtUtc = closed;
+                            if (TryParseTime(record.Closed, out var closed))
+                            {
+                                known.ClosedAtUtc = closed;
+                            }
+
+                            if (record.Pinned != null)
+                            {
+                                known.Pinned = record.Pinned == "1";
+                            }
                         }
 
                         continue;
@@ -99,7 +110,7 @@ namespace SqlPrompter.Core.History
                     if (TryParseTime(record.Ran, out var ran) && !byId.ContainsKey(record.Id))
                     {
                         var entry = new HistoryEntry(record.Id, record.Text, record.Server, record.Database, record.Login, ran,
-                            TryParseTime(record.Closed, out var closedAt) ? closedAt : (DateTime?)null, record.Tab);
+                            TryParseTime(record.Closed, out var closedAt) ? closedAt : (DateTime?)null, record.Tab) { Pinned = record.Pinned == "1" };
                         byId[record.Id] = entry;
                         loaded.Add(entry);
                     }
@@ -152,6 +163,25 @@ namespace SqlPrompter.Core.History
             }
         }
 
+        /// <summary>Pins or unpins runs; a pinned run is kept by <see cref="Prune"/> and comes first in <see cref="Filter"/>.</summary>
+        public void SetPinned(IEnumerable<string> ids, bool pinned)
+        {
+            lock (sync)
+            {
+                foreach (var id in ids)
+                {
+                    var entry = entries.FirstOrDefault(e => e.Id == id);
+                    if (entry == null || entry.Pinned == pinned)
+                    {
+                        continue;
+                    }
+
+                    entry.Pinned = pinned;
+                    Append(Serialize(new Record { Id = id, Pinned = pinned ? "1" : "0" }));
+                }
+            }
+        }
+
         /// <summary>Removes the runs older than <paramref name="keepDays"/> days (0 or less keeps everything). Returns how many were removed.</summary>
         public int Prune(int keepDays, DateTime nowUtc)
         {
@@ -163,7 +193,7 @@ namespace SqlPrompter.Core.History
             lock (sync)
             {
                 var limit = nowUtc.AddDays(-keepDays);
-                var removed = entries.RemoveAll(e => e.RanAtUtc < limit);
+                var removed = entries.RemoveAll(e => !e.Pinned && e.RanAtUtc < limit);
                 if (removed > 0)
                 {
                     Rewrite();
@@ -198,7 +228,8 @@ namespace SqlPrompter.Core.History
                     e.Server.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     e.Tab.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     e.Database.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0))
-                .OrderByDescending(e => e.RanAtUtc)
+                .OrderByDescending(e => e.Pinned)
+                .ThenByDescending(e => e.RanAtUtc)
                 .ToList();
         }
 
@@ -244,6 +275,7 @@ namespace SqlPrompter.Core.History
             Ran = FormatTime(e.RanAtUtc),
             Closed = e.ClosedAtUtc.HasValue ? FormatTime(e.ClosedAtUtc.Value) : null,
             Tab = e.Tab.Length > 0 ? e.Tab : null,
+            Pinned = e.Pinned ? "1" : null,
         });
 
         private static string FormatTime(DateTime utc) => utc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
@@ -306,6 +338,9 @@ namespace SqlPrompter.Core.History
 
             [DataMember(Name = "tab", EmitDefaultValue = false)]
             public string Tab { get; set; }
+
+            [DataMember(Name = "pinned", EmitDefaultValue = false)]
+            public string Pinned { get; set; }
         }
     }
 }
