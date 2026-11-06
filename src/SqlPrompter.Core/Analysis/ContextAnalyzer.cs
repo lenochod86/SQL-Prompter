@@ -322,7 +322,8 @@ namespace SqlPrompter.Core.Analysis
             expression.Sources = sources;
             expression.SoftSelection = operandBefore;
             expression.ApplyPosition(position, operandBefore || anchor.IsWord("END") || anchor.IsWord("ASC") || anchor.IsWord("DESC"));
-            expression.SoftSelection = operandBefore;
+            // OVER after a ranking function is the only thing that fits: it stays preselected.
+            expression.SoftSelection = operandBefore && !(position.First.Count == 1 && position.Then.Count == 0 && position.First[0] == "OVER");
             if (qualifier.Count == 0)
             {
                 var operand = ConditionOperandBefore(tokens, anchorIndex, block.Start, clauseState.Clause, out var afterComparison);

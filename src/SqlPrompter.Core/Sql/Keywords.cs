@@ -89,6 +89,30 @@ namespace SqlPrompter.Core.Sql
         /// <summary>True for built-in functions that are usually called without arguments, so the caret goes after the parentheses.</summary>
         public static bool TakesNoArguments(string function) => function != null && NoArguments.Contains(function);
 
+        private static readonly HashSet<string> RankingWithoutArguments = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ROW_NUMBER", "RANK", "DENSE_RANK", "PERCENT_RANK", "CUME_DIST",
+        };
+
+        private static readonly HashSet<string> OverRequired = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ROW_NUMBER", "RANK", "DENSE_RANK", "PERCENT_RANK", "CUME_DIST", "NTILE", "LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE",
+        };
+
+        private static readonly HashSet<string> WindowAggregates = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "SUM", "COUNT", "AVG", "MIN", "MAX",
+        };
+
+        /// <summary>A ranking or analytic function: it is only valid with an OVER clause.</summary>
+        public static bool RequiresOver(string function) => function != null && OverRequired.Contains(function);
+
+        /// <summary>A ranking function that takes no argument (ROW_NUMBER, RANK ...): the first slot of its OVER clause is PARTITION BY.</summary>
+        public static bool IsRankingWithoutArguments(string function) => function != null && RankingWithoutArguments.Contains(function);
+
+        /// <summary>A function that can take an OVER clause: the ranking and analytic functions and the aggregates.</summary>
+        public static bool IsWindowFunction(string function) => RequiresOver(function) || (function != null && WindowAggregates.Contains(function));
+
         /// <summary>SQL Server system data types.</summary>
         public static readonly IReadOnlyList<string> DataTypes = new[]
         {

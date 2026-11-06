@@ -238,6 +238,14 @@ namespace SqlPrompter.Core.Completion
                 var text = Keywords.ApplyCase(function, context.TypedPrefix);
                 // The name comes with parentheses; the caret goes between them unless the function takes no arguments.
                 yield return new Suggestion(SuggestionKind.Function, text, text + "()", text, null, "built-in function", preferred != null && preferred.Contains(function) ? 0 : group, caretBack: Keywords.TakesNoArguments(function) ? 0 : 1);
+
+                if (Keywords.IsWindowFunction(function))
+                {
+                    // The call with its OVER clause; the caret goes to the first slot (the argument, or PARTITION BY for the functions without one).
+                    var noArguments = Keywords.IsRankingWithoutArguments(function);
+                    var tail = noArguments ? " ORDER BY )" : ") OVER (PARTITION BY  ORDER BY )";
+                    yield return new Suggestion(SuggestionKind.Function, text + "() OVER (...)", text + "() OVER (PARTITION BY  ORDER BY )", text, null, "window function with OVER", group, caretBack: tail.Length);
+                }
             }
         }
 
