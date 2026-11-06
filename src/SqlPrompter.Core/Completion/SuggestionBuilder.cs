@@ -185,7 +185,13 @@ namespace SqlPrompter.Core.Completion
                 case ContextKind.InsertColumns:
                     return InsertColumnSuggestions(context, metadata, options).ToList();
                 case ContextKind.Expression:
-                    return StatementFragments.Build(context, metadata, options).Concat(ExpressionSuggestions(context, metadata, script, options)).ToList();
+                {
+                    var all = StatementFragments.Build(context, metadata, options)
+                        .Concat(SelectListSuggestions.Leading(context))
+                        .Concat(ExpressionSuggestions(context, metadata, script, options));
+                    var columns = SelectListSuggestions.ColumnFilter(context);
+                    return (columns == null ? all : all.Where(columns)).ToList();
+                }
                 case ContextKind.Name:
                     return context.UnknownExpressionQualifier && metadata != null
                         ? SchemaFunctionSuggestions(context, metadata).ToList()

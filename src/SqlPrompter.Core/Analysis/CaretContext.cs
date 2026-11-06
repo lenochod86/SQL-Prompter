@@ -209,6 +209,9 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>With <see cref="ConditionOperand"/>: the caret is after a comparison operator, where a value of the type of the column goes.</summary>
         public bool AfterComparison { get; internal set; }
 
+        /// <summary>At the start of a condition of HAVING (after HAVING, AND, OR, NOT or an opening parenthesis): the aggregates of the select list are offered first.</summary>
+        public bool InHaving { get; internal set; }
+
         /// <summary>After <c>INSERT INTO table (columns) |</c>: the table (VALUES and SELECT are offered pre-filled for the listed columns).</summary>
         public TableSource InsertTail { get; internal set; }
 

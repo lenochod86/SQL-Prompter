@@ -37,13 +37,41 @@ namespace SqlPrompter.Core.Completion
         /// <summary>The expressions of the select list that must appear in a <c>GROUP BY</c> at the caret, as written (aliases and constants left out, aggregates skipped).</summary>
         public static IReadOnlyList<string> NonAggregatedItems(string text, int caret)
         {
-            var all = Lexer.Tokenize(text ?? string.Empty).Where(t => t.Kind != TokenKind.Comment).ToList();
-            var tokens = all.Where(t => t.Start < caret).ToList();
             if (At(text, caret) != ColumnClause.GroupBy)
             {
                 return new string[0];
             }
 
+            var items = new List<string>();
+            foreach (var item in SelectListItems(text, caret))
+            {
+                var expression = ExpressionOf(item.Tokens, text);
+                if (expression != null && !items.Contains(expression, StringComparer.OrdinalIgnoreCase))
+                {
+                    items.Add(expression);
+                }
+            }
+
+            return items;
+        }
+
+        /// <summary>One item of the select list of the block the caret is in.</summary>
+        public sealed class SelectItem
+        {
+            internal SelectItem(List<Token> tokens)
+            {
+                Tokens = tokens;
+            }
+
+            internal List<Token> Tokens { get; }
+        }
+
+        /// <summary>The items of the select list of the block the caret is in (up to its FROM), or none when the caret is not in a query block.</summary>
+        internal static List<SelectItem> SelectListItems(string text, int caret)
+        {
+            var result = new List<SelectItem>();
+            var all = Lexer.Tokenize(text ?? string.Empty).Where(t => t.Kind != TokenKind.Comment).ToList();
+            var tokens = all.Where(t => t.Start < caret).ToList();
             // Back from the caret to the SELECT of the same block.
             var depth = 0;
             var select = -1;
@@ -58,12 +86,12 @@ namespace SqlPrompter.Core.Completion
                 {
                     if (--depth < 0)
                     {
-                        return new string[0];
+                        return result;
                     }
                 }
                 else if (depth == 0 && (t.Kind == TokenKind.Semicolon || t.IsWord("UNION") || t.IsWord("EXCEPT") || t.IsWord("INTERSECT")))
                 {
-                    return new string[0];
+                    return result;
                 }
                 else if (depth == 0 && t.IsWord("SELECT"))
                 {
@@ -74,7 +102,7 @@ namespace SqlPrompter.Core.Completion
 
             if (select < 0)
             {
-                return new string[0];
+                return result;
             }
 
             // After SELECT [ALL | DISTINCT] [TOP n | TOP (n)] [PERCENT] [WITH TIES].
@@ -127,7 +155,6 @@ namespace SqlPrompter.Core.Completion
                 }
             }
 
-            var items = new List<string>();
             var itemStart = start;
             depth = 0;
             for (var i = start; i <= end; i++)
@@ -147,17 +174,17 @@ namespace SqlPrompter.Core.Completion
 
                 if (atEnd || (depth == 0 && tokens[i].Kind == TokenKind.Comma))
                 {
-                    var expression = ExpressionOf(tokens.GetRange(itemStart, i - itemStart), text);
-                    if (expression != null && !items.Contains(expression, StringComparer.OrdinalIgnoreCase))
+                    var range = tokens.GetRange(itemStart, i - itemStart);
+                    if (range.Count > 0)
                     {
-                        items.Add(expression);
+                        result.Add(new SelectItem(range));
                     }
 
                     itemStart = i + 1;
                 }
             }
 
-            return items;
+            return result;
         }
 
         /// <summary>The column names already written in the parentheses of an <c>INSERT INTO t (...)</c> around the caret.</summary>
@@ -406,6 +433,206 @@ namespace SqlPrompter.Core.Completion
 
             var written = text.Substring(item[0].Start, item[item.Count - 1].End - item[0].Start);
             return string.Join(" ", written.Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim())).Trim();
+        }
+
+        /// <summary>An item of the select list as HAVING and ORDER BY see it: the expression as written, its alias and whether it is an aggregate.</summary>
+        public sealed class SelectListEntry
+        {
+            public SelectListEntry(string expression, string alias, bool isAggregate, bool isStar)
+            {
+                Expression = expression;
+                Alias = alias;
+                IsAggregate = isAggregate;
+                IsStar = isStar;
+            }
+
+            /// <summary>The expression as written, white space collapsed, without the alias.</summary>
+            public string Expression { get; }
+
+            /// <summary>The alias (<c>AS name</c>, <c>name</c> or <c>name = expression</c>), or null.</summary>
+            public string Alias { get; }
+
+            /// <summary>The expression contains an aggregate function call (not as a window function).</summary>
+            public bool IsAggregate { get; }
+
+            /// <summary>The item is <c>*</c> or <c>t.*</c>.</summary>
+            public bool IsStar { get; }
+        }
+
+        /// <summary>What a query block says about the order of its result, for ORDER BY and HAVING.</summary>
+        public sealed class BlockShape
+        {
+            public BlockShape(IReadOnlyList<SelectListEntry> entries, IReadOnlyList<string> groupBy, bool distinct)
+            {
+                Entries = entries;
+                GroupBy = groupBy;
+                Distinct = distinct;
+            }
+
+            public IReadOnlyList<SelectListEntry> Entries { get; }
+
+            /// <summary>The expressions of the GROUP BY before the caret, as written; empty without one.</summary>
+            public IReadOnlyList<string> GroupBy { get; }
+
+            public bool HasGroupBy => GroupBy.Count > 0;
+
+            public bool Distinct { get; }
+        }
+
+        /// <summary>The select list, the GROUP BY and DISTINCT of the block the caret is in (the clauses before the caret).</summary>
+        public static BlockShape ShapeOf(string text, int caret)
+        {
+            var entries = new List<SelectListEntry>();
+            foreach (var item in SelectListItems(text, caret))
+            {
+                var entry = Describe(item.Tokens, text);
+                if (entry != null)
+                {
+                    entries.Add(entry);
+                }
+            }
+
+            var tokens = Lexer.Tokenize(text ?? string.Empty).Where(t => t.Kind != TokenKind.Comment && t.Start < caret).ToList();
+            var depth = 0;
+            var select = -1;
+            var groupBy = new List<string>();
+            for (var i = tokens.Count - 1; i >= 0; i--)
+            {
+                if (tokens[i].Kind == TokenKind.CloseParen)
+                {
+                    depth++;
+                }
+                else if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    if (--depth < 0)
+                    {
+                        break;
+                    }
+                }
+                else if (depth == 0 && tokens[i].IsWord("SELECT"))
+                {
+                    select = i;
+                    break;
+                }
+            }
+
+            var distinct = select >= 0 && select + 1 < tokens.Count && tokens[select + 1].IsWord("DISTINCT");
+            if (select >= 0)
+            {
+                depth = 0;
+                var inGroup = false;
+                var itemStart = -1;
+                for (var i = select + 1; i <= tokens.Count; i++)
+                {
+                    var atEnd = i == tokens.Count;
+                    var t = atEnd ? null : tokens[i];
+                    if (!atEnd && t.Kind == TokenKind.OpenParen)
+                    {
+                        depth++;
+                    }
+                    else if (!atEnd && t.Kind == TokenKind.CloseParen)
+                    {
+                        depth--;
+                    }
+
+                    var leaves = atEnd || (depth == 0 && (t.IsWord("HAVING") || t.IsWord("ORDER") || t.IsWord("UNION") || t.IsWord("EXCEPT") || t.IsWord("INTERSECT")));
+                    var separates = !atEnd && depth == 0 && t.Kind == TokenKind.Comma;
+                    if (inGroup && itemStart >= 0 && (leaves || separates) && i > itemStart)
+                    {
+                        groupBy.Add(Normalize(text.Substring(tokens[itemStart].Start, tokens[i - 1].End - tokens[itemStart].Start)));
+                        itemStart = separates ? i + 1 : -1;
+                    }
+
+                    if (leaves)
+                    {
+                        inGroup = false;
+                    }
+                    else if (!atEnd && depth == 0 && t.IsWord("GROUP") && i + 1 < tokens.Count && tokens[i + 1].IsWord("BY"))
+                    {
+                        inGroup = true;
+                        itemStart = i + 2;
+                        i++;
+                    }
+                }
+            }
+
+            return new BlockShape(entries, groupBy, distinct);
+        }
+
+        private static string Normalize(string written) =>
+            string.Join(" ", written.Split(new[] { '\r', '\n', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries)).Trim();
+
+        private static SelectListEntry Describe(List<Token> item, string text)
+        {
+            if (item.Count == 0)
+            {
+                return null;
+            }
+
+            string alias = null;
+            if (item.Count > 2 && item[0].IsNamePart && item[1].Kind == TokenKind.Operator && item[1].Text == "=")
+            {
+                alias = item[0].IdentifierValue;
+                item = item.GetRange(2, item.Count - 2);
+            }
+
+            var asIndex = -1;
+            var depth = 0;
+            for (var i = 0; i < item.Count; i++)
+            {
+                if (item[i].Kind == TokenKind.OpenParen)
+                {
+                    depth++;
+                }
+                else if (item[i].Kind == TokenKind.CloseParen)
+                {
+                    depth--;
+                }
+                else if (depth == 0 && item[i].IsWord("AS") && i > 0)
+                {
+                    asIndex = i;
+                }
+            }
+
+            if (asIndex > 0 && asIndex + 1 < item.Count && item[asIndex + 1].IsNamePart)
+            {
+                alias = item[asIndex + 1].IdentifierValue;
+                item = item.GetRange(0, asIndex);
+            }
+            else if (alias == null && item.Count > 1)
+            {
+                var last = item[item.Count - 1];
+                var before = item[item.Count - 2];
+                if (last.IsNamePart && !last.IsWord("END") && (before.IsNamePart || before.Kind == TokenKind.CloseParen || before.Kind == TokenKind.Number || before.Kind == TokenKind.String) &&
+                    !(before.Kind == TokenKind.Word && IsOperatorWord(before.Upper)))
+                {
+                    alias = last.IdentifierValue;
+                    item = item.GetRange(0, item.Count - 1);
+                }
+            }
+
+            if (item.Count == 0)
+            {
+                return null;
+            }
+
+            var star = item[item.Count - 1].Kind == TokenKind.Operator && item[item.Count - 1].Text == "*" && (item.Count == 1 || item[item.Count - 2].Kind == TokenKind.Dot);
+            var aggregate = false;
+            for (var i = 0; i < item.Count - 1; i++)
+            {
+                if (item[i].Kind == TokenKind.Word && Aggregates.Contains(item[i].Text) && item[i + 1].Kind == TokenKind.OpenParen)
+                {
+                    aggregate = true;
+                }
+            }
+
+            if (item.Any(t => t.IsWord("OVER")))
+            {
+                aggregate = false;
+            }
+
+            var written = Normalize(text.Substring(item[0].Start, item[item.Count - 1].End - item[0].Start));
+            return new SelectListEntry(written, alias, aggregate, star);
         }
 
         private static bool IsOperatorWord(string upper) => upper == "AND" || upper == "OR" || upper == "NOT" || upper == "IN" || upper == "LIKE" || upper == "IS" || upper == "THEN" || upper == "ELSE" || upper == "WHEN" || upper == "CASE" || upper == "BETWEEN";
