@@ -36,39 +36,11 @@ namespace SqlPrompter.Ssms
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
                 var view = args.TextView;
-                var caret = view.Caret.Position.BufferPosition;
-                var snapshot = caret.Snapshot;
-                if (caret.Position == 0 || snapshot[caret.Position - 1] != '*' || !view.Selection.IsEmpty ||
-                    SnippetSession.IsActive(view) || Broker.GetSession(view) != null)
-                {
-                    return false;
-                }
-
-                if (!SqlBatch.TryGet(snapshot, caret.Position, out var batchStart, out var batch))
-                {
-                    return false;
-                }
-
-                var service = MetadataService.Current;
-                var cache = service?.CacheForActiveWindow(out _, SqlBatch.FindUsedDatabase(snapshot, caret.Position));
-                var metadata = cache?.Current;
-                if (metadata == null)
-                {
-                    return false;
-                }
-
-                var caretInBatch = caret.Position - batchStart;
-                var script = ScriptModel.Build(batch, caretInBatch);
-                var options = SettingsService.Current.ToSuggestionOptions().WithEditor(EditorLayouts.Read(view, snapshot, caret.Position));
-                var expansion = StarExpander.TryExpand(batch, caretInBatch, metadata, script, options);
+                var expansion = Find(view, Broker, out var start);
                 if (expansion == null)
                 {
                     return false;
                 }
-
-                // The text is aligned with the first column, so the layout is read where the replaced text starts (alias.* starts earlier).
-                var start = batchStart + expansion.Start;
-                expansion = StarExpander.TryExpand(batch, caretInBatch, metadata, script, options.WithEditor(EditorLayouts.Read(view, snapshot, start))) ?? expansion;
 
                 view.TextBuffer.Replace(new Span(start, expansion.Length), expansion.Text);
                 view.Caret.MoveTo(new SnapshotPoint(view.TextBuffer.CurrentSnapshot, start + expansion.Text.Length));
@@ -79,6 +51,49 @@ namespace SqlPrompter.Ssms
                 Log.Error("Expanding * failed", ex);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// The expansion Tab would make at the caret, or null when Tab does nothing special there. <paramref name="start"/> is the position in the
+        /// buffer where the replaced text starts. The hint that tells the user about Tab (<see cref="StarHint"/>) asks the same question.
+        /// </summary>
+        internal static StarExpansion Find(ITextView view, IAsyncCompletionBroker broker, out int start)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            start = 0;
+            var caret = view.Caret.Position.BufferPosition;
+            var snapshot = caret.Snapshot;
+            if (caret.Position == 0 || snapshot[caret.Position - 1] != '*' || !view.Selection.IsEmpty ||
+                SnippetSession.IsActive(view) || broker.GetSession(view) != null)
+            {
+                return null;
+            }
+
+            if (!SqlBatch.TryGet(snapshot, caret.Position, out var batchStart, out var batch))
+            {
+                return null;
+            }
+
+            var service = MetadataService.Current;
+            var cache = service?.CacheForActiveWindow(out _, SqlBatch.FindUsedDatabase(snapshot, caret.Position));
+            var metadata = cache?.Current;
+            if (metadata == null)
+            {
+                return null;
+            }
+
+            var caretInBatch = caret.Position - batchStart;
+            var script = ScriptModel.Build(batch, caretInBatch);
+            var options = SettingsService.Current.ToSuggestionOptions().WithEditor(EditorLayouts.Read(view, snapshot, caret.Position));
+            var expansion = StarExpander.TryExpand(batch, caretInBatch, metadata, script, options);
+            if (expansion == null)
+            {
+                return null;
+            }
+
+            // The text is aligned with the first column, so the layout is read where the replaced text starts (alias.* starts earlier).
+            start = batchStart + expansion.Start;
+            return StarExpander.TryExpand(batch, caretInBatch, metadata, script, options.WithEditor(EditorLayouts.Read(view, snapshot, start))) ?? expansion;
         }
     }
 }
