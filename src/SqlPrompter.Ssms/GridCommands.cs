@@ -74,6 +74,53 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>Copies the selected cells with the own copy command of SSMS, formats the text with <paramref name="format"/> and puts the result on the clipboard.</summary>
+        public static void CopyAs(Func<string, string> format, string what)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var dte = Package.GetGlobalService(typeof(DTE)) as DTE;
+                if (dte == null)
+                {
+                    return;
+                }
+
+                if (!SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.ResultsGrid))
+                {
+                    Tell("This feature is switched off: the copy command of the results grid was not found in this SSMS version (see the log).");
+                    return;
+                }
+
+                if (ActiveEditor.GetView()?.HasAggregateFocus == true)
+                {
+                    Tell("Click into the results grid and select the rows (or cells) first.");
+                    return;
+                }
+
+                Clipboard.Clear();
+                dte.ExecuteCommand("Edit.CopywithHeaders");
+                var copied = Clipboard.ContainsText() ? Clipboard.GetText() : null;
+                var text = format(copied);
+                if (string.IsNullOrEmpty(text))
+                {
+                    Tell("Select the rows (or cells) in the results grid first.");
+                    return;
+                }
+
+                Clipboard.SetText(text);
+                Log.Write("Grid: copied the selection as " + what + " (" + text.Length + " characters).");
+                if (Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsStatusbar)) is Microsoft.VisualStudio.Shell.Interop.IVsStatusbar statusBar)
+                {
+                    statusBar.SetText("SQL Prompter: the selection was copied as " + what + ".");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Copying the grid selection as " + what + " failed", ex);
+            }
+        }
+
         private static void Tell(string message) => MessageBox.Show(message, "SQL Prompter", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 }
