@@ -194,7 +194,7 @@ namespace SqlPrompter.Core.Analysis
             // 0. The column list of INSERT INTO table (…).
             if (qualifier.Count == 0 && (anchor.Kind == TokenKind.OpenParen || anchor.Kind == TokenKind.Comma))
             {
-                var insertColumns = TryInsertColumns(tokens, statementStart, anchorIndex, Make);
+                var insertColumns = TryInsertColumns(tokens, statementStart, anchorIndex, Make) ?? TryIndexColumns(tokens, statementStart, anchorIndex, Make);
                 if (insertColumns != null)
                 {
                     return insertColumns;
@@ -258,6 +258,15 @@ namespace SqlPrompter.Core.Analysis
             var position = qualifier.Count == 0
                 ? KeywordMap.At(structure, block, nameStart, caretIndex + (word != null ? 1 : 0))
                 : KeywordPosition.None;
+
+            // CREATE / ALTER / DROP INDEX has no expressions (but the filter predicate, where the map knows nothing): the keywords of the position.
+            if (!position.IsEmpty && IndexDdl.IndexKeyword(tokens, statementStart) >= 0)
+            {
+                var index = Make(position.Exclusive ? ContextKind.Keyword : ContextKind.Fallback);
+                index.SoftSelection = true;
+                index.ApplyPosition(position, false);
+                return index;
+            }
 
             // 2. After a table source in FROM: an alias or the next clause.
             if (clauseState.Clause == Clause.From && anchorAtBlockLevel && qualifier.Count == 0)
@@ -478,6 +487,11 @@ namespace SqlPrompter.Core.Analysis
                     return new[] { "INTO" };
                 case "DELETE":
                     return anchorIndex == statementStart ? new[] { "FROM", "TOP" } : null;
+                case "ON":
+                    // CREATE / ALTER / DROP INDEX name ON table: the first ON, before any parenthesis (a later ON names a filegroup).
+                    return IndexDdl.IndexKeyword(tokens, statementStart) >= 0 && !tokens.Skip(statementStart).Take(anchorIndex - statementStart).Any(t => t.Kind == TokenKind.OpenParen)
+                        ? Array.Empty<string>()
+                        : null;
                 case "TABLE":
                     return prevWord == "DROP" ? new[] { "IF EXISTS" } : prevWord == "TRUNCATE" || prevWord == "ALTER" ? Array.Empty<string>() : null;
                 default:
@@ -538,6 +552,105 @@ namespace SqlPrompter.Core.Analysis
             context.Sources = new[] { new TableSource(TableSourceKind.Object, parts, null, 0) };
             context.FirstInsertColumn = tokens[anchorIndex].Kind == TokenKind.OpenParen;
             return context;
+        }
+
+        /// <summary>
+        /// The column lists of CREATE INDEX name ON table (key columns) INCLUDE (columns): the columns of the table, without those listed
+        /// already (the INCLUDE list also without the key columns). Null when the caret is somewhere else.
+        /// </summary>
+        private static CaretContext TryIndexColumns(List<Token> tokens, int statementStart, int anchorIndex, Func<ContextKind, CaretContext> make)
+        {
+            if (IndexDdl.IndexKeyword(tokens, statementStart) < 0 || !tokens[statementStart].IsWord("CREATE"))
+            {
+                return null;
+            }
+
+            var open = anchorIndex;
+            if (tokens[anchorIndex].Kind == TokenKind.Comma)
+            {
+                var j = anchorIndex - 1;
+                while (j > statementStart && (tokens[j].IsNamePart || tokens[j].Kind == TokenKind.Comma))
+                {
+                    j--;
+                }
+
+                if (tokens[j].Kind != TokenKind.OpenParen)
+                {
+                    return null;
+                }
+
+                open = j;
+            }
+
+            // The table: the name after the first ON, before any parenthesis.
+            var on = -1;
+            for (var i = statementStart; i < open; i++)
+            {
+                if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    break;
+                }
+
+                if (tokens[i].IsWord("ON"))
+                {
+                    on = i;
+                    break;
+                }
+            }
+
+            if (on < 0)
+            {
+                return null;
+            }
+
+            var parts = new List<string>();
+            var k = on + 1;
+            while (k < open && (tokens[k].IsNamePart || tokens[k].Kind == TokenKind.Dot))
+            {
+                if (tokens[k].IsNamePart)
+                {
+                    parts.Add(tokens[k].IdentifierValue);
+                }
+
+                k++;
+            }
+
+            if (parts.Count == 0 || parts.Count > 3)
+            {
+                return null;
+            }
+
+            var excluded = new List<string>();
+            if (k != open)
+            {
+                // Only INCLUDE ( may follow the key columns; those are not offered again.
+                if (!tokens[open - 1].IsWord("INCLUDE") || tokens[k].Kind != TokenKind.OpenParen)
+                {
+                    return null;
+                }
+
+                excluded.AddRange(ListedColumns(tokens, k, int.MaxValue));
+            }
+
+            excluded.AddRange(ListedColumns(tokens, open, anchorIndex));
+            var context = make(ContextKind.InsertColumns);
+            context.Sources = new[] { new TableSource(TableSourceKind.Object, parts, null, 0) };
+            context.FirstInsertColumn = tokens[anchorIndex].Kind == TokenKind.OpenParen;
+            context.IndexColumns = true;
+            context.ExcludedColumns = excluded;
+            return context;
+        }
+
+        /// <summary>The column names listed in the parentheses that open at <paramref name="open"/> (up to the token <paramref name="last"/> or the closing parenthesis).</summary>
+        private static IEnumerable<string> ListedColumns(List<Token> tokens, int open, int last)
+        {
+            for (var i = open + 1; i < tokens.Count && i <= last && tokens[i].Kind != TokenKind.CloseParen; i++)
+            {
+                if (tokens[i].IsNamePart && (tokens[i - 1].Kind == TokenKind.OpenParen || tokens[i - 1].Kind == TokenKind.Comma))
+                {
+                    yield return tokens[i].IdentifierValue;
+                }
+            }
         }
 
         private static TableSource FindQualifiedSource(IReadOnlyList<TableSource> sources, IReadOnlyList<string> qualifier)

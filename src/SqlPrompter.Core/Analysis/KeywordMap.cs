@@ -107,6 +107,15 @@ namespace SqlPrompter.Core.Analysis
                 return InWindow(new List<Token>());
             }
 
+            if (top[top.Count - 1].Kind == TokenKind.OpenParen)
+            {
+                var index = IndexDdl.Inside(top.GetRange(0, top.Count - 1), new List<Token>());
+                if (index != null)
+                {
+                    return index;
+                }
+            }
+
             return Resolve(top, followingFrom);
         }
 
@@ -157,6 +166,15 @@ namespace SqlPrompter.Core.Analysis
 
             var inner = Collapse(s, open + 1, nameStart, s.Depth[open] + 1);
             var before = tokens[open - 1];
+            if (open > s.StatementStart)
+            {
+                var index = IndexDdl.Inside(Collapse(s, s.StatementStart, open, s.Depth[s.StatementStart]), inner);
+                if (index != null)
+                {
+                    return index;
+                }
+            }
+
             if (before.IsWord("OVER"))
             {
                 return InWindow(inner);
@@ -257,8 +275,17 @@ namespace SqlPrompter.Core.Analysis
             {
                 var kinds = new[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION", "INDEX", "TRIGGER" };
                 return head == "CREATE"
-                    ? Of(new[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION", "INDEX", "TRIGGER", "OR ALTER" }, new[] { "SCHEMA", "DATABASE", "TYPE", "SEQUENCE", "UNIQUE INDEX", "CLUSTERED INDEX", "NONCLUSTERED INDEX" })
+                    ? Of(new[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION", "INDEX", "TRIGGER", "OR ALTER" }, new[] { "UNIQUE", "CLUSTERED", "NONCLUSTERED", "COLUMNSTORE", "SCHEMA", "DATABASE", "TYPE", "SEQUENCE" })
                     : Of(kinds, new[] { "SCHEMA", "DATABASE", "TYPE", "SEQUENCE" });
+            }
+
+            if (head == "CREATE" || head == "ALTER" || head == "DROP")
+            {
+                var index = IndexDdl.Modifier(top) ?? IndexDdl.After(top);
+                if (index != null)
+                {
+                    return index;
+                }
             }
 
             if (head == "CREATE" && top.Count == 2 && anchor.IsWord("OR"))
