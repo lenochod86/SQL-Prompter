@@ -135,6 +135,12 @@ namespace SqlPrompter.Ssms
 
         private void ImportFormatStyle() => SettingsFiles.ImportFormatStyle(null);
 
+        /// <summary>The SSMS main window as the owner of a WinForms dialog, so that the dialog stays in front of it.</summary>
+        private sealed class MainWindowOwner : System.Windows.Forms.IWin32Window
+        {
+            public IntPtr Handle => System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+        }
+
         private static void OpenSettings()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -142,7 +148,7 @@ namespace SqlPrompter.Ssms
             {
                 using (var window = new SettingsWindow())
                 {
-                    window.ShowDialog();
+                    window.ShowDialog(new MainWindowOwner());
                 }
             }
             catch (Exception ex)
