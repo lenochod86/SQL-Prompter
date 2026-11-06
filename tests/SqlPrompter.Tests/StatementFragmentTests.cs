@@ -116,7 +116,7 @@ namespace SqlPrompter.Tests
         [Fact]
         public void TheClausesAreOfferedAfterAnActionToo()
         {
-            Assert.Contains(Items(MergeHead + "ON t.Id = s.Id WHEN MATCHED THEN DELETE |"), i => i.Group == -1 && i.FilterText == "WHEN NOT MATCHED");
+            Assert.Contains(Items(MergeHead + "ON t.Id = s.Id WHEN MATCHED THEN DELETE |"), i => i.IsBlock && i.FilterText == "WHEN NOT MATCHED");
         }
     }
 }
