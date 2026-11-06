@@ -372,3 +372,7 @@ Verified in SSMS 22: Ctrl+Space after `WHERE ty` and `AS a ij` and after `WHERE 
 Cases are in `KeywordMapTests` and `KeywordMapMoreTests`. A position unknown to the map keeps the old behavior (all keywords, with those the analyzer preferred before first). Not covered yet: the clauses of `CREATE TABLE` / `ALTER TABLE`, `EXEC` parameter names (offered elsewhere), `FETCH` of cursors, `FOR` after `DECLARE … CURSOR`. Verified only by unit tests (and four positions in SSMS 22) until the user tests the VSIX.
 
 **Snippets** are offered in every position (not after a qualifier and not in a name that is being invented): those whose prefix starts with the typed text in group 1 (next to the aliases), all the others (those that contain it and, before a character is typed, all) in the last group (`SuggestionBuilder.SnippetsLastGroup`, 50). Usage ranking takes precedence: a snippet that was chosen before is sorted as if it were in group 1 and, within the group, by the number of uses (`Suggestion.RankedSortText`).
+
+## Architecture review (#183)
+
+Whether the in-process VSIX is still the right approach is examined in [architecture-review.md](architecture-review.md): the inventory of problems by root cause, the alternatives (own list for typing, language server, VisualStudio.Extensibility, ScriptDOM) and the recommendation.
