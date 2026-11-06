@@ -131,6 +131,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.ShowStarHint, v => work.Behavior.ShowStarHint = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Mark items with \"SQL Prompter\"", "Shows \"SQL Prompter\" on the right of every item so that it is obvious the list is ours and not the built-in one.",
                 () => work.Behavior.MarkItems, v => work.Behavior.MarkItems = v, () => work.Behavior.SuggestionsEnabled);
+            completion.Check("Match initials and loose characters", "Besides a prefix or a part of the name the typed text may pick the capital letters or the words of a name (BKT finds BurzaKlientTyp, kt finds Burza_Klient_Typ) or its characters in order (bzkl). Exact and prefix matches stay first, loose matches last.",
+                () => work.Behavior.LooseMatching, v => work.Behavior.LooseMatching = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Rank by usage", "Items you choose more often come first in their group. The counts are kept on this computer only (%APPDATA%\\SqlPrompter\\usage.json); reset them with SQL Prompter > Reset Usage Statistics.",
                 () => work.Behavior.RankByUsage, v => work.Behavior.RankByUsage = v, () => work.Behavior.SuggestionsEnabled);
             completion.Choice("Keyword case", "How keywords are inserted. \"Match what I typed\" inserts upper case, or lower case if you started typing in lower case.",

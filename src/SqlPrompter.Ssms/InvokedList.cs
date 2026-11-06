@@ -296,7 +296,8 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            var matches = ListOrdering.Filter(suggestions.Items, typed, i => i.FilterText);
+            var loose = SettingsService.Current.Behavior.LooseMatching;
+            var matches = ListOrdering.Filter(suggestions.Items, typed, i => i.FilterText, loose);
             shown = matches.Select(i => new CompletionItemWithHighlight(i, Highlight(i, typed))).ToList();
             selected = Math.Min(selected, Math.Max(0, shown.Count - 1));
         }
@@ -314,7 +315,7 @@ namespace SqlPrompter.Ssms
                     continue;
                 }
 
-                if (item != nonAggregatedItem && !ListOrdering.Matches(item.FilterText, typed))
+                if (item != nonAggregatedItem && !ListOrdering.Matches(item.FilterText, typed, SettingsService.Current.Behavior.LooseMatching))
                 {
                     continue;
                 }
@@ -343,8 +344,14 @@ namespace SqlPrompter.Ssms
 
         private static ImmutableArray<Span> Highlight(CompletionItem item, string typed)
         {
-            var at = typed.Length == 0 ? -1 : item.DisplayText.IndexOf(typed, StringComparison.OrdinalIgnoreCase);
-            return at < 0 ? ImmutableArray<Span>.Empty : ImmutableArray.Create(new Span(at, typed.Length));
+            // The characters of the name that the typed text picked (a prefix, a part, the humps or words, or just the characters in order).
+            var match = typed.Length == 0 ? null : NameMatcher.Match(item.DisplayText, typed, SettingsService.Current.Behavior.LooseMatching);
+            if (match == null)
+            {
+                return ImmutableArray<Span>.Empty;
+            }
+
+            return match.Runs().Select(run => new Span(run.Key, run.Value)).ToImmutableArray();
         }
 
         private string TypedText()

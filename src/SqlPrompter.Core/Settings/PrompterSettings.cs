@@ -191,6 +191,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "markItems")]
         public bool MarkItems { get; set; }
 
+        /// <summary>The typed text may also pick the humps or words of a name (BKT for BurzaKlientTyp) or its characters in order; without it only a prefix or a substring matches.</summary>
+        [DataMember(Name = "looseMatching")]
+        public bool LooseMatching { get; set; }
+
         /// <summary>Items chosen more often come first in their group; the counts stay on this machine.</summary>
         [DataMember(Name = "rankByUsage")]
         public bool RankByUsage { get; set; }
@@ -288,6 +292,7 @@ namespace SqlPrompter.Core.Settings
             CommitOnClosingBracket = false;
             KeywordCase = KeywordCase.MatchTyped;
             MarkItems = true;
+            LooseMatching = true;
             RankByUsage = true;
             AutoClose = true;
             SuggestAfterComma = true;

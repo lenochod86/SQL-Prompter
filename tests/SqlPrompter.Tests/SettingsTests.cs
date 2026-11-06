@@ -30,6 +30,14 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void LooseMatchingIsOnByDefaultAndCanBeSwitchedOff()
+        {
+            Assert.True(new PrompterSettings().Behavior.LooseMatching);
+            Assert.True(SettingsJson.Deserialize("{}").Behavior.LooseMatching);
+            Assert.False(SettingsJson.Deserialize("{ \"behavior\": { \"looseMatching\": false } }").Behavior.LooseMatching);
+        }
+
+        [Fact]
         public void ItemsAreMarkedByDefaultAndTheMarkerKeepsTheSuffix()
         {
             Assert.True(new PrompterSettings().Behavior.MarkItems);
