@@ -41,17 +41,18 @@ namespace SqlPrompter.Ssms
     {
         private readonly IWpfTextView view;
         private readonly IAsyncCompletionBroker broker;
-        private bool alone;
+        private readonly CtrlTapDetector detector = new CtrlTapDetector();
 
         public CtrlTap(IWpfTextView view, IAsyncCompletionBroker broker)
         {
             this.view = view;
             this.broker = broker;
+            InputWatcher.EnsureInstalled();
             var element = view.VisualElement;
             element.PreviewKeyDown += OnKeyDown;
             element.PreviewKeyUp += OnKeyUp;
-            element.PreviewMouseDown += (s, e) => alone = false;
-            element.LostKeyboardFocus += (s, e) => alone = false;
+            element.PreviewMouseDown += (s, e) => detector.Interrupted();
+            element.LostKeyboardFocus += (s, e) => detector.Interrupted();
         }
 
         private static bool IsCtrl(Key key) => key == Key.LeftCtrl || key == Key.RightCtrl;
@@ -59,19 +60,26 @@ namespace SqlPrompter.Ssms
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
             // The first Ctrl press arms the tap; any other key (also Shift, Alt) or the key repeat of a held Ctrl disarms it.
-            alone = IsCtrl(e.Key) && !e.IsRepeat && Keyboard.Modifiers == ModifierKeys.Control;
+            if (IsCtrl(e.Key))
+            {
+                detector.CtrlDown(e.IsRepeat, Keyboard.Modifiers == ModifierKeys.Control, InputWatcher.Count);
+            }
+            else
+            {
+                detector.Interrupted();
+            }
         }
 
         private void OnKeyUp(object sender, KeyEventArgs e)
         {
             if (!IsCtrl(e.Key))
             {
-                alone = false;
+                detector.Interrupted();
                 return;
             }
 
-            var tapped = alone && Keyboard.Modifiers == ModifierKeys.None;
-            alone = false;
+            // Chords that SSMS routes to commands (Ctrl+A, Ctrl+Space ...) never reach the key events above; the input watcher sees them.
+            var tapped = detector.CtrlUp(Keyboard.Modifiers == ModifierKeys.None, InputWatcher.Count);
             if (!tapped || !SettingsService.Current.Behavior.QuickActionsOnCtrl || broker.GetSession(view) != null || SnippetSession.IsActive(view))
             {
                 return;
