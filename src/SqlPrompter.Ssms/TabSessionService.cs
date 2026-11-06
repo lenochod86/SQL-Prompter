@@ -38,6 +38,7 @@ namespace SqlPrompter.Ssms
         private bool shuttingDown;
         private bool sawTabs;
         private int emptyTicks;
+        private readonly HashSet<string> describeFailures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private TabSessionService(DTE dte)
         {
@@ -277,7 +278,20 @@ namespace SqlPrompter.Ssms
                         continue;
                     }
 
-                    var saved = Describe(document, ReferenceEquals(document, active) || document.FullName == active?.FullName);
+                    SavedTab saved = null;
+                    try
+                    {
+                        saved = Describe(document, ReferenceEquals(document, active) || document.FullName == active?.FullName);
+                    }
+                    catch (Exception ex)
+                    {
+                        // One document that cannot be read (a window that is closing, E_FAIL) must not stop the others from being saved.
+                        if (describeFailures.Add(document.FullName))
+                        {
+                            Log.Error("A tab could not be described and is skipped: " + document.FullName, ex);
+                        }
+                    }
+
                     if (saved != null)
                     {
                         tabs.Add(saved);
