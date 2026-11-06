@@ -177,6 +177,12 @@
           <ButtonText>Find In Database Code</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidShowDependencies" priority="0x011B" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Show Dependencies</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidFormatDocument" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
         <Strings>
@@ -306,6 +312,7 @@
       <IDSymbol name="cmdidScriptOutline" value="0x012C" />
       <IDSymbol name="cmdidQuickOpen" value="0x012D" />
       <IDSymbol name="cmdidFindInCode" value="0x012E" />
+      <IDSymbol name="cmdidShowDependencies" value="0x012F" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />
