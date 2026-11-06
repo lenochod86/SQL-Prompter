@@ -212,6 +212,9 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>At the start of a condition of HAVING (after HAVING, AND, OR, NOT or an opening parenthesis): the aggregates of the select list are offered first.</summary>
         public bool InHaving { get; internal set; }
 
+        /// <summary>With <see cref="ContextKind.DataType"/>: the name (variable without @, or the operand of CAST) whose same-named columns give the types to offer first.</summary>
+        public string TypeOfName { get; internal set; }
+
         /// <summary>After <c>INSERT INTO table (columns) |</c>: the table (VALUES and SELECT are offered pre-filled for the listed columns).</summary>
         public TableSource InsertTail { get; internal set; }
 

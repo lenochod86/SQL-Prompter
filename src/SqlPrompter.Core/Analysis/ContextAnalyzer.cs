@@ -257,7 +257,18 @@ namespace SqlPrompter.Core.Analysis
                 ((anchor.IsWord("AS") && IsCastArgument(structure, anchorIndex)) ||
                  (anchor.Kind == TokenKind.Variable && tokens[statementStart].IsWord("DECLARE"))))
             {
-                return Make(ContextKind.DataType);
+                var dataType = Make(ContextKind.DataType);
+                // The name whose column type is likely wanted: DECLARE @IdCustomer |, CAST(IdCustomer AS |.
+                if (anchor.Kind == TokenKind.Variable)
+                {
+                    dataType.TypeOfName = anchor.Text.TrimStart('@');
+                }
+                else if (anchorIndex - 1 >= statementStart && tokens[anchorIndex - 1].IsNamePart)
+                {
+                    dataType.TypeOfName = tokens[anchorIndex - 1].IdentifierValue;
+                }
+
+                return dataType;
             }
 
             if (anchor.IsWord("AS"))

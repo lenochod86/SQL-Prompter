@@ -199,7 +199,7 @@ namespace SqlPrompter.Core.Completion
                 case ContextKind.Variable:
                     return VariableSuggestions(context, script, 0).ToList();
                 case ContextKind.DataType:
-                    return DataTypeSuggestions(context, 0).ToList();
+                    return ColumnTypeSuggestions(context, metadata).Concat(DataTypeSuggestions(context, 0)).ToList();
                 case ContextKind.Fallback:
                     return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0))
                         .Concat(SnippetSuggestions(context, options))
@@ -254,6 +254,35 @@ namespace SqlPrompter.Core.Completion
                     var tail = noArguments ? " ORDER BY )" : ") OVER (PARTITION BY  ORDER BY )";
                     yield return new Suggestion(SuggestionKind.Function, text + "() OVER (...)", text + "() OVER (PARTITION BY  ORDER BY )", text, null, "window function with OVER", group, caretBack: tail.Length);
                 }
+            }
+        }
+
+        /// <summary>
+        /// DECLARE @IdCustomer |, CAST(IdCustomer AS |: the types, with their exact length, precision and scale, of the columns of the database that have the same name
+        /// (case-insensitive; only columns whose table has been used, so that its columns are loaded); the most common first.
+        /// </summary>
+        private static IEnumerable<Suggestion> ColumnTypeSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        {
+            if (metadata == null || string.IsNullOrEmpty(context.TypeOfName))
+            {
+                yield break;
+            }
+
+            var found = new List<KeyValuePair<string, string>>();
+            foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem && (o.Kind == DbObjectKind.Table || o.Kind == DbObjectKind.View)))
+            {
+                var column = metadata.GetColumns(dbObject)?.FirstOrDefault(c => string.Equals(c.Name, context.TypeOfName, StringComparison.OrdinalIgnoreCase));
+                if (column != null && column.TypeName.Length > 0)
+                {
+                    found.Add(new KeyValuePair<string, string>(column.TypeName, dbObject.Schema + "." + dbObject.Name + "." + column.Name));
+                }
+            }
+
+            var order = 0;
+            foreach (var type in found.GroupBy(f => f.Key, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()))
+            {
+                var owners = type.Select(t => t.Value).Take(3).ToList();
+                yield return new Suggestion(SuggestionKind.DataType, type.Key, type.Key, type.Key, owners[0], "type of " + string.Join(", ", owners) + (type.Count() > 3 ? " ..." : string.Empty), -20 + order++);
             }
         }
 
