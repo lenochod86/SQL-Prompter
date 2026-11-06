@@ -215,6 +215,8 @@ namespace SqlPrompter.Ssms
             analysis.Heading("Warnings");
             analysis.Check("Comparison with NULL", "= NULL, <> NULL and != NULL in a condition are never true; use IS NULL or IS NOT NULL.", () => work.Analysis.EqualsNull, v => work.Analysis.EqualsNull = v, checks, 1);
             analysis.Check("JOIN without ON", "A JOIN (other than CROSS JOIN) without an ON condition combines every row with every row.", () => work.Analysis.JoinWithoutOn, v => work.Analysis.JoinWithoutOn = v, checks, 1);
+            analysis.Check("Unexpected end", "A script that stops in the middle of a construct: an unclosed parenthesis, string or bracketed name, a CTE that no statement follows, BEGIN or CASE without END, a batch that ends with FROM, WHERE, AND, a comma or an operator. Checked at the end of every batch (before GO and at the end of the script).",
+                () => work.Analysis.UnexpectedEnd, v => work.Analysis.UnexpectedEnd = v, checks, 1);
             analysis.Heading("Hints");
             analysis.Check("INSERT without a column list", "INSERT INTO table VALUES (...) or SELECT depends on the order of the table's columns and breaks when one is added.", () => work.Analysis.InsertWithoutColumns, v => work.Analysis.InsertWithoutColumns = v, checks, 1);
             analysis.Check("Unused variable", "A variable declared with DECLARE that the batch never mentions again.", () => work.Analysis.UnusedVariable, v => work.Analysis.UnusedVariable = v, checks, 1);
