@@ -132,7 +132,12 @@ namespace SqlPrompter.Core.Completion
         public string SortText => (Group + 100).ToString("D3") + DisplayText;
 
         /// <summary>Sort key with the usage of the item: within a group the items chosen more often come first.</summary>
-        public string RankedSortText(int usageCount) => (Group + 100).ToString("D3") + UsageStatistics.SortPrefix(usageCount) + DisplayText;
+        public string RankedSortText(int usageCount)
+        {
+            // Usage comes first: a snippet that was chosen before is not left at the end of the list.
+            var group = Kind == SuggestionKind.Snippet && usageCount > 0 ? Math.Min(Group, 1) : Group;
+            return (group + 100).ToString("D3") + UsageStatistics.SortPrefix(usageCount) + DisplayText;
+        }
 
         /// <summary>Identifies the item for the usage statistics: its kind, its text and where it belongs (schema, alias).</summary>
         public string UsageKey => Kind + "|" + DisplayText + "|" + Suffix;
@@ -172,11 +177,9 @@ namespace SqlPrompter.Core.Completion
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
-                    return context.OnlyExpectedKeywords
-                        ? KeywordSuggestions(context, 0).ToList()
-                        : KeywordSuggestions(context, 0).Concat(SnippetSuggestions(context, options)).ToList();
+                    return KeywordSuggestions(context, 0).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
-                    return ObjectSuggestions(context, metadata, script, options).ToList();
+                    return ObjectSuggestions(context, metadata, script, options).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.InsertColumns:
                     return InsertColumnSuggestions(context, metadata, options).ToList();
                 case ContextKind.Expression:
@@ -244,18 +247,27 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        /// <summary>Snippets whose prefix contains what is typed; nothing before a character is typed, so that the list does not start with a hundred of them.</summary>
+        /// <summary>The group of the snippets that do not match the typed text at its start (and of all of them before a character is typed): the end of the list.</summary>
+        internal const int SnippetsLastGroup = 50;
+
+        /// <summary>
+        /// Snippets are always offered (not after a qualifier): those whose prefix starts with what is typed next to the other likely items,
+        /// the others (those that contain it and, before a character is typed, all of them) at the end of the list. Items chosen often
+        /// move up (<see cref="Suggestion.RankedSortText"/>).
+        /// </summary>
         private static IEnumerable<Suggestion> SnippetSuggestions(CaretContext context, SuggestionOptions options)
         {
-            if (context.TypedPrefix.Length == 0 || context.Qualifier.Count > 0)
+            if (context.Qualifier.Count > 0)
             {
                 yield break;
             }
 
-            foreach (var snippet in options.Snippets.Where(s => s.Prefix.IndexOf(context.TypedPrefix, StringComparison.OrdinalIgnoreCase) >= 0))
+            var typed = context.TypedPrefix;
+            foreach (var snippet in options.Snippets.Where(s => typed.Length == 0 || s.Prefix.IndexOf(typed, StringComparison.OrdinalIgnoreCase) >= 0))
             {
+                var startsWith = typed.Length > 0 && snippet.Prefix.StartsWith(typed, StringComparison.OrdinalIgnoreCase);
                 var description = string.IsNullOrWhiteSpace(snippet.Description) ? "snippet" : "snippet: " + snippet.Description;
-                yield return new Suggestion(SuggestionKind.Snippet, snippet.Prefix, snippet.Prefix, snippet.Prefix, "snippet", description + "\n\n" + Preview(snippet.Body), 1,
+                yield return new Suggestion(SuggestionKind.Snippet, snippet.Prefix, snippet.Prefix, snippet.Prefix, "snippet", description + "\n\n" + Preview(snippet.Body), startsWith ? 1 : SnippetsLastGroup,
                     null, string.IsNullOrWhiteSpace(snippet.Description) ? null : snippet.Description, KeyKind.None, snippet);
             }
         }

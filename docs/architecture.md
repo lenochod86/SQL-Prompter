@@ -350,6 +350,25 @@ Verified in SSMS 22: Ctrl+Space after `WHERE ty` and `AS a ij` and after `WHERE 
 | `CASE |`, `CASE x |` | `WHEN` | |
 | `CASE WHEN c |` | `THEN` (`BETWEEN x` → `AND`) | `AND`, `OR` |
 | `… THEN x |` / `… ELSE x |` | `WHEN`, `ELSE`, `END` / `END` | |
+| `MERGE INTO t |` / `USING s |` | `AS`, `USING` / `AS`, `ON` (after an alias only `USING` / `ON`) | |
+| after the `MERGE` `ON` condition | `AND`, `OR` | `WHEN MATCHED`, `WHEN NOT MATCHED` |
+| `WHEN |` / `WHEN MATCHED |` / `WHEN NOT MATCHED [BY] |` | `MATCHED`, `NOT MATCHED` / `THEN`, `AND` / `BY TARGET`, `BY SOURCE`, `THEN` | `AND` |
+| `THEN |` / `THEN UPDATE |` | `UPDATE SET`, `DELETE`, `INSERT` / `SET` | |
+| after a `MERGE` action | `WHEN`, `OUTPUT` (after `INSERT (cols)`: `VALUES`) | `OPTION` |
+| `FROM t |` | (see above) plus `PIVOT`, `UNPIVOT` | |
+| `PIVOT (…) |` | `AS` | |
+| `PIVOT (SUM(x) |` / `… FOR c |` | `FOR` / `IN` | |
+| `OVER (|` | `PARTITION BY`, `ORDER BY` | |
+| inside `OVER (…)` | after `PARTITION BY list`: `ORDER BY`; after an order item: `ASC`, `DESC`, `ROWS`, `RANGE`; frame: `BETWEEN`, `UNBOUNDED PRECEDING`, `CURRENT ROW`, `AND`, `UNBOUNDED FOLLOWING` | |
+| `COUNT(*) |` in a select list | `FROM`, `AS`, `INTO` | `OVER` |
+| `IF |` / `IF cond |` / `WHILE cond |` | `EXISTS`, `NOT EXISTS` / `BEGIN`, `AND`, `OR` | the statements that can be the body |
+| `EXEC p @a = @b |` | `OUTPUT` | `WITH RECOMPILE`, `WITH RESULT SETS`; after `OUTPUT`: `WITH RECOMPILE`; `WITH |`: `RECOMPILE`, `RESULT SETS` |
+| `OFFSET n |` / `OFFSET n ROWS |` | `ROWS`, `ROW` / `FETCH NEXT`, `FETCH FIRST` | tails |
+| `FETCH |` / `FETCH NEXT n |` / `… ROWS |` | `NEXT`, `FIRST` / `ROWS`, `ROW` / `ONLY` | |
+| `FOR |` / `FOR XML |` / `FOR JSON |` | `XML`, `JSON`, `BROWSE` / `PATH`, `AUTO`, `RAW`, `EXPLICIT` / `PATH`, `AUTO` | |
+| `FOR XML PATH('r') |`, `FOR XML AUTO, |` | `ROOT`, `TYPE`, `ELEMENTS` (JSON: `ROOT`, `INCLUDE_NULL_VALUES`, `WITHOUT_ARRAY_WRAPPER`) | `BINARY BASE64`, `XMLSCHEMA`, `XSINIL` |
 | statement start | `SELECT`, `INSERT INTO`, `UPDATE`, `DELETE FROM`, `WITH`, `DECLARE`, `SET`, `EXEC`, `IF`, `BEGIN` | the other statement keywords |
 
-Cases are in `KeywordMapTests`. **Not covered yet:** `MERGE` clauses, `PIVOT`, `OVER (` contents, `IF`/`WHILE` conditions, `EXEC` parameters, `OFFSET … FETCH`, `FOR XML` options; a position unknown to the map keeps the old behavior (all keywords, with those the analyzer preferred before first). Verified only by unit tests until the user tests the VSIX in SSMS 22.
+Cases are in `KeywordMapTests` and `KeywordMapMoreTests`. A position unknown to the map keeps the old behavior (all keywords, with those the analyzer preferred before first). Not covered yet: the clauses of `CREATE TABLE` / `ALTER TABLE`, `EXEC` parameter names (offered elsewhere), `FETCH` of cursors, `FOR` after `DECLARE … CURSOR`. Verified only by unit tests (and four positions in SSMS 22) until the user tests the VSIX.
+
+**Snippets** are offered in every position (not after a qualifier and not in a name that is being invented): those whose prefix starts with the typed text in group 1 (next to the aliases), all the others (those that contain it and, before a character is typed, all) in the last group (`SuggestionBuilder.SnippetsLastGroup`, 50). Usage ranking takes precedence: a snippet that was chosen before is sorted as if it were in group 1 and, within the group, by the number of uses (`Suggestion.RankedSortText`).

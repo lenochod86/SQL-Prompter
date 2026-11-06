@@ -468,7 +468,7 @@ namespace SqlPrompter.Core.Analysis
                 case "UPDATE":
                     // Not ON UPDATE CASCADE, FOR UPDATE, AFTER INSERT, UPDATE …
                     var isDml = prev == null || (prev.Kind != TokenKind.Comma && prevWord != "ON" && prevWord != "FOR" &&
-                                                 prevWord != "AFTER" && prevWord != "OF");
+                                                 prevWord != "AFTER" && prevWord != "OF" && prevWord != "THEN");
                     return isDml ? Array.Empty<string>() : null;
                 case "INTO":
                     return prevWord == "INSERT" || prevWord == "MERGE" ? Array.Empty<string>() : null;

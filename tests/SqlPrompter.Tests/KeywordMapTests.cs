@@ -36,6 +36,7 @@ namespace SqlPrompter.Tests
         private static void AssertFirst(string sql, params string[] expected)
         {
             var first = First(sql);
+            Assert.True(first.Length < 40, "nothing is preferred at this position");
             foreach (var keyword in expected)
             {
                 Assert.Contains(keyword, first);
