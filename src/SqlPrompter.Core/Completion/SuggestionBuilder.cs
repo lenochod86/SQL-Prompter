@@ -785,10 +785,12 @@ namespace SqlPrompter.Core.Completion
             // In a condition: the operators that fit the column before the caret, or after a comparison the values of its type first.
             var operand = context.ConditionOperand == null ? null : FindOperandColumn(context.ConditionOperand, resolved);
             var valueType = operand != null && context.AfterComparison ? OperatorSuggestions.Classify(operand.TypeName) : TypeClass.Unknown;
+            var operators = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (operand != null && !context.AfterComparison)
             {
                 foreach (var op in OperatorSuggestions.Build(operand))
                 {
+                    operators.Add(op.DisplayText);
                     yield return op;
                 }
             }
@@ -873,6 +875,12 @@ namespace SqlPrompter.Core.Completion
 
             foreach (var keyword in KeywordSuggestions(context, 4, inExpression: true))
             {
+                // The operator items already offer IN, LIKE, BETWEEN ... with the right text; the plain keyword would only duplicate them (and could be the one preselected).
+                if (operators.Contains(keyword.DisplayText))
+                {
+                    continue;
+                }
+
                 yield return keyword;
             }
         }

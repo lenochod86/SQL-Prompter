@@ -104,6 +104,17 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void ThePlainKeywordsOfTheOperatorsAreNotOfferedAgain()
+        {
+            var items = Items("SELECT * FROM dbo.Users WHERE Name |");
+
+            foreach (var text in new[] { "IN", "LIKE", "NOT IN", "IS NULL" })
+            {
+                Assert.Single(items, i => i.Kind == SuggestionKind.Keyword && string.Equals(i.DisplayText, text, System.StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        [Fact]
         public void InComesWithParenthesesAndTheCaretBetweenThem()
         {
             var item = Items("SELECT * FROM dbo.Users WHERE Id |").Single(i => i.DisplayText == "IN" && i.Group < -20);
