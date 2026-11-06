@@ -177,13 +177,13 @@ namespace SqlPrompter.Core.Completion
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
-                    return KeywordSuggestions(context, 0).Concat(SnippetSuggestions(context, options)).ToList();
+                    return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0)).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
                     return ObjectSuggestions(context, metadata, script, options).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.InsertColumns:
                     return InsertColumnSuggestions(context, metadata, options).ToList();
                 case ContextKind.Expression:
-                    return ExpressionSuggestions(context, metadata, script, options).ToList();
+                    return StatementFragments.Build(context, metadata, options).Concat(ExpressionSuggestions(context, metadata, script, options)).ToList();
                 case ContextKind.Name:
                     return context.UnknownExpressionQualifier && metadata != null
                         ? SchemaFunctionSuggestions(context, metadata).ToList()
@@ -193,7 +193,7 @@ namespace SqlPrompter.Core.Completion
                 case ContextKind.DataType:
                     return DataTypeSuggestions(context, 0).ToList();
                 case ContextKind.Fallback:
-                    return KeywordSuggestions(context, 0)
+                    return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0))
                         .Concat(SnippetSuggestions(context, options))
                         .Concat(FunctionSuggestions(context, 2))
                         .Concat(DataTypeSuggestions(context, 3))
