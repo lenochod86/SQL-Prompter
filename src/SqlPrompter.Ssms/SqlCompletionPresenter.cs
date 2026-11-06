@@ -108,6 +108,8 @@ namespace SqlPrompter.Ssms
         private Button summaryTab;
         private string definitionScript;
         private CompletionItem definitionItem;
+        private CompletionItem dbDescriptionItem;
+        private string dbDescription;
         private DispatcherTimer definitionTimer;
         private readonly StackPanel rowPanel = new StackPanel();
         private readonly ScrollBar scrollBar;
@@ -553,6 +555,11 @@ namespace SqlPrompter.Ssms
             }
 
             descriptionText.Text = description ?? string.Empty;
+            if (dbDescription != null && selected >= 0 && selected < items.Count && ReferenceEquals(items[selected].CompletionItem, dbDescriptionItem))
+            {
+                descriptionText.Text += (descriptionText.Text.Length > 0 ? "\n\n" : string.Empty) + dbDescription;
+            }
+
             UpdateDefinition(selected >= 0 && selected < items.Count ? items[selected].CompletionItem : null);
         }
 
@@ -577,6 +584,7 @@ namespace SqlPrompter.Ssms
             }
 
             definitionReference = reference;
+            RequestDescription(item, reference);
 
             if (DefinitionPreview.TryGetCached(reference, out var cached))
             {
@@ -600,6 +608,30 @@ namespace SqlPrompter.Ssms
                 }
             };
             definitionTimer.Start();
+        }
+
+        /// <summary>The descriptions of the database (MS_Description) are added under the description of the item when they arrive (#206).</summary>
+        private void RequestDescription(CompletionItem item, DefinitionRef reference)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            dbDescription = null;
+            dbDescriptionItem = item;
+            if (!SettingsService.Current.Behavior.ShowDbDescriptions)
+            {
+                return;
+            }
+
+            DescriptionPreview.Request(reference, text =>
+            {
+                if (string.IsNullOrEmpty(text) || !ReferenceEquals(definitionItem, item) || !ReferenceEquals(dbDescriptionItem, item))
+                {
+                    return;
+                }
+
+                dbDescription = text;
+                descriptionText.Text += (descriptionText.Text.Length > 0 ? "\n\n" : string.Empty) + text;
+                descriptionPopup.IsOpen = popup.IsOpen;
+            });
         }
 
         private void ShowDefinition(string script)
