@@ -36,6 +36,14 @@ namespace SqlPrompter.Ssms
         [Import]
         internal MetadataService Metadata { get; set; }
 
+        /// <summary>The provider the editor created, so that <see cref="InvokedList"/> reaches the source of a view.</summary>
+        internal static SqlCompletionSourceProvider Current { get; private set; }
+
+        public SqlCompletionSourceProvider()
+        {
+            Current = this;
+        }
+
         public IAsyncCompletionSource GetOrCreate(ITextView textView) =>
             textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionSource(Metadata, textView));
     }
@@ -127,9 +135,7 @@ namespace SqlPrompter.Ssms
             try
             {
                 // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
-                var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
-                RequestScriptColumns(prepared, script);
-                var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor)).Select(s => ToItem(s, prepared)).ToImmutableArray();
+                var items = BuildItems(prepared);
                 session.Properties[HardSelectionKey] = !prepared.Context.SoftSelection;
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 // Where the user probably types a name of their own (an alias), Enter must keep what was typed instead of inserting
@@ -141,6 +147,38 @@ namespace SqlPrompter.Ssms
             {
                 Log.Error("Building suggestions failed", ex);
                 return Task.FromResult(CompletionContext.Empty);
+            }
+        }
+
+        private ImmutableArray<CompletionItem> BuildItems(Prepared prepared)
+        {
+            var script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
+            RequestScriptColumns(prepared, script);
+            return SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor)).Select(s => ToItem(s, prepared)).ToImmutableArray();
+        }
+
+        /// <summary>
+        /// The suggestions for a list that SQL Prompter runs itself (<see cref="InvokedList"/>): the same preparation and the same items as the editor's
+        /// session, built on the UI thread (it takes milliseconds and never waits for the database). Null when this place has no suggestions.
+        /// </summary>
+        internal InvokedSuggestions BuildForInvoke(SnapshotPoint location)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var start = Initialize(new CompletionTrigger(CompletionTriggerReason.Invoke, location.Snapshot), location);
+                var prepared = pending;
+                if (start.ApplicableToSpan.Snapshot == null || prepared == null || prepared.Snapshot != location.Snapshot)
+                {
+                    return null;
+                }
+
+                return new InvokedSuggestions(BuildItems(prepared), location.Snapshot.CreateTrackingSpan(start.ApplicableToSpan, SpanTrackingMode.EdgeInclusive), prepared.Context.SoftSelection);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Building the suggestions failed", ex);
+                return null;
             }
         }
 
@@ -426,11 +464,11 @@ namespace SqlPrompter.Ssms
         public bool ShouldCommitCompletion(IAsyncCompletionSession session, SnapshotPoint location, char typedChar, CancellationToken token) =>
             Keys.PotentialCharacters.Contains(typedChar);
 
-        private static void MoveCaret(IAsyncCompletionSession session, ITextBuffer buffer, int position)
+        private static void MoveCaret(ITextView view, ITextBuffer buffer, int position)
         {
             try
             {
-                session.TextView.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, position));
+                view.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, position));
             }
             catch (Exception ex)
             {
@@ -441,8 +479,18 @@ namespace SqlPrompter.Ssms
         public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            return Commit(session.TextView, session.ApplicableToSpan, buffer, item, typedChar);
+        }
+
+        /// <summary>
+        /// The commit of an item in place of the typed text (<paramref name="applicable"/>), shared by the editor's session (above) and the list SQL Prompter
+        /// runs itself (<see cref="InvokedList"/>).
+        /// </summary>
+        internal static CommitResult Commit(ITextView view, ITrackingSpan applicable, ITextBuffer buffer, CompletionItem item, char typedChar)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
             // A space typed while nothing has been typed yet (the list opened after a comma) only closes the list.
-            if (typedChar == ' ' && session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot).Length == 0)
+            if (typedChar == ' ' && applicable.GetSpan(buffer.CurrentSnapshot).Length == 0)
             {
                 return CloseWithoutInserting;
             }
@@ -457,7 +505,7 @@ namespace SqlPrompter.Ssms
 
                 // A snippet is expanded instead of inserting its prefix; the typed character (Tab, Enter, Space) is swallowed.
                 if (item.Properties.TryGetProperty(SqlCompletionSource.SnippetKey, out SqlPrompter.Core.Snippets.Snippet snippetToExpand) &&
-                    SnippetInserter.TryInsert(session, buffer, snippetToExpand))
+                    SnippetInserter.TryInsert(view, applicable, buffer, snippetToExpand))
                 {
                     return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
                 }
@@ -469,10 +517,10 @@ namespace SqlPrompter.Ssms
                 {
                     try
                     {
-                        var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                        var span = applicable.GetSpan(buffer.CurrentSnapshot);
                         buffer.Replace(span, item.InsertText);
                         buffer.Insert(edit.Position.GetPosition(buffer.CurrentSnapshot), edit.Text);
-                        MoveCaret(session, buffer, span.Start.Position + item.InsertText.Length);
+                        MoveCaret(view, buffer, span.Start.Position + item.InsertText.Length);
                         return new CommitResult(isHandled: true, CommitBehavior.None);
                     }
                     catch (Exception ex)
@@ -487,7 +535,7 @@ namespace SqlPrompter.Ssms
                 {
                     try
                     {
-                        var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                        var span = applicable.GetSpan(buffer.CurrentSnapshot);
                         var before = item.Properties.TryGetProperty(SqlCompletionSource.BeforeLineKey, out string lines) ? lines : string.Empty;
                         using (var blockEdit = buffer.CreateEdit())
                         {
@@ -500,7 +548,7 @@ namespace SqlPrompter.Ssms
                             blockEdit.Apply();
                         }
 
-                        MoveCaret(session, buffer, span.Start.Position + before.Length + item.InsertText.Length);
+                        MoveCaret(view, buffer, span.Start.Position + before.Length + item.InsertText.Length);
                         return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
                     }
                     catch (Exception ex)
@@ -516,7 +564,7 @@ namespace SqlPrompter.Ssms
                 {
                     try
                     {
-                        var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                        var span = applicable.GetSpan(buffer.CurrentSnapshot);
                         var text = item.InsertText;
                         var followed = span.End.Position < buffer.CurrentSnapshot.Length && buffer.CurrentSnapshot[span.End.Position] == '(';
                         if (followed && text.EndsWith("()", StringComparison.Ordinal))
@@ -526,7 +574,7 @@ namespace SqlPrompter.Ssms
                         }
 
                         buffer.Replace(span, text);
-                        MoveCaret(session, buffer, span.Start.Position + text.Length - caretBack);
+                        MoveCaret(view, buffer, span.Start.Position + text.Length - caretBack);
                         return new CommitResult(isHandled: true, CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
                     }
                     catch (Exception ex)

@@ -15,10 +15,17 @@ namespace SqlPrompter.Ssms
         public static bool TryInsert(IAsyncCompletionSession session, ITextBuffer buffer, Snippet snippet)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            return TryInsert(session.TextView, session.ApplicableToSpan, buffer, snippet);
+        }
+
+        /// <summary>Expands the snippet in place of the typed prefix given as a tracking span (the editor's session or the list SQL Prompter runs itself).</summary>
+        public static bool TryInsert(ITextView view, ITrackingSpan applicableToSpan, ITextBuffer buffer, Snippet snippet)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
-                var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
-                Insert(session.TextView, span, snippet, selectedText: null);
+                var span = applicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                Insert(view, span, snippet, selectedText: null);
                 return true;
             }
             catch (Exception ex)

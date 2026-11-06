@@ -94,6 +94,12 @@
           <ButtonText>Manage Snippets...</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidShowSuggestions" priority="0x00F0" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
+        <Strings>
+          <ButtonText>Show Suggestions</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidGoToDefinition" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
         <Strings>
@@ -255,6 +261,7 @@
       <IDSymbol name="cmdidNewSnippetFromSelection" value="0x0108" />
       <IDSymbol name="cmdidManageSnippets" value="0x0109" />
       <IDSymbol name="cmdidSettings" value="0x011F" />
+      <IDSymbol name="cmdidShowSuggestions" value="0x0121" />
       <IDSymbol name="cmdidFormattingStyles" value="0x0120" />
       <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
       <IDSymbol name="cmdidOpenLog" value="0x0101" />

@@ -711,7 +711,7 @@ namespace SqlPrompter.Core.Completion
                 yield return function;
             }
 
-            foreach (var function in metadata.Objects.Where(o => o.Kind == DbObjectKind.ScalarFunction && !o.IsSystem))
+            foreach (var function in (metadata?.Objects ?? System.Array.Empty<DbObject>()).Where(o => o.Kind == DbObjectKind.ScalarFunction && !o.IsSystem))
             {
                 yield return ScalarFunctionSuggestion(function, SqlIdentifier.Quote(function.Schema, quote) + "." + SqlIdentifier.Quote(function.Name, quote), function.Schema);
             }
