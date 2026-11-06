@@ -27,7 +27,7 @@ namespace SqlPrompter.Ssms
         ICommandHandler<TabKeyCommandArgs>,
         ICommandHandler<ReturnKeyCommandArgs>,
         ICommandHandler<EscapeKeyCommandArgs>,
-        ICommandHandler<TypeCharCommandArgs>
+        IChainedCommandHandler<TypeCharCommandArgs>
     {
         public string DisplayName => "SQL Prompter: keys of the suggestion list";
 
@@ -45,7 +45,7 @@ namespace SqlPrompter.Ssms
 
         public CommandState GetCommandState(EscapeKeyCommandArgs args) => CommandState.Unspecified;
 
-        public CommandState GetCommandState(TypeCharCommandArgs args) => CommandState.Unspecified;
+        public CommandState GetCommandState(TypeCharCommandArgs args, System.Func<CommandState> nextCommandHandler) => nextCommandHandler();
 
 
         public bool ExecuteCommand(DownKeyCommandArgs args, CommandExecutionContext context) { ThreadHelper.ThrowIfNotOnUIThread(); return Key(args.TextView, System.Windows.Input.Key.Down); }
@@ -62,11 +62,23 @@ namespace SqlPrompter.Ssms
 
         public bool ExecuteCommand(EscapeKeyCommandArgs args, CommandExecutionContext context) { ThreadHelper.ThrowIfNotOnUIThread(); return Key(args.TextView, System.Windows.Input.Key.Escape); }
 
-        public bool ExecuteCommand(TypeCharCommandArgs args, CommandExecutionContext context)
+        public void ExecuteCommand(TypeCharCommandArgs args, System.Action nextCommandHandler, CommandExecutionContext context)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var list = InvokedList.Of(args.TextView);
-            return list != null && list.IsOpen && list.OnTypedChar(args.TypedChar);
+            if (list != null && list.IsOpen && list.OnTypedChar(args.TypedChar))
+            {
+                return;
+            }
+
+            nextCommandHandler();
+
+            // The editor has inserted the character. With the option on, the list that opens while typing is ours.
+            if (SettingsService.Current.Behavior.OwnTypingList && args.TextView is Microsoft.VisualStudio.Text.Editor.IWpfTextView view &&
+                (list == null || !list.IsOpen) && SqlCompletionSource.StartsList(args.TypedChar))
+            {
+                InvokedList.OpenForTyping(view, args.TypedChar);
+            }
         }
 
         private static bool Key(ITextView view, Key key)

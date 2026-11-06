@@ -154,6 +154,60 @@ namespace SqlPrompter.Ssms
             return source == null ? null : new InvokedList(view, presenter, source);
         }
 
+        /// <summary>
+        /// Opens the list after a character was typed (the option OwnTypingList): the editor has already inserted it. The items are built off the UI
+        /// thread; a result that arrives after more typing is dropped, the newer request wins.
+        /// </summary>
+        internal static void OpenForTyping(IWpfTextView view, char typed)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var list = view.Properties.GetOrCreateSingletonProperty(() => Create(view));
+                if (list != null)
+                {
+                    _ = list.OpenForTypingAsync(typed);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening the suggestion list while typing failed", ex);
+            }
+        }
+
+        private int typingRequest;
+        private bool typingMode;
+
+        private async System.Threading.Tasks.Task OpenForTypingAsync(char typed)
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            var request = ++typingRequest;
+            var snapshot = view.TextSnapshot;
+            var caret = view.Caret.Position.BufferPosition;
+            var built = await source.BuildForTypingAsync(caret, typed);
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            if (request != typingRequest || view.TextSnapshot != snapshot || built == null || built.Items.Length == 0)
+            {
+                return;
+            }
+
+            Close();
+            suggestions = built;
+            typingMode = true;
+            selected = 0;
+            pickerMode = false;
+            BuildPickerItems();
+            Filter();
+            if (shown.Count == 0)
+            {
+                suggestions = null;
+                return;
+            }
+
+            presenter.Show();
+            Show();
+        }
+
         private void OpenAtCaret(bool picker)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -416,6 +470,7 @@ namespace SqlPrompter.Ssms
             }
 
             suggestions = null;
+            typingMode = false;
             pickerMode = false;
             presenter.CheckedItems = null;
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -501,7 +556,10 @@ namespace SqlPrompter.Ssms
             return handled;
         }
 
-        /// <summary>A typed letter hands over to the editor's own session (normal list); in the picker Space checks a column and letters filter.</summary>
+        /// <summary>
+        /// A typed letter: the editor inserts it and the list filters again (the typed text is part of its span); in the picker Space checks a column
+        /// and letters filter. Another character ends the picking or inserts the selected item.
+        /// </summary>
         internal bool OnTypedChar(char c)
         {
             if (!IsOpen)
@@ -535,7 +593,14 @@ namespace SqlPrompter.Ssms
                     return false;
                 }
 
-                if (char.IsLetterOrDigit(c) || c == '_' || c == '@' || c == '#' || suggestions.SoftSelection || shown.Count == 0)
+                var wordChar = char.IsLetterOrDigit(c) || c == '_' || c == '@' || c == '#';
+                if (typingMode && wordChar)
+                {
+                    // The list that was opened by typing stays and filters (the editor inserts the character).
+                    return false;
+                }
+
+                if (wordChar || suggestions.SoftSelection || shown.Count == 0)
                 {
                     Close();
                     return false;

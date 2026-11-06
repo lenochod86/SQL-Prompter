@@ -138,6 +138,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.KeywordCase, v => work.Behavior.KeywordCase = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Show the column picker hint", "A line under the list that says Ctrl+Left switches to the column picker (Ctrl+Space opens the list).",
                 () => work.Behavior.ShowColumnPickerHint, v => work.Behavior.ShowColumnPickerHint = v, () => work.Behavior.SuggestionsEnabled);
+            completion.Check("Run the list myself while typing (experimental)", "SQL Prompter shows and drives the list that opens while you type, the same list as Ctrl+Space, instead of the editor's completion session. Turn it off if typing misbehaves.",
+                () => work.Behavior.OwnTypingList, v => work.Behavior.OwnTypingList = v, () => work.Behavior.SuggestionsEnabled);
             completion.Button("Reset usage statistics...", () => SqlPrompterPackage.ResetUsage(this), "Forgets which suggestions you chose how often; the list goes back to its plain order.");
             completion.Heading("Size of the list");
             completion.Help("Drag the triangle in the bottom-right corner of the list to resize it; the size is kept. Here you can type it or go back to the default.");
