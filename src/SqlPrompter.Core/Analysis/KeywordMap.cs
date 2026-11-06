@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlPrompter.Core.Lexing;
+using SqlPrompter.Core.Sql;
 
 namespace SqlPrompter.Core.Analysis
 {
@@ -59,31 +60,26 @@ namespace SqlPrompter.Core.Analysis
         {
             var tokens = s.Tokens;
             var anchorIndex = nameStart - 1;
-            if (anchorIndex < block.Start || s.Depth[anchorIndex] != block.Depth)
+            if (anchorIndex < block.Start)
             {
-                return KeywordPosition.None;
-            }
-
-            // The tokens of the block itself; a parenthesized group stands as its closing parenthesis.
-            var top = new List<Token>();
-            for (var i = block.Start; i < nameStart; i++)
-            {
-                if (s.Depth[i] != block.Depth)
+                // The blocks of a query are split at UNION, EXCEPT and INTERSECT: the caret is right after the operator.
+                var op = anchorIndex >= 0 ? tokens[anchorIndex] : null;
+                if (op != null && op.IsWord("UNION"))
                 {
-                    continue;
+                    return Of(new[] { "ALL", "SELECT" });
                 }
 
-                var close = tokens[i].Kind == TokenKind.OpenParen ? s.Match[i] : -1;
-                if (close >= 0 && close < nameStart)
-                {
-                    top.Add(tokens[close]);
-                    i = close;
-                }
-                else
-                {
-                    top.Add(tokens[i]);
-                }
+                return op != null && (op.IsWord("EXCEPT") || op.IsWord("INTERSECT") || (op.IsWord("ALL") && anchorIndex > 0 && tokens[anchorIndex - 1].IsWord("UNION")))
+                    ? Of(new[] { "SELECT" })
+                    : KeywordPosition.None;
             }
+
+            if (s.Depth[anchorIndex] != block.Depth)
+            {
+                return InParentheses(s, block, nameStart);
+            }
+
+            var top = Collapse(s, block.Start, nameStart, block.Depth);
 
             if (top.Count == 0)
             {
@@ -106,7 +102,145 @@ namespace SqlPrompter.Core.Analysis
                 return Of(new[] { "CATCH" }, null, true);
             }
 
+            if (top.Count >= 2 && top[top.Count - 1].Kind == TokenKind.OpenParen && top[top.Count - 2].IsWord("OVER"))
+            {
+                return InWindow(new List<Token>());
+            }
+
             return Resolve(top, followingFrom);
+        }
+
+        /// <summary>The tokens of one nesting level between two indexes; a parenthesized group stands as its closing parenthesis.</summary>
+        private static List<Token> Collapse(ContextAnalyzer.Structure s, int from, int to, int depth)
+        {
+            var tokens = s.Tokens;
+            var result = new List<Token>();
+            for (var i = from; i < to; i++)
+            {
+                if (s.Depth[i] != depth)
+                {
+                    continue;
+                }
+
+                var close = tokens[i].Kind == TokenKind.OpenParen ? s.Match[i] : -1;
+                if (close >= 0 && close < to)
+                {
+                    result.Add(tokens[close]);
+                    i = close;
+                }
+                else
+                {
+                    result.Add(tokens[i]);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>The caret is inside parentheses that are no query: the contents of OVER ( … ) and PIVOT ( … ) have a grammar of their own.</summary>
+        private static KeywordPosition InParentheses(ContextAnalyzer.Structure s, ContextAnalyzer.Scope block, int nameStart)
+        {
+            var tokens = s.Tokens;
+            var open = -1;
+            for (var i = block.Start; i < nameStart; i++)
+            {
+                if (tokens[i].Kind == TokenKind.OpenParen && (s.Match[i] < 0 || s.Match[i] >= nameStart))
+                {
+                    open = i;
+                }
+            }
+
+            if (open < 1)
+            {
+                return KeywordPosition.None;
+            }
+
+            var inner = Collapse(s, open + 1, nameStart, s.Depth[open] + 1);
+            var before = tokens[open - 1];
+            if (before.IsWord("OVER"))
+            {
+                return InWindow(inner);
+            }
+
+            if (before.IsWord("PIVOT") || before.IsWord("UNPIVOT"))
+            {
+                return InPivot(inner);
+            }
+
+            return KeywordPosition.None;
+        }
+
+        /// <summary>OVER ( PARTITION BY … ORDER BY … ROWS BETWEEN … ).</summary>
+        private static KeywordPosition InWindow(List<Token> inner)
+        {
+            if (inner.Count == 0)
+            {
+                return Of(new[] { "PARTITION BY", "ORDER BY" });
+            }
+
+            var anchor = inner[inner.Count - 1];
+            var frame = inner.FindIndex(t => t.IsWord("ROWS") || t.IsWord("RANGE") || t.IsWord("GROUPS"));
+            if (frame >= 0)
+            {
+                var between = inner.FindIndex(frame, t => t.IsWord("BETWEEN"));
+                var and = between >= 0 ? inner.FindIndex(between, t => t.IsWord("AND")) : -1;
+                switch (anchor.Upper)
+                {
+                    case "ROWS":
+                    case "RANGE":
+                    case "GROUPS":
+                        return Of(new[] { "BETWEEN", "UNBOUNDED PRECEDING", "CURRENT ROW" });
+                    case "BETWEEN":
+                        return Of(new[] { "UNBOUNDED PRECEDING", "CURRENT ROW" });
+                    case "AND":
+                        return Of(new[] { "CURRENT ROW", "UNBOUNDED FOLLOWING" });
+                    case "UNBOUNDED":
+                        return Of(new[] { "PRECEDING", "FOLLOWING" }, null, true);
+                    case "CURRENT":
+                        return Of(new[] { "ROW" }, null, true);
+                    case "PRECEDING":
+                    case "FOLLOWING":
+                    case "ROW":
+                        return between >= 0 && and < 0 ? Of(new[] { "AND" }) : KeywordPosition.None;
+                    default:
+                        return between >= 0 && and < 0 && anchor.Kind == TokenKind.Number ? Of(new[] { "PRECEDING", "FOLLOWING" }) : KeywordPosition.None;
+                }
+            }
+
+            if (anchor.IsWord("ASC") || anchor.IsWord("DESC"))
+            {
+                return Of(new[] { "ROWS", "RANGE" });
+            }
+
+            var order = inner.FindIndex(t => t.IsWord("ORDER"));
+            if (order >= 0)
+            {
+                return IsOperandToken(anchor) && !anchor.IsWord("BY") ? Of(new[] { "ASC", "DESC", "ROWS", "RANGE" }) : KeywordPosition.None;
+            }
+
+            return IsOperandToken(anchor) && inner.Any(t => t.IsWord("PARTITION")) ? Of(new[] { "ORDER BY" }, new[] { "ROWS", "RANGE" }) : KeywordPosition.None;
+        }
+
+        /// <summary>PIVOT ( aggregate FOR column IN ( … ) ) and UNPIVOT ( value FOR column IN ( … ) ).</summary>
+        private static KeywordPosition InPivot(List<Token> inner)
+        {
+            if (inner.Count == 0)
+            {
+                return KeywordPosition.None;
+            }
+
+            var anchor = inner[inner.Count - 1];
+            if (!IsOperandToken(anchor))
+            {
+                return KeywordPosition.None;
+            }
+
+            if (!inner.Any(t => t.IsWord("FOR")))
+            {
+                return Of(new[] { "FOR" });
+            }
+
+            return inner.Any(t => t.IsWord("IN")) ? KeywordPosition.None : Of(new[] { "IN" });
         }
 
         private static string W(IReadOnlyList<Token> top, int i) => i >= 0 && i < top.Count ? top[i].Upper : null;
@@ -143,6 +277,16 @@ namespace SqlPrompter.Core.Analysis
                 return Of(new[] { "TRANSACTION", "TRAN", "TRY" }, new[] { "CATCH", "DISTRIBUTED TRANSACTION" }.Concat(StatementFirst.Where(k => k != "BEGIN")).ToArray());
             }
 
+            if (head == "IF" || head == "WHILE")
+            {
+                return InCondition(top, head, anchor);
+            }
+
+            if (head == "EXEC" || head == "EXECUTE")
+            {
+                return InExec(top, anchor);
+            }
+
             // WITH cte AS (query) ...: the part before the main statement.
             var start = 0;
             if (head == "WITH")
@@ -170,6 +314,61 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return InStatement(part, anchor, operand, followingFrom);
+        }
+
+        private static readonly string[] BodyStarters = { "SELECT", "SET", "PRINT", "EXEC", "RETURN", "UPDATE", "INSERT INTO", "DELETE FROM", "THROW", "BREAK", "CONTINUE" };
+
+        /// <summary>IF condition and WHILE condition: after a complete condition BEGIN or the statement that is its body.</summary>
+        private static KeywordPosition InCondition(List<Token> top, string head, Token anchor)
+        {
+            if (top.Count == 1)
+            {
+                return head == "IF" ? Of(new[] { "EXISTS", "NOT EXISTS" }) : KeywordPosition.None;
+            }
+
+            if (!IsOperandToken(anchor))
+            {
+                return KeywordPosition.None;
+            }
+
+            switch (Condition(top, 1))
+            {
+                case ConditionState.Between:
+                    return Of(new[] { "AND" });
+                case ConditionState.Complete:
+                    return Of(new[] { "BEGIN", "AND", "OR" }, BodyStarters);
+                default:
+                    return KeywordPosition.None;
+            }
+        }
+
+        /// <summary>EXEC [@result =] procedure @p = value [OUTPUT] [, …] [WITH RECOMPILE].</summary>
+        private static KeywordPosition InExec(List<Token> top, Token anchor)
+        {
+            var nameIndex = top.Count > 3 && top[1].Kind == TokenKind.Variable && top[2].Kind == TokenKind.Operator && top[2].Text == "=" ? 3 : 1;
+            var arguments = top.Skip(nameIndex + 1).ToList();
+            if (anchor.IsWord("OUTPUT") || anchor.IsWord("OUT"))
+            {
+                return Of(new[] { "WITH RECOMPILE" });
+            }
+
+            if (arguments.Count == 0)
+            {
+                return KeywordPosition.None;
+            }
+
+            if (anchor.IsWord("WITH"))
+            {
+                return Of(new[] { "RECOMPILE", "RESULT SETS" }, null, true);
+            }
+
+            // After the value of a parameter: it can be an output parameter.
+            if (IsOperandToken(anchor) && arguments.Any(t => t.Kind == TokenKind.Operator && t.Text == "="))
+            {
+                return Of(new[] { "OUTPUT" }, new[] { "WITH RECOMPILE", "WITH RESULT SETS" });
+            }
+
+            return KeywordPosition.None;
         }
 
         /// <summary>The state of a CTE list at the end of the tokens; null once the main statement has started (<paramref name="mainStart"/> is its first token).</summary>
@@ -355,6 +554,16 @@ namespace SqlPrompter.Core.Analysis
             string clause = null;
             var clauseIndex = -1;
             var head = W(part, 0);
+            if (head == "MERGE")
+            {
+                return InMerge(part, anchor, operand);
+            }
+
+            if (head == "FETCH")
+            {
+                return KeywordPosition.None;
+            }
+
             for (var i = 0; i < part.Count; i++)
             {
                 var c = ClauseOf(part, i);
@@ -398,7 +607,8 @@ namespace SqlPrompter.Core.Analysis
                         return aliased ? KeywordPosition.None : Of(new[] { "AS" });
                     }
 
-                    return aliased ? Of(new[] { "FROM", "INTO" }) : Of(new[] { "FROM", "AS", "INTO" });
+                    var overHint = anchor.Kind == TokenKind.CloseParen && part.Count >= 3 && part[part.Count - 2].Kind == TokenKind.Word && !Keywords.IsReserved(part[part.Count - 2].Text) ? new[] { "OVER" } : null;
+                    return aliased ? Of(new[] { "FROM", "INTO" }) : Of(new[] { "FROM", "AS", "INTO" }, overHint);
 
                 case "INTO":
                     if (!operand)
@@ -457,6 +667,13 @@ namespace SqlPrompter.Core.Analysis
 
                     return operand ? Of(new[] { "ASC", "DESC", "OFFSET" }, tails) : KeywordPosition.None;
 
+                case "OFFSET":
+                case "FETCH":
+                    return InPaging(clause, anchor, operand, tails);
+
+                case "FOR":
+                    return query ? InFor(part, clauseIndex, anchor) : KeywordPosition.None;
+
                 case "SETOP":
                     if (anchor.IsWord("UNION"))
                     {
@@ -498,6 +715,169 @@ namespace SqlPrompter.Core.Analysis
             }
         }
 
+        /// <summary>OFFSET n ROWS FETCH NEXT m ROWS ONLY.</summary>
+        private static KeywordPosition InPaging(string clause, Token anchor, bool operand, string[] tails)
+        {
+            switch (anchor.Upper)
+            {
+                case "OFFSET":
+                    return KeywordPosition.None;
+                case "FETCH":
+                    return Of(new[] { "NEXT", "FIRST" }, null, true);
+                case "NEXT":
+                case "FIRST":
+                    return KeywordPosition.None;
+                case "ROWS":
+                case "ROW":
+                    return clause == "OFFSET" ? Of(new[] { "FETCH NEXT", "FETCH FIRST" }, tails) : Of(new[] { "ONLY" }, null, true);
+                case "ONLY":
+                    return Of(tails);
+                default:
+                    return operand ? Of(new[] { "ROWS", "ROW" }, null, true) : KeywordPosition.None;
+            }
+        }
+
+        /// <summary>FOR XML / FOR JSON and their options.</summary>
+        private static KeywordPosition InFor(List<Token> part, int clauseIndex, Token anchor)
+        {
+            if (clauseIndex == part.Count - 1)
+            {
+                return Of(new[] { "XML", "JSON", "BROWSE" }, null, true);
+            }
+
+            var kind = part[clauseIndex + 1].Upper;
+            if (kind != "XML" && kind != "JSON")
+            {
+                return KeywordPosition.None;
+            }
+
+            if (clauseIndex + 1 == part.Count - 1)
+            {
+                return kind == "XML" ? Of(new[] { "PATH", "AUTO", "RAW", "EXPLICIT" }, null, true) : Of(new[] { "PATH", "AUTO" }, null, true);
+            }
+
+            var optionPoint = anchor.Kind == TokenKind.CloseParen || anchor.Kind == TokenKind.Comma || anchor.IsWord("AUTO") || anchor.IsWord("RAW") || anchor.IsWord("EXPLICIT");
+            if (!optionPoint)
+            {
+                return KeywordPosition.None;
+            }
+
+            return kind == "XML"
+                ? Of(new[] { "ROOT", "TYPE", "ELEMENTS" }, new[] { "BINARY BASE64", "XMLSCHEMA", "XSINIL" })
+                : Of(new[] { "ROOT", "INCLUDE_NULL_VALUES", "WITHOUT_ARRAY_WRAPPER" });
+        }
+
+        /// <summary>MERGE INTO target USING source ON condition WHEN [NOT] MATCHED … THEN UPDATE / DELETE / INSERT.</summary>
+        private static KeywordPosition InMerge(List<Token> part, Token anchor, bool operand)
+        {
+            int Last(string word) => part.FindLastIndex(t => t.IsWord(word));
+            var iInto = Last("INTO");
+            var iUsing = Last("USING");
+            var iOn = Last("ON");
+            var iWhen = Last("WHEN");
+            var iThen = Last("THEN");
+            var last = Math.Max(Math.Max(iInto, iUsing), Math.Max(iOn, Math.Max(iWhen, iThen)));
+            if (last < 0)
+            {
+                return KeywordPosition.None;
+            }
+
+            var after = part.GetRange(last + 1, part.Count - last - 1);
+            var whenMatches = new[] { "WHEN MATCHED", "WHEN NOT MATCHED" };
+            if (last == iInto || last == iUsing)
+            {
+                if (after.Count == 0 || !operand)
+                {
+                    return KeywordPosition.None;
+                }
+
+                var next = last == iInto ? "USING" : "ON";
+                var aliased = after.Count >= 2 && (anchor.Kind == TokenKind.Word || anchor.Kind == TokenKind.QuotedIdentifier) &&
+                    (after[after.Count - 2].IsWord("AS") || (IsOperandToken(after[after.Count - 2]) && after[after.Count - 2].Kind != TokenKind.Dot));
+                return aliased ? Of(new[] { next }) : anchor.Kind == TokenKind.CloseParen ? Of(new[] { "AS" }) : Of(new[] { "AS", next });
+            }
+
+            if (last == iOn)
+            {
+                if (!operand)
+                {
+                    return KeywordPosition.None;
+                }
+
+                var condition = Condition(part, iOn + 1);
+                return condition == ConditionState.Between ? Of(new[] { "AND" })
+                    : condition == ConditionState.Complete ? Of(new[] { "AND", "OR" }, whenMatches)
+                    : KeywordPosition.None;
+            }
+
+            if (last == iWhen)
+            {
+                if (after.Count == 0)
+                {
+                    return Of(new[] { "MATCHED", "NOT MATCHED" }, null, true);
+                }
+
+                if (after.Any(t => t.IsWord("AND")))
+                {
+                    return operand ? Of(new[] { "THEN", "AND", "OR" }) : KeywordPosition.None;
+                }
+
+                switch (anchor.Upper)
+                {
+                    case "MATCHED":
+                        return after.Any(t => t.IsWord("NOT")) ? Of(new[] { "BY TARGET", "BY SOURCE", "THEN" }, new[] { "AND" }) : Of(new[] { "THEN", "AND" });
+                    case "BY":
+                        return Of(new[] { "TARGET", "SOURCE" }, null, true);
+                    case "TARGET":
+                    case "SOURCE":
+                        return Of(new[] { "THEN", "AND" });
+                    default:
+                        return KeywordPosition.None;
+                }
+            }
+
+            // After THEN: the action.
+            if (after.Count == 0)
+            {
+                return Of(new[] { "UPDATE SET", "DELETE", "INSERT" }, null, true);
+            }
+
+            var action = after[0].Upper;
+            var done = Of(new[] { "WHEN", "OUTPUT" }, new[] { "OPTION" });
+            switch (action)
+            {
+                case "UPDATE":
+                    if (after.Count == 1)
+                    {
+                        return Of(new[] { "SET" }, null, true);
+                    }
+
+                    var assigned = false;
+                    for (var i = after.Count - 1; i > 0 && after[i].Kind != TokenKind.Comma; i--)
+                    {
+                        assigned |= after[i].Kind == TokenKind.Operator && after[i].Text.EndsWith("=", StringComparison.Ordinal);
+                    }
+
+                    return assigned && operand ? done : KeywordPosition.None;
+                case "DELETE":
+                    return after.Count == 1 ? done : KeywordPosition.None;
+                case "INSERT":
+                    if (anchor.IsWord("VALUES") || anchor.IsWord("INSERT"))
+                    {
+                        return KeywordPosition.None;
+                    }
+
+                    if (anchor.Kind == TokenKind.CloseParen)
+                    {
+                        return after.Any(t => t.IsWord("VALUES")) ? done : Of(new[] { "VALUES" }, new[] { "DEFAULT VALUES" });
+                    }
+
+                    return anchor.IsWord("DEFAULT") ? Of(new[] { "VALUES" }, null, true) : KeywordPosition.None;
+                default:
+                    return KeywordPosition.None;
+            }
+        }
+
         private static KeywordPosition InFrom(List<Token> part, int clauseIndex, Token anchor, bool operand, string head, string[] tails)
         {
             // The table source the end of the tokens belongs to: after the last FROM, JOIN, APPLY or comma.
@@ -525,6 +905,11 @@ namespace SqlPrompter.Core.Analysis
 
             // WITH ( hints ) – a group that follows WITH.
             var afterHints = anchor.Kind == TokenKind.CloseParen && segment.Count >= 2 && segment.Any(t => t.IsWord("WITH"));
+            if (anchor.Kind == TokenKind.CloseParen && segment.Count >= 2 && segment.Any(t => t.IsWord("PIVOT") || t.IsWord("UNPIVOT")))
+            {
+                // The result of PIVOT needs an alias.
+                return Of(new[] { "AS" }, null, true);
+            }
             var aliased = !afterHints && (anchor.Kind == TokenKind.Word || anchor.Kind == TokenKind.QuotedIdentifier) && segment.Count >= 2 &&
                 (segment[segment.Count - 2].IsWord("AS") ||
                  (IsOperandToken(segment[segment.Count - 2]) && segment[segment.Count - 2].Kind != TokenKind.Dot));
@@ -553,7 +938,7 @@ namespace SqlPrompter.Core.Analysis
                 return Of(new[] { "ON", "AS" }, new[] { "WITH" });
             }
 
-            var then = MoreJoins.Concat(new[] { "GROUP BY", "ORDER BY" }.Where(k => tails == QueryTails)).Concat(tails).Distinct().ToArray();
+            var then = new[] { "PIVOT", "UNPIVOT" }.Concat(MoreJoins).Concat(new[] { "GROUP BY", "ORDER BY" }.Where(k => tails == QueryTails)).Concat(tails).Distinct().ToArray();
             if (afterHints || aliased)
             {
                 return Of(new[] { "WHERE" }.Concat(joins).Concat(afterHints ? Array.Empty<string>() : new[] { "WITH" }).ToArray(), then);
@@ -589,6 +974,12 @@ namespace SqlPrompter.Core.Analysis
                 case "EXCEPT":
                 case "INTERSECT":
                     return "SETOP";
+                case "OFFSET":
+                    return "OFFSET";
+                case "FETCH":
+                    return "FETCH";
+                case "FOR":
+                    return "FOR";
                 case "UPDATE":
                     return "UPDATE";
                 case "SET":
