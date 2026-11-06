@@ -42,12 +42,33 @@ namespace SqlPrompter.Tests
         [InlineData("SELECT a + |")]
         [InlineData("SELECT COUNT(|")]
         [InlineData("SELECT a |")]
-        [InlineData("UPDATE t SET a = 1, |")]
+        
         [InlineData("SELECT * FROM t JOIN u ON a = b, |")]
         [InlineData("SELECT * FROM t UNION ALL |")]
         [InlineData("|")]
         public void ElsewhereThereIsNoColumnClause(string sql) => Assert.Equal(ColumnClause.None, At(sql));
 
+        [Theory]
+        [InlineData("UPDATE t SET |")]
+        [InlineData("UPDATE t SET a = 1, |")]
+        [InlineData("UPDATE t SET a = (SELECT 1), |")]
+        [InlineData("UPDATE t SET a = 1, b = 2, |")]
+        public void AnUpdateSetListHasItsOwnClause(string sql) => Assert.Equal(ColumnClause.UpdateSet, At(sql));
+
+        [Theory]
+        [InlineData("SET |")]
+        [InlineData("SET NOCOUNT ON, |")]
+        [InlineData("SELECT 1; SET |")]
+        [InlineData("UPDATE t SET a = 1 WHERE b = 2, |")]
+        public void OtherSetStatementsHaveNone(string sql) => Assert.Equal(ColumnClause.None, At(sql));
+
+        [Fact]
+        public void TheAssignedColumnsAreFound()
+        {
+            var sql = "UPDATE t SET a = 1, [b] = (SELECT x = 1), t.c = 2, ";
+
+            Assert.Equal(new[] { "a", "b", "c" }, ColumnClauses.ExistingAssignments(sql, sql.Length).ToArray());
+        }
         [Fact]
         public void TheExampleOfTheIssueRepeatsTheNonAggregatedItem() =>
             Assert.Equal(new[] { "sk.IdZakaznik" }, NonAggregated("SELECT MAX(sk.PosledniAktivita), sk.IdZakaznik FROM Zfp.SanonKlienta AS sk GROUP BY |"));
@@ -150,6 +171,28 @@ namespace SqlPrompter.Tests
 
             Assert.Equal(ColumnClause.InsertColumns, picker.Clause);
             Assert.Equal(new[] { "Name", "Email" }, picker.Columns.Select(c => c.Name).ToArray());
+        }
+
+        [Fact]
+        public void UpdateSetOffersTheAssignableColumnsAsAssignmentLines()
+        {
+            var picker = Picker("UPDATE dbo.Users SET Name = N'x', |");
+
+            Assert.Equal(ColumnClause.UpdateSet, picker.Clause);
+            Assert.Contains("Email", picker.Columns.Select(c => c.Name));
+            Assert.DoesNotContain("Name", picker.Columns.Select(c => c.Name));
+            Assert.All(picker.Columns, c => Assert.StartsWith(c.Name + " = ", c.InsertText));
+        }
+
+        [Fact]
+        public void UpdateSetTextIsAListLaidOutByTheStyle()
+        {
+            var picker = Picker("UPDATE dbo.Users SET |");
+
+            var text = picker.InsertText(picker.Columns, true, SuggestionOptions.Default);
+
+            Assert.Contains("Name = ", text);
+            Assert.Contains("," + "\r\n", text);
         }
 
         [Fact]

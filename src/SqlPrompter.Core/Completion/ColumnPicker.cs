@@ -78,6 +78,10 @@ namespace SqlPrompter.Core.Completion
             options = options ?? SuggestionOptions.Default;
             script = script ?? ScriptModel.Empty;
             var clause = context.Kind == ContextKind.InsertColumns ? ColumnClause.InsertColumns : ColumnClauses.At(batch, caret);
+            if (clause == ColumnClause.UpdateSet && context.Kind != ContextKind.Expression)
+            {
+                return null;
+            }
             if (clause == ColumnClause.None)
             {
                 return null;
@@ -103,6 +107,29 @@ namespace SqlPrompter.Core.Completion
                     {
                         columns.Add(new PickerColumn(dbObject.Name, dbObject.ToString(), insertable[i], KeyKind.None, SqlIdentifier.Quote(insertable[i].Name, quote), i));
                     }
+                }
+            }
+            else if (clause == ColumnClause.UpdateSet)
+            {
+                var source = context.Sources.FirstOrDefault();
+                var x = source == null ? null : SuggestionBuilder.ResolveColumns(source, metadata, script, options);
+                if (x == null)
+                {
+                    return null;
+                }
+
+                var assigned = new HashSet<string>(ColumnClauses.ExistingAssignments(batch, caret), StringComparer.OrdinalIgnoreCase);
+                var reference = x.Source.ReferenceName ?? string.Empty;
+                for (var i = 0; i < x.Columns.Count; i++)
+                {
+                    var column = x.Columns[i];
+                    if (!column.IsInsertable || assigned.Contains(column.Name))
+                    {
+                        continue;
+                    }
+
+                    var value = SqlDefaults.ValueFor(column.TypeName, column.IsNullable);
+                    columns.Add(new PickerColumn(reference, x.Owner, column, x.KeyOf(column), SqlIdentifier.Quote(column.Name, quote) + " = " + value, i));
                 }
             }
             else

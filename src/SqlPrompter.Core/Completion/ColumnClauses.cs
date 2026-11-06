@@ -13,6 +13,9 @@ namespace SqlPrompter.Core.Completion
         InsertColumns,
         GroupBy,
         OrderBy,
+
+        /// <summary>The column of an assignment in <c>UPDATE t SET</c>.</summary>
+        UpdateSet,
     }
 
     /// <summary>
@@ -253,6 +256,11 @@ namespace SqlPrompter.Core.Completion
             }
 
             var previous = tokens[last];
+            if (previous.IsWord("SET"))
+            {
+                return IsUpdateSet(tokens, last) ? ColumnClause.UpdateSet : ColumnClause.None;
+            }
+
             if (previous.IsWord("SELECT") || previous.IsWord("DISTINCT") || previous.IsWord("ALL"))
             {
                 return previous.IsWord("ALL") && last > 0 && (tokens[last - 1].IsWord("UNION") || tokens[last - 1].IsWord("EXCEPT") || tokens[last - 1].IsWord("INTERSECT"))
@@ -311,7 +319,12 @@ namespace SqlPrompter.Core.Completion
                             return tokens[i - 1].IsWord("GROUP") ? ColumnClause.GroupBy : tokens[i - 1].IsWord("ORDER") ? ColumnClause.OrderBy : ColumnClause.None;
                         }
 
-                        if (t.Kind == TokenKind.Semicolon || t.IsWord("FROM") || t.IsWord("WHERE") || t.IsWord("HAVING") || t.IsWord("SET") || t.IsWord("VALUES") || t.IsWord("ON") || t.IsWord("JOIN"))
+                        if (t.IsWord("SET"))
+                        {
+                            return IsUpdateSet(tokens, i) ? ColumnClause.UpdateSet : ColumnClause.None;
+                        }
+
+                        if (t.Kind == TokenKind.Semicolon || t.IsWord("FROM") || t.IsWord("WHERE") || t.IsWord("HAVING") || t.IsWord("VALUES") || t.IsWord("ON") || t.IsWord("JOIN"))
                         {
                             return ColumnClause.None;
                         }
@@ -320,6 +333,88 @@ namespace SqlPrompter.Core.Completion
             }
 
             return ColumnClause.None;
+        }
+
+        /// <summary>Whether the SET at <paramref name="set"/> belongs to an UPDATE of the same statement (not to <c>SET NOCOUNT</c> or <c>SET @x</c>).</summary>
+        private static bool IsUpdateSet(List<Token> tokens, int set)
+        {
+            var depth = 0;
+            for (var i = set - 1; i >= 0; i--)
+            {
+                var t = tokens[i];
+                if (t.Kind == TokenKind.CloseParen)
+                {
+                    depth++;
+                }
+                else if (t.Kind == TokenKind.OpenParen)
+                {
+                    depth--;
+                }
+                else if (depth == 0 && t.IsWord("UPDATE"))
+                {
+                    return true;
+                }
+                else if (depth == 0 && (t.Kind == TokenKind.Semicolon || t.IsWord("SELECT") || t.IsWord("INSERT") || t.IsWord("DELETE")))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>The columns that the SET list before the caret assigns already (the last part of each name, without the alias).</summary>
+        public static IReadOnlyList<string> ExistingAssignments(string text, int caret)
+        {
+            var tokens = TokensBefore(text, caret, out _);
+            var names = new List<string>();
+            var depth = 0;
+            var set = -1;
+            for (var i = tokens.Count - 1; i >= 0; i--)
+            {
+                if (tokens[i].Kind == TokenKind.CloseParen)
+                {
+                    depth++;
+                }
+                else if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    depth--;
+                }
+                else if (depth == 0 && tokens[i].IsWord("SET"))
+                {
+                    set = i;
+                    break;
+                }
+            }
+
+            if (set < 0)
+            {
+                return names;
+            }
+
+            depth = 0;
+            var itemStart = set + 1;
+            for (var i = set + 1; i < tokens.Count; i++)
+            {
+                if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    depth++;
+                }
+                else if (tokens[i].Kind == TokenKind.CloseParen)
+                {
+                    depth--;
+                }
+                else if (depth == 0 && tokens[i].Kind == TokenKind.Comma)
+                {
+                    itemStart = i + 1;
+                }
+                else if (depth == 0 && i > itemStart && tokens[i].Kind == TokenKind.Operator && tokens[i].Text == "=" && tokens[i - 1].IsNamePart)
+                {
+                    names.Add(tokens[i - 1].IdentifierValue);
+                }
+            }
+
+            return names;
         }
 
         private static int MatchingOpen(List<Token> tokens, int close)
