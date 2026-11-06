@@ -108,6 +108,7 @@ namespace SqlPrompter.Ssms
         private readonly TextBox filter = SnippetUi.Box(false);
         private readonly ListBox list = new ListBox { BorderThickness = new Thickness(0) };
         private readonly List<Entry> entries;
+        private Func<string, List<Entry>> search;
         private Action chosen;
         private bool closing;
         private readonly CtrlTapDetector closeTap = new CtrlTapDetector();
@@ -236,6 +237,43 @@ namespace SqlPrompter.Ssms
             Open(new QuickActionsPopup(view, entries, "Script outline: type to filter; Enter jumps to the item, Esc closes"));
         }
 
+        /// <summary>Quick open (#223): objects of the current database by a part of the name; Enter opens the definition, Shift+Enter inserts the name.</summary>
+        public static void ShowObjects(IWpfTextView view)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (open != null)
+            {
+                return;
+            }
+
+            var snapshot = view.TextSnapshot;
+            var database = SqlBatch.FindUsedDatabase(snapshot, view.Caret.Position.BufferPosition.Position);
+            var metadata = MetadataService.Current?.CacheForActiveWindow(out _, database)?.Current;
+            if (metadata == null)
+            {
+                GoToDefinitionHandler.Tell("SQL Prompter: the objects of the database are not loaded yet (or the window is not connected).");
+                return;
+            }
+
+            var popup = new QuickActionsPopup(view, new List<Entry>(), "Quick open: type a part of the name; Enter opens the definition, Shift+Enter inserts the name, Esc closes");
+            popup.search = text => SqlPrompter.Core.Navigation.ObjectFinder.Search(metadata, text).Select(found =>
+            {
+                var name = found.FullName;
+                var schema = found.Schema;
+                var objectName = found.Name;
+                return new Entry(found.Name, found.Kind + "  " + found.Schema,
+                    () => { ThreadHelper.ThrowIfNotOnUIThread(); GoToDefinitionHandler.OpenObject(view, schema, objectName); },
+                    () =>
+                    {
+                        ThreadHelper.ThrowIfNotOnUIThread();
+                        var caret = view.Caret.Position.BufferPosition;
+                        view.TextBuffer.Insert(caret.Position, name);
+                    });
+            }).ToList();
+            popup.Fill();
+            Open(popup);
+        }
+
         private static void Open(QuickActionsPopup popup)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -312,10 +350,10 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private void Fill()
+        public void Fill()
         {
             list.Items.Clear();
-            foreach (var entry in entries.Where(e => QuickActionCatalog.Matches(e.Name, e.Description, filter.Text)))
+            foreach (var entry in search != null ? search(filter.Text) : entries.Where(e => QuickActionCatalog.Matches(e.Name, e.Description, filter.Text)).ToList())
             {
                 var panel = new StackPanel { Margin = new Thickness(2, 1, 2, 1) };
                 panel.Children.Add(new TextBlock { Text = entry.Name });
@@ -330,11 +368,11 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private void Choose()
+        private void Choose(bool alternate = false)
         {
             if ((list.SelectedItem as ListBoxItem)?.Tag is Entry entry)
             {
-                chosen = entry.Run;
+                chosen = alternate && entry.Alternate != null ? entry.Alternate : entry.Run;
                 Close();
             }
         }
@@ -355,7 +393,7 @@ namespace SqlPrompter.Ssms
             switch (e.Key)
             {
                 case Key.Escape: Close(); e.Handled = true; break;
-                case Key.Enter: Choose(); e.Handled = true; break;
+                case Key.Enter: Choose(Keyboard.Modifiers == ModifierKeys.Shift); e.Handled = true; break;
                 case Key.Down: Move(1); e.Handled = true; break;
                 case Key.Up: Move(-1); e.Handled = true; break;
                 case Key.PageDown: Move(8); e.Handled = true; break;
@@ -365,12 +403,16 @@ namespace SqlPrompter.Ssms
 
         private sealed class Entry
         {
-            public Entry(string name, string description, Action run)
+            public Entry(string name, string description, Action run, Action alternate = null)
             {
                 Name = name;
                 Description = description;
                 Run = run;
+                Alternate = alternate;
             }
+
+            /// <summary>What Shift+Enter does, or null.</summary>
+            public Action Alternate { get; }
 
             public string Name { get; }
 

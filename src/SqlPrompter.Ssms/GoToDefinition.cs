@@ -73,6 +73,41 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        public static void Tell(string text)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            SetStatus(text);
+        }
+
+        /// <summary>Opens the script of a named object of the database of the window in a new window (quick open, #223).</summary>
+        public static void OpenObject(ITextView view, string schema, string name)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var connection = SsmsConnection.GetActive();
+                if (connection == null || !connection.CanConnect)
+                {
+                    SetStatus("SQL Prompter: the window is not connected.");
+                    return;
+                }
+
+                var snapshot = view.TextBuffer.CurrentSnapshot;
+                var database = SqlBatch.FindUsedDatabase(snapshot, view.Caret.Position.BufferPosition.Position) ?? connection.Database;
+                var target = string.IsNullOrEmpty(database) ? connection : connection.WithDatabase(database);
+                var loader = new DefinitionLoader(() => SqlClientConnections.Create(target.BuildConnectionString(ApplicationName)));
+                var reference = new ObjectReference(database, schema, name);
+                SetStatus("SQL Prompter: loading " + reference + "...");
+#pragma warning disable VSSDK007 // fire and forget on purpose
+                ThreadHelper.JoinableTaskFactory.RunAsync(() => OpenAsync(loader, reference, database)).Task.FileAndForget("sqlprompter/quickopen");
+#pragma warning restore VSSDK007
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Quick open failed", ex);
+            }
+        }
+
         private static async Task OpenAsync(DefinitionLoader loader, ObjectReference reference, string database)
         {
             ObjectDefinition definition = null;
