@@ -112,11 +112,11 @@ namespace SqlPrompter.Ssms
         private bool closing;
         private readonly CtrlTapDetector closeTap = new CtrlTapDetector();
 
-        private QuickActionsPopup(IWpfTextView view, bool hasSelection)
+        private QuickActionsPopup(IWpfTextView view, List<Entry> entries, string hint)
         {
             this.view = view;
             ThreadHelper.ThrowIfNotOnUIThread();
-            entries = BuildEntries(view, hasSelection);
+            this.entries = entries;
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
             ShowInTaskbar = false;
@@ -130,7 +130,7 @@ namespace SqlPrompter.Ssms
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             filter.Margin = new Thickness(0, 0, 0, 6);
-            filter.ToolTip = "Type to filter; Enter runs the item, Esc closes";
+            filter.ToolTip = hint;
             Grid.SetRow(list, 1);
             grid.Children.Add(filter);
             grid.Children.Add(list);
@@ -206,7 +206,39 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            var popup = new QuickActionsPopup(view, !view.Selection.IsEmpty);
+            var hasSelection = !view.Selection.IsEmpty;
+            Open(new QuickActionsPopup(view, BuildEntries(view, hasSelection), "Type to filter; Enter runs the item, Esc closes"));
+        }
+
+        /// <summary>The outline of the script (#224): batches, statements, CTEs, temporary tables and variables; Enter moves the caret to the item.</summary>
+        public static void ShowOutline(IWpfTextView view)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (open != null)
+            {
+                return;
+            }
+
+            var snapshot = view.TextSnapshot;
+            var items = SqlPrompter.Core.Navigation.ScriptOutline.Build(snapshot.GetText());
+            var entries = items.Select(item => new Entry(new string(' ', item.Depth * 3) + item.Text, "line " + item.Line, () =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                var position = new SnapshotPoint(view.TextSnapshot, Math.Min(item.Offset, view.TextSnapshot.Length));
+                view.Caret.MoveTo(position);
+                view.ViewScroller.EnsureSpanVisible(new SnapshotSpan(position, 0), Microsoft.VisualStudio.Text.Editor.EnsureSpanVisibleOptions.AlwaysCenter);
+            })).ToList();
+            if (entries.Count == 0)
+            {
+                return;
+            }
+
+            Open(new QuickActionsPopup(view, entries, "Script outline: type to filter; Enter jumps to the item, Esc closes"));
+        }
+
+        private static void Open(QuickActionsPopup popup)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
             ActiveEditor.SetOwner(popup);
             popup.WindowStartupLocation = WindowStartupLocation.Manual;
             popup.Place();
