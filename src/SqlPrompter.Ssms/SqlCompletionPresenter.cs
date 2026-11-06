@@ -71,6 +71,12 @@ namespace SqlPrompter.Ssms
         private readonly Grid definitionHeader = new Grid { Visibility = Visibility.Collapsed, Margin = new Thickness(8, 0, 4, 2) };
         private readonly TextBlock definitionName = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
         private DefinitionRef definitionReference;
+        private SqlPrompter.Core.Model.ObjectSummary definitionSummary;
+        private bool showingSummary;
+        private readonly StackPanel definitionTabs = new StackPanel { Orientation = Orientation.Horizontal, Visibility = Visibility.Collapsed, Margin = new Thickness(8, 0, 4, 4) };
+        private readonly Grid summaryGrid = new Grid { Visibility = Visibility.Collapsed, Margin = new Thickness(8, 0, 8, 6) };
+        private Button scriptTab;
+        private Button summaryTab;
         private string definitionScript;
         private CompletionItem definitionItem;
         private DispatcherTimer definitionTimer;
@@ -167,8 +173,14 @@ namespace SqlPrompter.Ssms
             definitionHeader.Children.Add(pinButton);
             var detailPanel = new StackPanel();
             detailPanel.Children.Add(descriptionText);
+            scriptTab = TabButton("Script", () => SelectTab(false));
+            summaryTab = TabButton("Summary", () => SelectTab(true));
+            definitionTabs.Children.Add(scriptTab);
+            definitionTabs.Children.Add(summaryTab);
             detailPanel.Children.Add(definitionHeader);
+            detailPanel.Children.Add(definitionTabs);
             detailPanel.Children.Add(definitionText);
+            detailPanel.Children.Add(summaryGrid);
             descriptionPopup = CreatePopup(detailPanel);
             PopupWindows.Attach(descriptionPopup, () => view.VisualElement);
         }
@@ -444,12 +456,16 @@ namespace SqlPrompter.Ssms
 
         private void ShowDefinition(string script)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             definitionScript = script;
             if (string.IsNullOrWhiteSpace(script))
             {
                 definitionText.Inlines.Clear();
                 definitionText.Visibility = Visibility.Collapsed;
                 definitionHeader.Visibility = Visibility.Collapsed;
+                definitionTabs.Visibility = Visibility.Collapsed;
+                summaryGrid.Visibility = Visibility.Collapsed;
+                definitionSummary = null;
                 return;
             }
 
@@ -468,9 +484,83 @@ namespace SqlPrompter.Ssms
                 definitionName.Inlines.Add(new System.Windows.Documents.Run(definitionReference.Name));
             }
 
-            definitionText.Visibility = Visibility.Visible;
+            definitionSummary = BuildSummary();
+            definitionTabs.Visibility = definitionSummary != null ? Visibility.Visible : Visibility.Collapsed;
             definitionHeader.Visibility = Visibility.Visible;
+            SelectTab(false);
             descriptionPopup.IsOpen = popup.IsOpen;
+        }
+
+        /// <summary>The columns or parameters of the object from the metadata that is loaded (null when there are none).</summary>
+        private SqlPrompter.Core.Model.ObjectSummary BuildSummary()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (definitionReference == null)
+                {
+                    return null;
+                }
+
+                var cache = MetadataService.Current?.CacheForActiveWindow(out _, definitionReference.Database);
+                return SqlPrompter.Core.Model.ObjectSummary.For(cache?.Current, definitionReference.Schema, definitionReference.Name);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Building the summary failed", ex);
+                return null;
+            }
+        }
+
+        private void SelectTab(bool summary)
+        {
+            showingSummary = summary && definitionSummary != null;
+            definitionText.Visibility = showingSummary ? Visibility.Collapsed : (string.IsNullOrWhiteSpace(definitionScript) ? Visibility.Collapsed : Visibility.Visible);
+            summaryGrid.Visibility = showingSummary ? Visibility.Visible : Visibility.Collapsed;
+            scriptTab.FontWeight = showingSummary ? FontWeights.Normal : FontWeights.Bold;
+            summaryTab.FontWeight = showingSummary ? FontWeights.Bold : FontWeights.Normal;
+            if (showingSummary)
+            {
+                FillSummary(summaryGrid, definitionSummary);
+            }
+        }
+
+        /// <summary>The summary as a small table: a header row, then a row per column or parameter.</summary>
+        private static void FillSummary(Grid grid, SqlPrompter.Core.Model.ObjectSummary summary)
+        {
+            grid.Children.Clear();
+            grid.RowDefinitions.Clear();
+            grid.ColumnDefinitions.Clear();
+            for (var c = 0; c < summary.Headers.Count; c++)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = c == 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto, MinWidth = c == 0 ? 160 : 0 });
+            }
+
+            for (var r = -1; r < summary.Rows.Count; r++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                for (var c = 0; c < summary.Headers.Count; c++)
+                {
+                    var cell = new TextBlock
+                    {
+                        Text = r < 0 ? summary.Headers[c] : summary.Rows[r][c],
+                        Margin = new Thickness(4, 2, 16, 2),
+                        FontWeight = r < 0 ? FontWeights.SemiBold : FontWeights.Normal,
+                        FontSize = 12,
+                    };
+                    cell.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+                    Grid.SetRow(cell, r + 1);
+                    Grid.SetColumn(cell, c);
+                    grid.Children.Add(cell);
+                }
+            }
+        }
+
+        private static Button TabButton(string text, Action click)
+        {
+            var button = new Button { Content = text, Focusable = false, Padding = new Thickness(10, 1, 10, 1), Margin = new Thickness(0, 0, 4, 0), FontSize = 11 };
+            button.Click += (s, e) => click();
+            return button;
         }
 
         private static Brush DimBrush()
@@ -528,7 +618,11 @@ namespace SqlPrompter.Ssms
         {
             try
             {
-                if (!string.IsNullOrEmpty(definitionScript))
+                if (showingSummary && definitionSummary != null)
+                {
+                    Clipboard.SetText(definitionSummary.ToText());
+                }
+                else if (!string.IsNullOrEmpty(definitionScript))
                 {
                     Clipboard.SetText(definitionScript);
                 }
@@ -549,7 +643,7 @@ namespace SqlPrompter.Ssms
             }
 
             var title = definitionReference == null ? "Definition" : (string.IsNullOrEmpty(definitionReference.Schema) ? string.Empty : definitionReference.Schema + ".") + definitionReference.Name;
-            DefinitionWindow.Open(title, definitionScript);
+            DefinitionWindow.Open(title, definitionScript, definitionSummary, showingSummary);
         }
 
         private void Position(CompletionPresentationViewModel presentation)
