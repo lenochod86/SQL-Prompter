@@ -211,6 +211,7 @@ namespace SqlPrompter.Ssms
 
             var formatting = Add("Formatting", "Used by Format Document and Format Selection, and by the lists and keywords SQL Prompter inserts.");
             formatting.Button("Import a SQL Prompt style...", () => { if (SettingsFiles.ImportFormatStyle(this)) { Imported(); } }, "Reads a style exported from SQL Prompt (.json) and applies the options this formatter has.");
+            formatting.Preview("Preview (sample SQL formatted with the style above)", () => SqlFormatter.Format(FormatSample.Text, work.Formatting).Text);
             formatting.Heading("Casing");
             formatting.Choice("Keywords", "SELECT, FROM, WHERE and the other reserved words.", caseStyles, () => work.Formatting.KeywordCase, v => work.Formatting.KeywordCase = v);
             formatting.Choice("Built-in functions", "COUNT, ISNULL, DATEADD and so on (only when followed by a parenthesis).", caseStyles, () => work.Formatting.FunctionCase, v => work.Formatting.FunctionCase = v);

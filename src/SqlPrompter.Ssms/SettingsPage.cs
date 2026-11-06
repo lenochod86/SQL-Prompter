@@ -20,6 +20,8 @@ namespace SqlPrompter.Ssms
         private readonly List<Action> enablers = new List<Action>();
         private readonly List<Func<IEnumerable<string>>> validators = new List<Func<IEnumerable<string>>>();
         private bool loading;
+        private FormatPreview previewBox;
+        private Func<string> previewText;
 
         public SettingsPage(string title, string intro = null)
         {
@@ -72,6 +74,37 @@ namespace SqlPrompter.Ssms
             foreach (var enabler in enablers)
             {
                 enabler();
+            }
+
+            RefreshPreview();
+        }
+
+        /// <summary>A colored preview under the options; it is drawn again after every change (<paramref name="render"/> returns the text to show).</summary>
+        public void Preview(string heading, Func<string> render)
+        {
+            previewText = render;
+            previewBox = new FormatPreview { Dock = DockStyle.Fill };
+            var panel = new Panel { Dock = DockStyle.Bottom, Height = 250, Padding = new Padding(14, 4, 14, 10) };
+            panel.Controls.Add(previewBox);
+            panel.Controls.Add(new Label { Text = heading, Dock = DockStyle.Top, Height = 22, Font = new Font(Font, FontStyle.Bold) });
+            Controls.Add(panel);
+            flow.BringToFront();
+        }
+
+        private void RefreshPreview()
+        {
+            if (previewBox == null)
+            {
+                return;
+            }
+
+            try
+            {
+                previewBox.ShowText(previewText());
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Drawing the preview failed", ex);
             }
         }
 
