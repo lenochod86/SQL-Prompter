@@ -73,6 +73,7 @@ namespace SqlPrompter.Ssms
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             TabColoring.Start();
             DefaultKeyBindings.Apply();
+            GridContextMenu.Install();
             if (await GetServiceAsync(typeof(IMenuCommandService)) is OleMenuCommandService commands)
             {
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
