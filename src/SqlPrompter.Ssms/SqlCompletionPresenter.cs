@@ -38,12 +38,40 @@ namespace SqlPrompter.Ssms
             textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionPresenter((IWpfTextView)textView));
     }
 
+    /// <summary>
+    /// The status bar of the list when SQL Prompter runs the list itself (<see cref="InvokedList"/>): the tabs Column Picker and All Suggestions, in the
+    /// picker the Select All button and the table order check box, and a hint. The editor's own session has no footer.
+    /// </summary>
+    internal sealed class ListFooter
+    {
+        /// <summary>True while the column picker is shown, false for the normal list.</summary>
+        public bool PickerMode { get; set; }
+
+        /// <summary>The tab Column Picker is available (the caret is where columns are picked).</summary>
+        public bool PickerAvailable { get; set; }
+
+        public string Hint { get; set; }
+
+        public bool TableOrder { get; set; }
+
+        public Action ShowPicker { get; set; }
+
+        public Action ShowAll { get; set; }
+
+        public Action SelectAll { get; set; }
+
+        public Action HideHint { get; set; }
+
+        public Action<bool> TableOrderChanged { get; set; }
+    }
+
     internal sealed class SqlCompletionPresenter : ICompletionPresenter
     {
         public const int VisibleRows = 12;
 
         private const double RowHeight = 22;
         private const double GripHeight = 14;
+        private const double FooterHeight = 24;
         private const int MinRows = 4;
         private const int MaxRows = 40;
         private const double MinWidth = 300;
@@ -100,6 +128,11 @@ namespace SqlPrompter.Ssms
         private double dragRows;
         private double dragWidth;
         private readonly Grid listGrid;
+        private readonly StackPanel footerPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(4, 1, 20, 1), Visibility = Visibility.Collapsed };
+        private ListFooter footer;
+
+        /// <summary>The items shown with a check box (the column picker); null for a normal list.</summary>
+        public HashSet<CompletionItem> CheckedItems { get; set; }
 
         public SqlCompletionPresenter(IWpfTextView view)
         {
@@ -131,7 +164,9 @@ namespace SqlPrompter.Ssms
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(GripHeight) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = GripHeight });
+            Grid.SetRow(footerPanel, 1);
+            grid.Children.Add(footerPanel);
             Grid.SetColumn(rowPanel, 0);
             Grid.SetColumn(scrollBar, 1);
             grid.Children.Add(rowPanel);
@@ -250,6 +285,57 @@ namespace SqlPrompter.Ssms
             {
                 descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
             }
+        }
+
+        /// <summary>Sets what the status bar shows (null for none) and draws it.</summary>
+        public void SetFooter(ListFooter value)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            footer = value;
+            footerPanel.Children.Clear();
+            footerPanel.Visibility = value == null ? Visibility.Collapsed : Visibility.Visible;
+            if (value == null)
+            {
+                return;
+            }
+
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            footerPanel.Children.Add(row);
+            if (value.PickerAvailable)
+            {
+                row.Children.Add(FooterButton("Column Picker", value.PickerMode, () => value.ShowPicker?.Invoke()));
+                row.Children.Add(FooterButton("All Suggestions", !value.PickerMode, () => value.ShowAll?.Invoke()));
+            }
+
+            if (value.PickerMode)
+            {
+                row.Children.Add(FooterButton("Select All", false, () => value.SelectAll?.Invoke()));
+                var order = new CheckBox { Content = "List in table order", IsChecked = value.TableOrder, Focusable = false, FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 8, 0) };
+                order.SetResourceReference(Control.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+                order.Click += (s, e) => value.TableOrderChanged?.Invoke(order.IsChecked == true);
+                row.Children.Add(order);
+            }
+
+            if (!string.IsNullOrEmpty(value.Hint))
+            {
+                var hintRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 0) };
+                var hint = new TextBlock { Text = value.Hint, FontSize = 11, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0) };
+                hint.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
+                hintRow.Children.Add(hint);
+                if (value.HideHint != null)
+                {
+                    hintRow.Children.Add(FooterButton("x", false, () => value.HideHint()));
+                }
+
+                footerPanel.Children.Add(hintRow);
+            }
+        }
+
+        private static Button FooterButton(string text, bool active, Action click)
+        {
+            var button = new Button { Content = text, Focusable = false, FontSize = 11, Padding = new Thickness(7, 0, 7, 0), Margin = new Thickness(0, 0, 4, 0), FontWeight = active ? FontWeights.Bold : FontWeights.Normal };
+            button.Click += (s, e) => click();
+            return button;
         }
 
         /// <summary>True while the popup is shown.</summary>
@@ -679,7 +765,7 @@ namespace SqlPrompter.Ssms
                 var span = applicableToSpan.GetSpan(view.TextSnapshot);
                 var line = view.GetTextViewLineContainingBufferPosition(span.Start);
                 var bounds = line.GetCharacterBounds(span.Start);
-                var height = (Math.Min(items.Count, visibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + GripHeight + 2;
+                var height = (Math.Min(items.Count, visibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + (footer == null ? GripHeight : FooterHeight + (string.IsNullOrEmpty(footer.Hint) ? 0 : 20)) + 2;
                 var left = bounds.Left - view.ViewportLeft;
                 var below = bounds.Bottom - view.ViewportTop + 2;
                 var above = bounds.Top - view.ViewportTop - height - 2;
@@ -726,9 +812,12 @@ namespace SqlPrompter.Ssms
             private readonly CrispImage keyIcon;
             private readonly InlineUIContainer keyContainer;
             private readonly TextBlock suffix;
+            private readonly SqlCompletionPresenter owner;
+            private readonly TextBlock check = new TextBlock { Width = 16, Height = 16, Margin = new Thickness(6, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, FontSize = 14, Visibility = Visibility.Collapsed };
 
             public Row(SqlCompletionPresenter owner)
             {
+                this.owner = owner;
                 Root = new Grid { Height = RowHeight, Background = Brushes.Transparent, Focusable = false };
                 Root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 Root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -738,6 +827,8 @@ namespace SqlPrompter.Ssms
                 icon = new CrispImage { Width = 16, Height = 16, Margin = new Thickness(6, 0, 6, 0) };
                 Grid.SetColumn(icon, 0);
                 Root.Children.Add(icon);
+                Grid.SetColumn(check, 0);
+                Root.Children.Add(check);
 
                 name = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
                 name.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
@@ -772,6 +863,7 @@ namespace SqlPrompter.Ssms
             {
                 Item = entry;
                 Root.Visibility = Visibility.Visible;
+                check.Visibility = Visibility.Collapsed;
                 icon.Visibility = Visibility.Hidden;
                 name.Inlines.Clear();
                 name.Inlines.Add(new Run(entry.CompletionItem.DisplayText) { FontStyle = FontStyles.Italic });
@@ -793,8 +885,30 @@ namespace SqlPrompter.Ssms
                 Item = entry;
                 var item = entry.CompletionItem;
                 Root.Visibility = Visibility.Visible;
-                icon.Visibility = Visibility.Visible;
-                icon.Moniker = new ImageMoniker { Guid = item.Icon.ImageId.Guid, Id = item.Icon.ImageId.Id };
+                if (item.Properties.TryGetProperty(SqlCompletionSource.PickerHeaderKey, out string heading))
+                {
+                    // A heading of the column picker: the source of the columns that follow.
+                    icon.Visibility = Visibility.Collapsed;
+                    check.Visibility = Visibility.Collapsed;
+                    name.Inlines.Clear();
+                    name.Inlines.Add(new Run(heading) { FontWeight = FontWeights.Bold });
+                    suffix.Text = item.Suffix;
+                    SetTextColor(false);
+                    Root.ClearValue(Panel.BackgroundProperty);
+                    Root.Background = Brushes.Transparent;
+                    return;
+                }
+
+                var checks = owner.CheckedItems != null;
+                icon.Visibility = checks ? Visibility.Collapsed : Visibility.Visible;
+                check.Visibility = checks ? Visibility.Visible : Visibility.Collapsed;
+                check.Text = checks && owner.CheckedItems.Contains(item) ? "[x]" : "[ ]";
+                check.FontSize = 11;
+                check.Width = 22;
+                if (!checks)
+                {
+                    icon.Moniker = new ImageMoniker { Guid = item.Icon.ImageId.Guid, Id = item.Icon.ImageId.Id };
+                }
 
                 name.Inlines.Clear();
                 AddHighlighted(name, item.DisplayText, entry.HighlightedSpans);
@@ -829,6 +943,7 @@ namespace SqlPrompter.Ssms
                 var key = highlighted ? VsBrushes.HighlightTextKey : VsBrushes.ToolWindowTextKey;
                 name.SetResourceReference(TextBlock.ForegroundProperty, key);
                 suffix.SetResourceReference(TextBlock.ForegroundProperty, key);
+                check.SetResourceReference(TextBlock.ForegroundProperty, key);
             }
 
             private static void AddHighlighted(TextBlock block, string text, System.Collections.Immutable.ImmutableArray<Microsoft.VisualStudio.Text.Span> spans)

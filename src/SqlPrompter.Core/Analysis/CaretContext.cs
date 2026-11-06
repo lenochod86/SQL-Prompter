@@ -208,6 +208,11 @@ namespace SqlPrompter.Core.Analysis
         /// </summary>
         public bool SoftSelection { get; internal set; }
 
+        /// <summary>The text (the batch) and the caret this context was made from; null / 0 for contexts made by hand.</summary>
+        public string Text { get; internal set; }
+
+        public int Caret { get; internal set; }
+
         /// <summary>Copy of the context with another qualifier (e.g. without the database part) and without preferred keywords.</summary>
         internal CaretContext WithQualifier(IReadOnlyList<string> qualifier, bool inOtherDatabase = true) => new CaretContext(Kind, ReplaceStart, ReplaceLength, TypedPrefix)
         {

@@ -219,6 +219,14 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "listWidth")]
         public int ListWidth { get; set; }
 
+        /// <summary>The column picker lists the columns in the order of the table (false: alphabetically); it is remembered.</summary>
+        [DataMember(Name = "pickerTableOrder")]
+        public bool PickerTableOrder { get; set; }
+
+        /// <summary>The list says that Ctrl+Left switches to the column picker (the hint can be closed).</summary>
+        [DataMember(Name = "showColumnPickerHint")]
+        public bool ShowColumnPickerHint { get; set; }
+
         /// <summary>The other places of the name under the caret are highlighted.</summary>
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
@@ -277,6 +285,8 @@ namespace SqlPrompter.Core.Settings
             AutoClose = true;
             SuggestAfterComma = true;
             HighlightMatches = true;
+            PickerTableOrder = false;
+            ShowColumnPickerHint = true;
             ListRows = 12;
             ListWidth = 0;
             QuickActionsOnCtrl = true;

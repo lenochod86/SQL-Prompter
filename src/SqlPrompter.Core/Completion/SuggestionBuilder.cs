@@ -577,7 +577,7 @@ namespace SqlPrompter.Core.Completion
         }
 
         /// <summary>Columns of one table source and how to describe their owner.</summary>
-        private sealed class SourceColumns
+        internal sealed class SourceColumns
         {
             public SourceColumns(TableSource source, IReadOnlyList<DbColumn> columns, string owner, DbObject dbObject = null, IDatabaseMetadata metadata = null)
             {
@@ -606,7 +606,7 @@ namespace SqlPrompter.Core.Completion
         }
 
         /// <summary>Columns of a source defined in the script or found in the database; null if they are not known (yet).</summary>
-        private static SourceColumns ResolveColumns(TableSource source, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
+        internal static SourceColumns ResolveColumns(TableSource source, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             var scripted = script.Resolve(source, metadata);
             if (scripted != null)
@@ -649,6 +649,17 @@ namespace SqlPrompter.Core.Completion
                 .Select(s => ResolveColumns(s, metadata, script, options))
                 .Where(x => x != null)
                 .ToList();
+
+            // GROUP BY |: one item repeats the select-list items that are not aggregates.
+            if (context.Text != null && context.TypedPrefix.Length == 0 && ColumnClauses.At(context.Text, context.Caret) == ColumnClause.GroupBy)
+            {
+                var items = ColumnClauses.NonAggregatedItems(context.Text, context.Caret);
+                if (items.Count > 0)
+                {
+                    yield return new Suggestion(SuggestionKind.Column, "All non-aggregated columns", FormattedList.Join(items, options.Editor.LinePrefix, options.Editor), "all non-aggregated columns", null,
+                        "the items of the select list that are not aggregates: " + string.Join(", ", items), -2, isBlock: true);
+                }
+            }
 
             // A column whose name exists in several sources of the same block is inserted with its alias.
             var ambiguous = new HashSet<string>(

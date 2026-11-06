@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 25)]
+    [ProvideMenuResource("Menus.ctmenu", 27)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
@@ -25,6 +25,8 @@ namespace SqlPrompter.Ssms
         public const int SettingsId = 0x011F;
         public const int FormattingStylesId = 0x0120;
         public const int ShowSuggestionsId = 0x0121;
+        public const int PickerLeftId = 0x0122;
+        public const int PickerRightId = 0x0123;
         public const int FormatDocumentId = 0x011A;
         public const int FormatSelectionId = 0x011B;
         public const int AddNPrefixId = 0x011C;
@@ -69,6 +71,8 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => OpenSettings(), new CommandID(CommandSet, SettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => FormattingStylesWindow.Open(), new CommandID(CommandSet, FormattingStylesId)));
                 commands.AddCommand(new MenuCommand((s, e) => ShowSuggestions(), new CommandID(CommandSet, ShowSuggestionsId)));
+                commands.AddCommand(new MenuCommand((s, e) => PickerKey(left: true), new CommandID(CommandSet, PickerLeftId)));
+                commands.AddCommand(new MenuCommand((s, e) => PickerKey(left: false), new CommandID(CommandSet, PickerRightId)));
                 commands.AddCommand(new MenuCommand((s, e) => SurroundSelection(), new CommandID(CommandSet, SurroundWithSnippetId)));
                 commands.AddCommand(new MenuCommand((s, e) => NewSnippetFromSelection(), new CommandID(CommandSet, NewSnippetFromSelectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
@@ -322,6 +326,49 @@ namespace SqlPrompter.Ssms
                 InvokedList.Open(view);
             }
         }
+        /// <summary>
+        /// Ctrl+Left / Ctrl+Right: Ctrl+Left switches the list to the column picker (our own list, or the editor's list where columns are picked, which is
+        /// replaced by ours), Ctrl+Right back to all suggestions. The SDK has no command arguments for these keys, so they are bound to hidden commands;
+        /// where no list is involved the command does what the key did before (Edit.WordPrevious, Edit.WordNext).
+        /// </summary>
+        private void PickerKey(bool left)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view)
+                {
+                    var list = InvokedList.Of(view);
+                    if (list != null && list.IsOpen)
+                    {
+                        if (list.OnKey(left ? System.Windows.Input.Key.Left : System.Windows.Input.Key.Right))
+                        {
+                            return;
+                        }
+                    }
+                    else if (left)
+                    {
+                        var components = (Microsoft.VisualStudio.ComponentModelHost.IComponentModel)GetGlobalService(typeof(Microsoft.VisualStudio.ComponentModelHost.SComponentModel));
+                        var broker = components.GetService<Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.IAsyncCompletionBroker>();
+                        var session = broker.GetSession(view);
+                        if (session != null && InvokedList.CanPick(view))
+                        {
+                            session.Dismiss();
+                            InvokedList.Open(view, picker: true);
+                            return;
+                        }
+                    }
+                }
+
+                var dte = (EnvDTE.DTE)GetGlobalService(typeof(EnvDTE.DTE));
+                dte.ExecuteCommand(left ? "Edit.WordPrevious" : "Edit.WordNext");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Switching the suggestion list failed", ex);
+            }
+        }
+
         private void OpenLog()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
