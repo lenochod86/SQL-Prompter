@@ -392,3 +392,14 @@ Whether the in-process VSIX is still the right approach is examined in [architec
 | `SqlPrompter.Ssms` | net48 | everything: Visual Studio SDK, DTE, WPF/WinForms, `SqlPrompter.Core` and `SqlPrompter.Metadata` |
 
 `DependencyBoundaryTests` (run in CI with the other tests) fails when the compiled `Core` or `Metadata` references an assembly outside that list or one of `Microsoft.VisualStudio*`, `Microsoft.SqlServer*`, `EnvDTE`, WPF, `System.Windows*`, `System.Drawing*`, MEF or `Microsoft.Data.SqlClient`, when their project files have a package or assembly reference to such a thing or to `SqlPrompter.Ssms`, or when `Core` references `Metadata`. A new need for something outside the table belongs in the SSMS layer behind an interface of Core or Metadata.
+
+## The list for typing through our own controller (#187, step 1)
+
+The option *Run the list myself while typing (experimental)* (`behavior.ownTypingList`, default off; Settings → Completion) makes the list that opens while typing the same list as Ctrl+Space (`InvokedList`) instead of the editor's completion session. How it works:
+
+- `InvokedListCommands` is now a chained handler of `TypeCharCommandArgs`: it first offers the character to an open list (`OnTypedChar`: a commit character inserts the selected item), then lets the editor insert it (`nextCommandHandler`), and then, if no list is open and the character can start a list (`SqlCompletionSource.StartsList`, the same characters as the session's `IsTrigger`), calls `InvokedList.OpenForTyping`.
+- `SqlCompletionSource.BuildForTypingAsync` prepares on the UI thread with the same rules as the session (`Initialize(…, out Prepared)` no longer shares the `pending` field with the session) and builds the items on a background thread (`Task.Run`, sorted by `ListOrdering`); the result is dropped when the user has typed more in the meantime (the newest request wins).
+- With the option on, the editor's session still takes part for a typed character (so that the built-in list does not show) but offers nothing (`ProvidesItems` with an empty span, as while a snippet field is typed).
+- A list opened by typing (`typingMode`) stays open while letters are typed: the typed text is part of its span, the text buffer change filters again (`ListOrdering.Filter`), and Backspace / caret moves close it when the caret leaves the span. Esc, Up/Down, Tab and Enter work as in the Ctrl+Space list; the status bar with the column picker is the same.
+
+Verified in SSMS 22.11 (VSIX 0.60.0): after `dbo.` the list opens; `ca` filters it to Categories and Tab inserts `Categories AS c`; `SELECT na` shows `Name` with the matching part in bold and the matching snippets at the end; Backspace shows all items again; Down + Enter insert the second item. Not verified yet: IME, very fast typing, snippet fields, comma/space triggers, the picker after typing (checklist in #187).

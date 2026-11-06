@@ -223,6 +223,13 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "pickerTableOrder")]
         public bool PickerTableOrder { get; set; }
 
+        /// <summary>
+        /// Experimental: the list that opens while typing is run by SQL Prompter itself (the same list as Ctrl+Space) instead of the editor's
+        /// completion session (#187).
+        /// </summary>
+        [DataMember(Name = "ownTypingList")]
+        public bool OwnTypingList { get; set; }
+
         /// <summary>The list says that Ctrl+Left switches to the column picker (the hint can be closed).</summary>
         [DataMember(Name = "showColumnPickerHint")]
         public bool ShowColumnPickerHint { get; set; }
@@ -287,6 +294,7 @@ namespace SqlPrompter.Core.Settings
             HighlightMatches = true;
             PickerTableOrder = false;
             ShowColumnPickerHint = true;
+            OwnTypingList = false;
             ListRows = 12;
             ListWidth = 0;
             QuickActionsOnCtrl = true;

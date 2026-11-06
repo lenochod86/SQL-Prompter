@@ -114,7 +114,17 @@ namespace SqlPrompter.Ssms
             {
                 // The editor calls InitializeCompletion on the UI thread; ScriptFactory requires it.
                 ThreadHelper.ThrowIfNotOnUIThread();
-                return Initialize(trigger, triggerLocation);
+                var start = Initialize(trigger, triggerLocation, out var prepared);
+                if (prepared != null && trigger.Reason == CompletionTriggerReason.Insertion && SettingsService.Current.Behavior.OwnTypingList)
+                {
+                    // The list that opens while typing is run by InvokedList; the session takes part (so that the built-in list does not show)
+                    // but offers nothing.
+                    pending = null;
+                    return new CompletionStartData(CompletionParticipation.ProvidesItems, new SnapshotSpan(triggerLocation, 0));
+                }
+
+                pending = prepared;
+                return start;
             }
             catch (Exception ex)
             {
@@ -167,6 +177,48 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>
+        /// The suggestions for the list that opens while typing (the option <see cref="BehaviorSettings.OwnTypingList"/>): the preparation (UI thread,
+        /// the same rules as the editor's session for a typed character) is done here, the items are built off the UI thread. Null when this
+        /// place has no suggestions.
+        /// </summary>
+        internal async Task<InvokedSuggestions> BuildForTypingAsync(SnapshotPoint location, char typed)
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            Prepared prepared;
+            CompletionStartData start;
+            try
+            {
+                start = Initialize(new CompletionTrigger(CompletionTriggerReason.Insertion, location.Snapshot, typed), location, out prepared);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Preparing the suggestions for typing failed", ex);
+                return null;
+            }
+
+            if (start.ApplicableToSpan.Snapshot == null || prepared == null || prepared.Snapshot != location.Snapshot)
+            {
+                return null;
+            }
+
+            try
+            {
+                var span = location.Snapshot.CreateTrackingSpan(start.ApplicableToSpan, SpanTrackingMode.EdgeInclusive);
+                return await Task.Run(() =>
+                {
+                    var items = ListOrdering.Sort(BuildItems(prepared, out var script, out var options), i => i.SortText).ToImmutableArray();
+                    var picker = ColumnPicker.TryBuild(prepared.Batch, prepared.CaretInBatch, prepared.Context, prepared.Metadata, script, options);
+                    return new InvokedSuggestions(items, span, prepared.Context.SoftSelection, picker, options, this);
+                }).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Building the suggestions for typing failed", ex);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// The suggestions for a list that SQL Prompter runs itself (<see cref="InvokedList"/>): the same preparation and the same items as the editor's
         /// session, built on the UI thread (it takes milliseconds and never waits for the database). Null when this place has no suggestions.
         /// </summary>
@@ -175,8 +227,7 @@ namespace SqlPrompter.Ssms
             ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
-                var start = Initialize(new CompletionTrigger(CompletionTriggerReason.Invoke, location.Snapshot), location);
-                var prepared = pending;
+                var start = Initialize(new CompletionTrigger(CompletionTriggerReason.Invoke, location.Snapshot), location, out var prepared);
                 if (start.ApplicableToSpan.Snapshot == null || prepared == null || prepared.Snapshot != location.Snapshot)
                 {
                     return null;
@@ -199,9 +250,11 @@ namespace SqlPrompter.Ssms
             return Task.FromResult<object>(item.Properties.TryGetProperty(DescriptionKey, out string description) ? description : null);
         }
 
-        private CompletionStartData Initialize(CompletionTrigger trigger, SnapshotPoint triggerLocation)
+        /// <summary>Decides whether SQL Prompter takes part at the trigger and prepares what the items are built from (null when there is nothing to build).</summary>
+        private CompletionStartData Initialize(CompletionTrigger trigger, SnapshotPoint triggerLocation, out Prepared prepared)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            prepared = null;
             if (!SettingsService.Current.Behavior.SuggestionsEnabled || !IsTrigger(trigger))
             {
                 return CompletionStartData.DoesNotParticipateInCompletion;
@@ -210,7 +263,6 @@ namespace SqlPrompter.Ssms
             if (SnippetSession.IsActive(textView))
             {
                 // The text of a snippet field is being typed: no list, but ours still takes part so that the built-in one does not show.
-                pending = null;
                 return new CompletionStartData(CompletionParticipation.ProvidesItems, new SnapshotSpan(triggerLocation, 0));
             }
 
@@ -251,7 +303,7 @@ namespace SqlPrompter.Ssms
                 loader = null;
             }
 
-            pending = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart));
+            prepared = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart));
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
@@ -304,6 +356,9 @@ namespace SqlPrompter.Ssms
                 _ = prepared.Cache.RequestColumns(readiness.MissingColumns, prepared.Loader);
             }
         }
+
+        /// <summary>A typed character that may start the list (the same characters as in <see cref="IsTrigger"/>).</summary>
+        internal static bool StartsList(char c) => char.IsLetter(c) || c == '_' || c == '.' || c == '[' || c == ' ' || c == ',' || c == '@' || c == '#' || c == '(';
 
         private static bool IsTrigger(CompletionTrigger trigger)
         {
