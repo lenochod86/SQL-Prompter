@@ -71,7 +71,7 @@ namespace SqlPrompter.Core.Completion
         /// <summary>
         /// " (a, b)" in one line, "(" and ")" on lines of their own with one item per line, or the items wrapped to the width of the editor.
         /// </summary>
-        private static string ParenthesizedList(IReadOnlyList<string> items, ListLayout layout, EditorLayout editor, int column)
+        internal static string ParenthesizedList(IReadOnlyList<string> items, ListLayout layout, EditorLayout editor, int column)
         {
             switch (layout)
             {

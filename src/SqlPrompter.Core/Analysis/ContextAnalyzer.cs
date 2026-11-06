@@ -287,6 +287,8 @@ namespace SqlPrompter.Core.Analysis
                     after.PreferredKeywords = Keywords.AfterTableSource;
                     after.SoftSelection = true;
                     after.ApplyPosition(position, false);
+                    after.Sources = sources;
+                    after.Merge = MergeStageOf(tokens, statementStart, position);
                     return after;
                 }
 
@@ -310,6 +312,9 @@ namespace SqlPrompter.Core.Analysis
                 var fallback = Make(position.Exclusive ? ContextKind.Keyword : ContextKind.Fallback);
                 fallback.SoftSelection = true;
                 fallback.ApplyPosition(position, false);
+                fallback.Sources = sources;
+                fallback.Merge = MergeStageOf(tokens, statementStart, position);
+                TryInsertTail(structure, anchorIndex, anchorAtBlockLevel, fallback);
                 return fallback;
             }
 
@@ -355,6 +360,7 @@ namespace SqlPrompter.Core.Analysis
                 expression.SoftSelection = false;
             }
 
+            expression.Merge = MergeStageOf(tokens, statementStart, position);
             return expression;
         }
 
@@ -387,7 +393,93 @@ namespace SqlPrompter.Core.Analysis
             return null;
         }
 
-        private static readonly string[] ComparisonOperators = { "=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>" };
+        /// <summary>MERGE: after USING source (the ON condition is offered) or after the condition or an action (the WHEN clauses).</summary>
+        private static MergeStage MergeStageOf(List<Token> tokens, int statementStart, KeywordPosition position)
+        {
+            if (!tokens[statementStart].IsWord("MERGE") || position.IsEmpty)
+            {
+                return MergeStage.None;
+            }
+
+            var all = position.First.Concat(position.Then).ToList();
+            if (all.Contains("WHEN MATCHED") || all.Contains("WHEN"))
+            {
+                return MergeStage.When;
+            }
+
+            return position.First.Contains("ON") ? MergeStage.On : MergeStage.None;
+        }
+
+        /// <summary>INSERT INTO table (columns) |: remembers the table and the listed columns, so that VALUES and SELECT can be offered filled in.</summary>
+        private static void TryInsertTail(Structure s, int anchorIndex, bool anchorAtBlockLevel, CaretContext target)
+        {
+            var tokens = s.Tokens;
+            if (!anchorAtBlockLevel || tokens[anchorIndex].Kind != TokenKind.CloseParen)
+            {
+                return;
+            }
+
+            var open = -1;
+            var depth = 0;
+            for (var i = anchorIndex - 1; i > s.StatementStart; i--)
+            {
+                if (tokens[i].Kind == TokenKind.CloseParen)
+                {
+                    depth++;
+                }
+                else if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    if (depth == 0)
+                    {
+                        open = i;
+                        break;
+                    }
+
+                    depth--;
+                }
+            }
+
+            if (open < 0)
+            {
+                return;
+            }
+
+            var parts = new List<string>();
+            var k = open - 1;
+            while (k >= s.StatementStart && tokens[k].IsNamePart)
+            {
+                parts.Insert(0, tokens[k].IdentifierValue);
+                if (k - 1 >= s.StatementStart && tokens[k - 1].Kind == TokenKind.Dot)
+                {
+                    k -= 2;
+                }
+                else
+                {
+                    k--;
+                    break;
+                }
+            }
+
+            if (parts.Count == 0 || parts.Count > 3 || k < s.StatementStart ||
+                !(tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= s.StatementStart && tokens[k - 1].IsWord("INSERT"))))
+            {
+                return;
+            }
+
+            var columns = new List<string>();
+            for (var j = open + 1; j < anchorIndex; j++)
+            {
+                if (tokens[j].IsNamePart && (tokens[j - 1].Kind == TokenKind.OpenParen || tokens[j - 1].Kind == TokenKind.Comma))
+                {
+                    columns.Add(tokens[j].IdentifierValue);
+                }
+            }
+
+            target.InsertTail = new TableSource(TableSourceKind.Object, parts, null, 0);
+            target.InsertTailColumns = columns;
+        }
+
+        private static readonly string[] ComparisonOperators ={ "=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>" };
 
         private static readonly HashSet<string> ConditionStarters = new HashSet<string>(StringComparer.Ordinal) { "WHERE", "AND", "OR", "ON", "HAVING", "WHEN", "NOT" };
 

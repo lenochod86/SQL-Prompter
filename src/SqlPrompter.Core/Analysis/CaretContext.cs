@@ -4,6 +4,18 @@ using System.Linq;
 
 namespace SqlPrompter.Core.Analysis
 {
+    /// <summary>Where in a MERGE statement the caret is, for the clauses offered as a whole.</summary>
+    public enum MergeStage
+    {
+        None,
+
+        /// <summary>After <c>USING source</c>: the ON condition.</summary>
+        On,
+
+        /// <summary>After the ON condition or a WHEN clause: the WHEN clauses.</summary>
+        When,
+    }
+
     public enum ContextKind
     {
         /// <summary>No completion: string, comment, number.</summary>
@@ -169,6 +181,15 @@ namespace SqlPrompter.Core.Analysis
 
         /// <summary>With <see cref="ConditionOperand"/>: the caret is after a comparison operator, where a value of the type of the column goes.</summary>
         public bool AfterComparison { get; internal set; }
+
+        /// <summary>After <c>INSERT INTO table (columns) |</c>: the table (VALUES and SELECT are offered pre-filled for the listed columns).</summary>
+        public TableSource InsertTail { get; internal set; }
+
+        /// <summary>With <see cref="InsertTail"/>: the columns listed in the parentheses.</summary>
+        public IReadOnlyList<string> InsertTailColumns { get; internal set; }
+
+        /// <summary>In a MERGE: where the caret is; the target and the source are the first two table sources.</summary>
+        public MergeStage Merge { get; internal set; }
 
         /// <summary>The name follows JOIN, so tables related by a foreign key to the tables of the query can be offered first.</summary>
         public bool AfterJoin { get; internal set; }
