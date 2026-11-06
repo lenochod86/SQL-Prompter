@@ -172,7 +172,9 @@ namespace SqlPrompter.Core.Completion
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
-                    return KeywordSuggestions(context, 0).Concat(SnippetSuggestions(context, options)).ToList();
+                    return context.OnlyExpectedKeywords
+                        ? KeywordSuggestions(context, 0).ToList()
+                        : KeywordSuggestions(context, 0).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
                     return ObjectSuggestions(context, metadata, script, options).ToList();
                 case ContextKind.InsertColumns:
@@ -217,14 +219,28 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        private static IEnumerable<Suggestion> KeywordSuggestions(CaretContext context, int firstGroup)
+        /// <summary>
+        /// Keywords: the preferred ones of the position first, then those that can follow as well, then the rest. In an expression
+        /// (<paramref name="inExpression"/>) the keywords of a position after a complete operand rank above the columns, the others with the aliases.
+        /// </summary>
+        private static IEnumerable<Suggestion> KeywordSuggestions(CaretContext context, int firstGroup, bool inExpression = false)
         {
             var preferred = new HashSet<string>(context.PreferredKeywords, StringComparer.OrdinalIgnoreCase);
-            foreach (var keyword in context.PreferredKeywords.Concat(Keywords.All).Distinct(StringComparer.OrdinalIgnoreCase))
+            var next = new HashSet<string>(context.NextKeywords, StringComparer.OrdinalIgnoreCase);
+            var firstRank = inExpression ? (context.KeywordsAfterOperand ? -2 : 1) : firstGroup - 1;
+            var nextRank = inExpression ? (context.KeywordsAfterOperand ? -1 : 1) : firstGroup;
+            var restRank = inExpression ? firstGroup : firstGroup + 1;
+            var all = context.PreferredKeywords.Concat(context.NextKeywords);
+            if (!context.OnlyExpectedKeywords)
+            {
+                all = all.Concat(Keywords.All);
+            }
+
+            foreach (var keyword in all.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 var text = Keywords.ApplyCase(keyword, context.TypedPrefix);
                 yield return new Suggestion(SuggestionKind.Keyword, text, text, text, null, null,
-                    preferred.Contains(keyword) ? firstGroup : firstGroup + 1);
+                    preferred.Contains(keyword) ? firstRank : next.Contains(keyword) ? nextRank : restRank);
             }
         }
 
@@ -727,7 +743,7 @@ namespace SqlPrompter.Core.Completion
                 yield return ScalarFunctionSuggestion(function, SqlIdentifier.Quote(function.Schema, quote) + "." + SqlIdentifier.Quote(function.Name, quote), function.Schema);
             }
 
-            foreach (var keyword in KeywordSuggestions(context, 4))
+            foreach (var keyword in KeywordSuggestions(context, 4, inExpression: true))
             {
                 yield return keyword;
             }

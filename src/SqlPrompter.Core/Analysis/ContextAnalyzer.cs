@@ -179,7 +179,8 @@ namespace SqlPrompter.Core.Analysis
                 }
 
                 var start = Make(ContextKind.Keyword);
-                start.PreferredKeywords = Keywords.StatementStart;
+                start.PreferredKeywords = KeywordMap.StatementFirst;
+                start.NextKeywords = Keywords.StatementStart.Except(KeywordMap.StatementFirst).ToArray();
                 return start;
             }
 
@@ -254,6 +255,9 @@ namespace SqlPrompter.Core.Analysis
 
             var sources = CollectSources(structure, scopes);
             var operandBefore = IsOperand(anchor);
+            var position = qualifier.Count == 0
+                ? KeywordMap.At(structure, block, nameStart, caretIndex + (word != null ? 1 : 0))
+                : KeywordPosition.None;
 
             // 2. After a table source in FROM: an alias or the next clause.
             if (clauseState.Clause == Clause.From && anchorAtBlockLevel && qualifier.Count == 0)
@@ -263,6 +267,7 @@ namespace SqlPrompter.Core.Analysis
                     var after = Make(ContextKind.Keyword);
                     after.PreferredKeywords = Keywords.AfterTableSource;
                     after.SoftSelection = true;
+                    after.ApplyPosition(position, false);
                     return after;
                 }
 
@@ -283,13 +288,16 @@ namespace SqlPrompter.Core.Analysis
                 }
 
                 // EXEC, VALUES, SET @x = … and other positions the extension does not understand yet.
-                var fallback = Make(ContextKind.Fallback);
+                var fallback = Make(position.Exclusive ? ContextKind.Keyword : ContextKind.Fallback);
                 fallback.SoftSelection = true;
+                fallback.ApplyPosition(position, false);
                 return fallback;
             }
 
             var expression = Make(ContextKind.Expression);
             expression.Sources = sources;
+            expression.SoftSelection = operandBefore;
+            expression.ApplyPosition(position, operandBefore || anchor.IsWord("END") || anchor.IsWord("ASC") || anchor.IsWord("DESC"));
             expression.SoftSelection = operandBefore;
             if (qualifier.Count == 0 && clauseState.Clause == Clause.Select && !sources.Any(src => src.ScopeLevel == 0))
             {
@@ -469,9 +477,9 @@ namespace SqlPrompter.Core.Analysis
                 case "MERGE":
                     return new[] { "INTO" };
                 case "DELETE":
-                    return anchorIndex == statementStart ? new[] { "FROM" } : null;
+                    return anchorIndex == statementStart ? new[] { "FROM", "TOP" } : null;
                 case "TABLE":
-                    return prevWord == "TRUNCATE" || prevWord == "DROP" || prevWord == "ALTER" ? Array.Empty<string>() : null;
+                    return prevWord == "DROP" ? new[] { "IF EXISTS" } : prevWord == "TRUNCATE" || prevWord == "ALTER" ? Array.Empty<string>() : null;
                 default:
                     return null;
             }
