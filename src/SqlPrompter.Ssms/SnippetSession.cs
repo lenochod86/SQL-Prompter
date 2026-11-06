@@ -12,9 +12,10 @@ using SqlPrompter.Core.Snippets;
 namespace SqlPrompter.Ssms
 {
     /// <summary>
-    /// Editing the custom fields of an expanded snippet in the text, as in Visual Studio: the fields are highlighted, Tab and Shift+Tab move
-    /// between them (the field text is selected, so typing replaces it), a field that appears several times is updated everywhere at once,
-    /// Enter, Esc, Tab after the last field or leaving the snippet end the editing with the caret at <c>$CURSOR$</c>.
+    /// Editing the custom fields of an expanded snippet in the text, as in Visual Studio: the fields are highlighted, Tab and Shift+Tab cycle
+    /// between them (the field text is selected, so typing replaces it), Enter moves on and ends the editing after the last field,
+    /// a field that appears several times is updated everywhere at once, Esc ends the editing at once, and so does leaving the snippet.
+    /// The caret then goes to <c>$CURSOR$</c> (not when the snippet is left).
     /// </summary>
     internal sealed class SnippetSession
     {
@@ -65,23 +66,27 @@ namespace SqlPrompter.Ssms
             session.Activate(0);
         }
 
-        /// <summary>Tab: the next field, after the last one the editing ends at <c>$CURSOR$</c>.</summary>
-        public void Next()
+        /// <summary>Tab: the next field; after the last one it wraps around to the first. Tab never ends the editing.</summary>
+        public void Next() => Activate(FieldNavigation.Cycle(current, fields.Count));
+
+        /// <summary>Shift+Tab: the previous field; before the first one it wraps around to the last.</summary>
+        public void Previous() => Activate(FieldNavigation.CycleBack(current, fields.Count));
+
+        /// <summary>Enter: the next field; on the last one the editing ends and the caret goes to <c>$CURSOR$</c>.</summary>
+        public void Advance()
         {
-            if (current + 1 < fields.Count)
-            {
-                Activate(current + 1);
-            }
-            else
+            var next = FieldNavigation.Advance(current, fields.Count);
+            if (next < 0)
             {
                 End(moveCaret: true);
             }
+            else
+            {
+                Activate(next);
+            }
         }
 
-        /// <summary>Shift+Tab: the previous field; stays on the first one.</summary>
-        public void Previous() => Activate(Math.Max(0, current - 1));
-
-        /// <summary>Enter and Esc: ends the editing, the caret goes to <c>$CURSOR$</c>.</summary>
+        /// <summary>Esc: ends the editing at once, the caret goes to <c>$CURSOR$</c>.</summary>
         public void Finish() => End(moveCaret: true);
 
         private void Activate(int index)

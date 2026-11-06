@@ -74,9 +74,9 @@ namespace SqlPrompter.Ssms
     [Order(Before = "default")]
     internal sealed class SnippetReturnHandler : SnippetCommandHandler<ReturnKeyCommandArgs>
     {
-        public override string DisplayName => "SQL Prompter: finish snippet";
+        public override string DisplayName => "SQL Prompter: next snippet field or finish";
 
-        protected override void Run(SnippetSession session) => session.Finish();
+        protected override void Run(SnippetSession session) => session.Advance();
     }
 
     [Export(typeof(ICommandHandler))]
