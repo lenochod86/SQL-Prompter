@@ -22,6 +22,8 @@ namespace SqlPrompter.Ssms
         private bool loading;
         private FormatPreview previewBox;
         private Func<string> previewText;
+        private Func<string> previewHeading;
+        private Label previewTitle;
 
         public SettingsPage(string title, string intro = null)
         {
@@ -80,13 +82,23 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>A colored preview under the options; it is drawn again after every change (<paramref name="render"/> returns the text to show).</summary>
-        public void Preview(string heading, Func<string> render)
+        public void Preview(string heading, Func<string> render, Control headerExtra = null, Func<string> title = null)
         {
             previewText = render;
             previewBox = new FormatPreview { Dock = DockStyle.Fill };
             var panel = new Panel { Dock = DockStyle.Bottom, Height = 250, Padding = new Padding(14, 4, 14, 10) };
             panel.Controls.Add(previewBox);
-            panel.Controls.Add(new Label { Text = heading, Dock = DockStyle.Top, Height = 22, Font = new Font(Font, FontStyle.Bold) });
+            var header = new Panel { Dock = DockStyle.Top, Height = 26 };
+            previewTitle = new Label { Text = heading, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font(Font, FontStyle.Bold) };
+            previewHeading = title;
+            header.Controls.Add(previewTitle);
+            if (headerExtra != null)
+            {
+                headerExtra.Dock = DockStyle.Right;
+                header.Controls.Add(headerExtra);
+            }
+
+            panel.Controls.Add(header);
             Controls.Add(panel);
             flow.BringToFront();
         }
@@ -101,6 +113,10 @@ namespace SqlPrompter.Ssms
             try
             {
                 previewBox.ShowText(previewText());
+                if (previewHeading != null)
+                {
+                    previewTitle.Text = previewHeading();
+                }
             }
             catch (Exception ex)
             {
@@ -111,6 +127,15 @@ namespace SqlPrompter.Ssms
         public void Heading(string text)
         {
             flow.Controls.Add(new Label { Text = text, AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 16, 0, 0) });
+        }
+
+        /// <summary>A line of text that is read again from <paramref name="get"/> whenever the page is loaded or an option changes.</summary>
+        public void Info(Func<string> get)
+        {
+            var label = new Label { AutoSize = true, MaximumSize = new Size(TextWidth, 0), Margin = new Padding(0, 10, 0, 0), Font = new Font(Font, FontStyle.Bold) };
+            refreshers.Add(() => label.Text = get());
+            enablers.Add(() => label.Text = get());
+            flow.Controls.Add(label);
         }
 
         public void Help(string text, int indent = 0)

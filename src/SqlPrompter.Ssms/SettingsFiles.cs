@@ -87,7 +87,7 @@ namespace SqlPrompter.Ssms
                     var json = System.IO.File.ReadAllText(dialog.FileName, System.Text.Encoding.UTF8);
                     var result = SqlPromptStyleImporter.Import(json, SettingsService.Current.Formatting);
                     var settings = SettingsService.Current.Clone();
-                    settings.Formatting = result.Style;
+                    settings.SetActiveStyleValues(result.Style);
                     SettingsService.Update(settings);
                     var text = "Imported:\n- " + (result.Applied.Count == 0 ? "(nothing)" : string.Join("\n- ", result.Applied));
                     if (result.Notes.Count > 0)

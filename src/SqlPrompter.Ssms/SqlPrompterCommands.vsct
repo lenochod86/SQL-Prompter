@@ -60,6 +60,12 @@
           <ButtonText>Settings...</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidFormattingStyles" priority="0x009A" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
+        <Strings>
+          <ButtonText>Formatting Styles...</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidExportSettings" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
         <Strings>
@@ -283,6 +289,7 @@
       <IDSymbol name="cmdidNewSnippetFromSelection" value="0x0108" />
       <IDSymbol name="cmdidManageSnippets" value="0x0109" />
       <IDSymbol name="cmdidSettings" value="0x011F" />
+      <IDSymbol name="cmdidFormattingStyles" value="0x0120" />
       <IDSymbol name="cmdidExportSettings" value="0x0102" />
       <IDSymbol name="cmdidImportSettings" value="0x0103" />
       <IDSymbol name="cmdidImportFormatStyle" value="0x0119" />

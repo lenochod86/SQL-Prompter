@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 using SqlPrompter.Core.Completion;
 using SqlPrompter.Core.Formatting;
@@ -16,6 +18,7 @@ namespace SqlPrompter.Core.Settings
         public PrompterSettings()
         {
             SetDefaults();
+            EnsureStyles();
         }
 
         [DataMember(Name = "version")]
@@ -42,16 +45,35 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "analysis")]
         public AnalysisSettings Analysis { get; set; }
 
+        /// <summary>The active formatting style (what Format Document and the inserted lists use). It is always a copy of the active named style.</summary>
         [DataMember(Name = "formatting")]
         public FormatStyle Formatting { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone(), Analysis = Analysis.Clone(), Formatting = Formatting.Clone() };
+        /// <summary>The named formatting styles; there is always at least one.</summary>
+        [DataMember(Name = "formattingStyles")]
+        public List<NamedFormatStyle> FormattingStyles { get; set; }
+
+        /// <summary>The name of the active entry of <see cref="FormattingStyles"/>.</summary>
+        [DataMember(Name = "activeFormattingStyle")]
+        public string ActiveFormattingStyle { get; set; }
+
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone(), Analysis = Analysis.Clone(), Formatting = Formatting.Clone(), FormattingStyles = (FormattingStyles ?? new List<NamedFormatStyle>()).Select(s => s.Clone()).ToList(), ActiveFormattingStyle = ActiveFormattingStyle };
 
         public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
             new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins, null, Inserts, new SqlPrompter.Core.Completion.EditorLayout { Style = Formatting });
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context) => SetDefaults();
+
+        /// <summary>Code that assigns <see cref="Formatting"/> directly (an import) is honored: the active style is written from it.</summary>
+        [OnSerializing]
+        private void OnSerializing(StreamingContext context)
+        {
+            if (Formatting != null && FormattingStyles != null && FormattingStyles.Count > 0)
+            {
+                ActiveStyle.Style = Formatting.Clone();
+            }
+        }
 
         [OnDeserialized]
         private void OnDeserialized(StreamingContext context)
@@ -65,6 +87,55 @@ namespace SqlPrompter.Core.Settings
             Coloring = Coloring ?? new ColorSettings();
             Analysis = Analysis ?? new AnalysisSettings();
             Formatting = Formatting ?? new FormatStyle();
+            EnsureStyles();
+        }
+
+        /// <summary>The name given to the style of a settings file from before there were several.</summary>
+        public const string DefaultStyleName = "Default";
+
+        /// <summary>The entry of <see cref="FormattingStyles"/> that is active.</summary>
+        public NamedFormatStyle ActiveStyle => FormattingStyles.FirstOrDefault(s => string.Equals(s.Name, ActiveFormattingStyle, StringComparison.OrdinalIgnoreCase)) ?? FormattingStyles[0];
+
+        /// <summary>
+        /// Makes the list of styles valid: at least one style (a file from before the styles gets its single style as "Default"), unique non-empty names,
+        /// an active name that exists; then <see cref="Formatting"/> is the active style.
+        /// </summary>
+        public void EnsureStyles()
+        {
+            var styles = (FormattingStyles ?? new List<NamedFormatStyle>()).Where(s => s != null).ToList();
+            if (styles.Count == 0)
+            {
+                styles.Add(new NamedFormatStyle(DefaultStyleName, (Formatting ?? new FormatStyle()).Clone()));
+                ActiveFormattingStyle = DefaultStyleName;
+            }
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var style in styles)
+            {
+                var name = string.IsNullOrWhiteSpace(style.Name) ? "Style" : style.Name.Trim();
+                var unique = name;
+                for (var i = 2; !seen.Add(unique); i++)
+                {
+                    unique = name + " " + i;
+                }
+
+                style.Name = unique;
+            }
+
+            FormattingStyles = styles;
+            if (!styles.Any(s => string.Equals(s.Name, ActiveFormattingStyle, StringComparison.OrdinalIgnoreCase)))
+            {
+                ActiveFormattingStyle = styles[0].Name;
+            }
+
+            Formatting = ActiveStyle.Style.Clone();
+        }
+
+        /// <summary>Replaces the values of the active style (an import of a SQL Prompt style) and keeps <see cref="Formatting"/> in step.</summary>
+        public void SetActiveStyleValues(FormatStyle style)
+        {
+            ActiveStyle.Style = style.Clone();
+            Formatting = style.Clone();
         }
 
         private void SetDefaults()
@@ -78,6 +149,9 @@ namespace SqlPrompter.Core.Settings
             Coloring = new ColorSettings();
             Analysis = new AnalysisSettings();
             Formatting = new FormatStyle();
+            // Empty on purpose: a file from before the styles has only 'formatting', which EnsureStyles turns into the first style.
+            FormattingStyles = new List<NamedFormatStyle>();
+            ActiveFormattingStyle = null;
         }
     }
 
