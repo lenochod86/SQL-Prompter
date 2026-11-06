@@ -14,14 +14,7 @@ namespace SqlPrompter.Ssms
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
     [ProvideMenuResource("Menus.ctmenu", 22)]
-    [ProvideOptionPage(typeof(BehaviorOptionsPage), "SQL Prompter", "Behavior", 0, 0, true)]
-    [ProvideOptionPage(typeof(AliasOptionsPage), "SQL Prompter", "Aliases and Qualification", 0, 0, true)]
-    [ProvideOptionPage(typeof(JoinOptionsPage), "SQL Prompter", "Joins", 0, 0, true)]
-    [ProvideOptionPage(typeof(InsertOptionsPage), "SQL Prompter", "Inserts", 0, 0, true)]
-    [ProvideOptionPage(typeof(SnippetOptionsPage), "SQL Prompter", "Snippets", 0, 0, true)]
-    [ProvideOptionPage(typeof(ColoringOptionsPage), "SQL Prompter", "Coloring", 0, 0, true)]
-    [ProvideOptionPage(typeof(AnalysisOptionsPage), "SQL Prompter", "Code Analysis", 0, 0, true)]
-    [ProvideOptionPage(typeof(FormattingOptionsPage), "SQL Prompter", "Formatting", 0, 0, true)]
+    [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {
@@ -142,7 +135,7 @@ namespace SqlPrompter.Ssms
             public IntPtr Handle => System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
         }
 
-        private static void OpenSettings()
+        internal static void OpenSettings()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             try
@@ -276,6 +269,13 @@ namespace SqlPrompter.Ssms
         private void ManageSnippets()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            OpenSnippetManager();
+        }
+
+        /// <summary>Opens the snippet manager (the menu command, the settings window and the Options page use it); the snippets reload when it closes.</summary>
+        internal static void OpenSnippetManager()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
                 var window = new SnippetManagerWindow(new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder), null);
@@ -285,7 +285,7 @@ namespace SqlPrompter.Ssms
             catch (Exception ex)
             {
                 Log.Error("Opening the snippet manager failed", ex);
-                ShowMessage("Opening the snippet manager failed: " + ex.Message);
+                System.Windows.Forms.MessageBox.Show("Opening the snippet manager failed: " + ex.Message, "SQL Prompter");
             }
         }
 
