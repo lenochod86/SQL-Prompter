@@ -14,6 +14,13 @@
           <CommandName>SQL Prompter</CommandName>
         </Strings>
       </Menu>
+      <Menu guid="guidSqlPrompterCmdSet" id="RefactorMenu" priority="0x0100" type="Menu">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactorHostGroup" />
+        <Strings>
+          <ButtonText>Refactor</ButtonText>
+          <CommandName>Refactor</CommandName>
+        </Strings>
+      </Menu>
     </Menus>
 
     <Groups>
@@ -39,8 +46,11 @@
       <Group guid="guidSqlPrompterCmdSet" id="FormattingGroup" priority="0x0540">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
       </Group>
-      <Group guid="guidSqlPrompterCmdSet" id="RefactoringGroup" priority="0x0550">
+      <Group guid="guidSqlPrompterCmdSet" id="RefactorHostGroup" priority="0x0560">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="RefactoringGroup" priority="0x0100">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactorMenu" />
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
@@ -66,24 +76,6 @@
           <ButtonText>Formatting Styles...</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidExportSettings" priority="0x0100" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
-        <Strings>
-          <ButtonText>Export Settings...</ButtonText>
-        </Strings>
-      </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidImportSettings" priority="0x0101" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
-        <Strings>
-          <ButtonText>Import Settings...</ButtonText>
-        </Strings>
-      </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidImportFormatStyle" priority="0x0102" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
-        <Strings>
-          <ButtonText>Import Formatting Style...</ButtonText>
-        </Strings>
-      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidSurroundWithSnippet" priority="0x0090" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
         <Strings>
@@ -100,24 +92,6 @@
         <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
         <Strings>
           <ButtonText>Manage Snippets...</ButtonText>
-        </Strings>
-      </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidImportSnippets" priority="0x0100" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
-        <Strings>
-          <ButtonText>Import Snippets...</ButtonText>
-        </Strings>
-      </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenSnippetsFolder" priority="0x0101" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
-        <Strings>
-          <ButtonText>Open Snippets Folder</ButtonText>
-        </Strings>
-      </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidReloadSnippets" priority="0x0102" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="SnippetsGroup" />
-        <Strings>
-          <ButtonText>Reload Snippets</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidGoToDefinition" priority="0x0100" type="Button">
@@ -147,20 +121,14 @@
           <ButtonText>Parameter Info</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidResetUsage" priority="0x0100" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="SettingsGroup" />
-        <Strings>
-          <ButtonText>Reset Usage Statistics</ButtonText>
-        </Strings>
-      </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddCommas" priority="0x0100" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddCommas" priority="0x0220" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
           <ButtonText>Add Commas To Selected Lines</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddQuotesAndCommas" priority="0x0101" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddQuotesAndCommas" priority="0x0221" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
           <ButtonText>Add Quotes And Commas To Selected Lines</ButtonText>
         </Strings>
@@ -183,20 +151,20 @@
           <ButtonText>Format Selection</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddNPrefix" priority="0x0102" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddNPrefix" priority="0x0210" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
           <ButtonText>Add N Prefix To Strings</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddAs" priority="0x0103" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAddAs" priority="0x0211" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
           <ButtonText>Add AS To Aliases</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidRemoveAs" priority="0x0104" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRemoveAs" priority="0x0212" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
           <ButtonText>Remove AS From Aliases</ButtonText>
         </Strings>
@@ -254,6 +222,8 @@
     <GuidSymbol name="guidSqlPrompterPackage" value="{a3a4db19-c58e-4eac-8a84-ba61357b9b01}" />
     <GuidSymbol name="guidSqlPrompterCmdSet" value="{15e19ce9-b3c9-47dd-97f9-49fe13869730}">
       <IDSymbol name="SqlPrompterMenu" value="0x1001" />
+      <IDSymbol name="RefactorMenu" value="0x1002" />
+      <IDSymbol name="RefactorHostGroup" value="0x1019" />
       <IDSymbol name="MetadataGroup" value="0x1010" />
       <IDSymbol name="DiagnosticsGroup" value="0x1011" />
       <IDSymbol name="SettingsGroup" value="0x1012" />
@@ -281,18 +251,11 @@
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
       <IDSymbol name="cmdidParameterInfo" value="0x010D" />
-      <IDSymbol name="cmdidResetUsage" value="0x010E" />
-      <IDSymbol name="cmdidImportSnippets" value="0x0104" />
-      <IDSymbol name="cmdidOpenSnippetsFolder" value="0x0105" />
-      <IDSymbol name="cmdidReloadSnippets" value="0x0106" />
       <IDSymbol name="cmdidSurroundWithSnippet" value="0x0107" />
       <IDSymbol name="cmdidNewSnippetFromSelection" value="0x0108" />
       <IDSymbol name="cmdidManageSnippets" value="0x0109" />
       <IDSymbol name="cmdidSettings" value="0x011F" />
       <IDSymbol name="cmdidFormattingStyles" value="0x0120" />
-      <IDSymbol name="cmdidExportSettings" value="0x0102" />
-      <IDSymbol name="cmdidImportSettings" value="0x0103" />
-      <IDSymbol name="cmdidImportFormatStyle" value="0x0119" />
       <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
       <IDSymbol name="cmdidOpenLog" value="0x0101" />
     </GuidSymbol>

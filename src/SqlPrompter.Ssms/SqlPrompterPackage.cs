@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 23)]
+    [ProvideMenuResource("Menus.ctmenu", 24)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
@@ -24,24 +24,17 @@ namespace SqlPrompter.Ssms
         public const int OpenLogId = 0x0101;
         public const int SettingsId = 0x011F;
         public const int FormattingStylesId = 0x0120;
-        public const int ExportSettingsId = 0x0102;
-        public const int ImportSettingsId = 0x0103;
-        public const int ImportFormatStyleId = 0x0119;
         public const int FormatDocumentId = 0x011A;
         public const int FormatSelectionId = 0x011B;
         public const int AddNPrefixId = 0x011C;
         public const int AddAsId = 0x011D;
         public const int RemoveAsId = 0x011E;
-        public const int ImportSnippetsId = 0x0104;
-        public const int OpenSnippetsFolderId = 0x0105;
-        public const int ReloadSnippetsId = 0x0106;
         public const int SurroundWithSnippetId = 0x0107;
         public const int NewSnippetFromSelectionId = 0x0108;
         public const int ManageSnippetsId = 0x0109;
         public const int GoToDefinitionId = 0x010B;
         public const int RunStatementId = 0x010C;
         public const int ParameterInfoId = 0x010D;
-        public const int ResetUsageId = 0x010E;
         public const int AddCommasId = 0x010F;
         public const int AddQuotesAndCommasId = 0x0110;
         public const int QueryHistoryId = 0x0111;
@@ -72,15 +65,8 @@ namespace SqlPrompter.Ssms
             {
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
-                commands.AddCommand(new MenuCommand((s, e) => ResetUsage(), new CommandID(CommandSet, ResetUsageId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenSettings(), new CommandID(CommandSet, SettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => FormattingStylesWindow.Open(), new CommandID(CommandSet, FormattingStylesId)));
-                commands.AddCommand(new MenuCommand((s, e) => ExportSettings(), new CommandID(CommandSet, ExportSettingsId)));
-                commands.AddCommand(new MenuCommand((s, e) => ImportSettings(), new CommandID(CommandSet, ImportSettingsId)));
-                commands.AddCommand(new MenuCommand((s, e) => ImportFormatStyle(), new CommandID(CommandSet, ImportFormatStyleId)));
-                commands.AddCommand(new MenuCommand((s, e) => ImportSnippets(), new CommandID(CommandSet, ImportSnippetsId)));
-                commands.AddCommand(new MenuCommand((s, e) => OpenSnippetsFolder(), new CommandID(CommandSet, OpenSnippetsFolderId)));
-                commands.AddCommand(new MenuCommand((s, e) => SnippetService.Reload(), new CommandID(CommandSet, ReloadSnippetsId)));
                 commands.AddCommand(new MenuCommand((s, e) => SurroundSelection(), new CommandID(CommandSet, SurroundWithSnippetId)));
                 commands.AddCommand(new MenuCommand((s, e) => NewSnippetFromSelection(), new CommandID(CommandSet, NewSnippetFromSelectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
@@ -125,13 +111,6 @@ namespace SqlPrompter.Ssms
             Log.Write("Metadata dropped; it is loaded again on the next completion.");
         }
 
-        private void ExportSettings() => SettingsFiles.Export(null);
-
-        private void ImportSettings() => SettingsFiles.Import(null);
-
-        private void ImportFormatStyle() => SettingsFiles.ImportFormatStyle(null);
-
-        /// <summary>The SSMS main window as the owner of a WinForms dialog, so that the dialog stays in front of it.</summary>
         private sealed class MainWindowOwner : System.Windows.Forms.IWin32Window
         {
             public IntPtr Handle => System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
@@ -150,46 +129,6 @@ namespace SqlPrompter.Ssms
             catch (Exception ex)
             {
                 Log.Error("Opening the settings window failed", ex);
-            }
-        }
-
-        private void ImportSnippets()
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            try
-            {
-                using (var dialog = new System.Windows.Forms.OpenFileDialog
-                {
-                    Title = "Import snippets (SQL Prompt .sqlpromptsnippet or snippet .json files)",
-                    Filter = "Snippet files (*.sqlpromptsnippet;*.json)|*.sqlpromptsnippet;*.json|All files (*.*)|*.*",
-                    Multiselect = true,
-                })
-                {
-                    if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                    {
-                        return;
-                    }
-
-                    var store = new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder);
-                    bool? replaceAnswer = null;
-                    var result = store.Import(
-                        dialog.FileNames,
-                        prefix => (replaceAnswer ?? (replaceAnswer = AskYesNo("A snippet with the prefix \"" + prefix + "\" exists already (there may be more). Replace snippets with the same prefix?"))).Value);
-                    var text = result.Imported + " snippets imported into " + store.Folder + (result.Replaced > 0 ? " (" + result.Replaced + " replaced)" : string.Empty) +
-                        (result.Skipped > 0 ? ", " + result.Skipped + " skipped because their prefix exists" : string.Empty) + ".";
-                    if (result.Errors.Count > 0)
-                    {
-                        text += "\n\nNot imported:\n- " + string.Join("\n- ", result.Errors);
-                    }
-
-                    SnippetService.Reload();
-                    ShowMessage(text);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Importing the snippets failed", ex);
-                ShowMessage("Importing the snippets failed: " + ex.Message);
             }
         }
 
@@ -291,9 +230,59 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private void OpenSnippetsFolder()
+        private void ShowMessage(string text)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            VsShellUtilities.ShowMessageBox(
+                this, text, "SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_INFO,
+                Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_OK,
+                Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+        }
+
+        /// <summary>Imports snippet files into the snippet folder (a button of the snippet manager).</summary>
+        internal static void ImportSnippets()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                using (var dialog = new System.Windows.Forms.OpenFileDialog
+                {
+                    Title = "Import snippets (SQL Prompt .sqlpromptsnippet or snippet .json files)",
+                    Filter = "Snippet files (*.sqlpromptsnippet;*.json)|*.sqlpromptsnippet;*.json|All files (*.*)|*.*",
+                    Multiselect = true,
+                })
+                {
+                    if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                    {
+                        return;
+                    }
+
+                    var store = new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder);
+                    bool? replaceAnswer = null;
+                    var result = store.Import(
+                        dialog.FileNames,
+                        prefix => (replaceAnswer ?? (replaceAnswer = AskYesNo("A snippet with the prefix \"" + prefix + "\" exists already (there may be more). Replace snippets with the same prefix?"))).Value);
+                    var text = result.Imported + " snippets imported into " + store.Folder + (result.Replaced > 0 ? " (" + result.Replaced + " replaced)" : string.Empty) +
+                        (result.Skipped > 0 ? ", " + result.Skipped + " skipped because their prefix exists" : string.Empty) + ".";
+                    if (result.Errors.Count > 0)
+                    {
+                        text += "\n\nNot imported:\n- " + string.Join("\n- ", result.Errors);
+                    }
+
+                    SnippetService.Reload();
+                    System.Windows.Forms.MessageBox.Show(text, "SQL Prompter", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Importing the snippets failed", ex);
+                System.Windows.Forms.MessageBox.Show("Importing the snippets failed: " + ex.Message, "SQL Prompter");
+            }
+        }
+
+        /// <summary>Opens the snippet folder in Explorer.</summary>
+        internal static void OpenSnippetsFolder()
+        {
             try
             {
                 var folder = SnippetService.Folder;
@@ -306,35 +295,18 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private bool AskYesNo(string text)
+        /// <summary>Forgets which suggestions the user chose how often (a button of the settings window).</summary>
+        internal static void ResetUsage(System.Windows.Forms.IWin32Window owner)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            return VsShellUtilities.ShowMessageBox(
-                this, text, "SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_QUERY,
-                Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_YESNO,
-                Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_SECOND) == 6;
-        }
-
-        private void ShowMessage(string text)
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            VsShellUtilities.ShowMessageBox(
-                this, text, "SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_INFO,
-                Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
-        }
-
-        private void ResetUsage()
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            if (VsShellUtilities.ShowMessageBox(this, "Forget which suggestions you chose how often? The list goes back to its plain order.", "SQL Prompter",
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_QUERY, Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_YESNO,
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_SECOND) == 6)
+            if (System.Windows.Forms.MessageBox.Show(owner, "Forget which suggestions you chose how often? The list goes back to its plain order.", "SQL Prompter",
+                    System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question, System.Windows.Forms.MessageBoxDefaultButton.Button2) == System.Windows.Forms.DialogResult.Yes)
             {
                 UsageService.Reset();
             }
         }
 
+        private static bool AskYesNo(string text) =>
+            System.Windows.Forms.MessageBox.Show(text, "SQL Prompter", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question, System.Windows.Forms.MessageBoxDefaultButton.Button2) == System.Windows.Forms.DialogResult.Yes;
         private void OpenLog()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
