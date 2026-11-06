@@ -125,6 +125,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.SuggestionsEnabled, v => work.Behavior.SuggestionsEnabled = v);
             completion.Check("Show suggestions after a comma", "The list opens after a comma and the space that follows it (next column, next item), except in VALUES lists, lists of literals and DECLARE.",
                 () => work.Behavior.SuggestAfterComma, v => work.Behavior.SuggestAfterComma = v, () => work.Behavior.SuggestionsEnabled);
+            completion.Check("Show a hint for expanding *", "While the caret is right behind a * in a select list that Tab can expand, a small note under it says \"Tab: expand columns\".",
+                () => work.Behavior.ShowStarHint, v => work.Behavior.ShowStarHint = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Mark items with \"SQL Prompter\"", "Shows \"SQL Prompter\" on the right of every item so that it is obvious the list is ours and not the built-in one.",
                 () => work.Behavior.MarkItems, v => work.Behavior.MarkItems = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Rank by usage", "Items you choose more often come first in their group. The counts are kept on this computer only (%APPDATA%\\SqlPrompter\\usage.json); reset them with SQL Prompter > Reset Usage Statistics.",

@@ -129,6 +129,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "suggestAfterComma")]
         public bool SuggestAfterComma { get; set; }
 
+        /// <summary>A note under the caret says that Tab expands a star in a select list.</summary>
+        [DataMember(Name = "showStarHint")]
+        public bool ShowStarHint { get; set; }
+
         /// <summary>The other places of the name under the caret are highlighted.</summary>
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
@@ -187,6 +191,7 @@ namespace SqlPrompter.Core.Settings
             AutoClose = true;
             SuggestAfterComma = true;
             HighlightMatches = true;
+            ShowStarHint = true;
             KeepHistory = true;
             HistoryDays = 0;
             RestoreTabs = true;
