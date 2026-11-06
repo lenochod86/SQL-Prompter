@@ -317,3 +317,39 @@ Verified in SSMS 22: Ctrl+Space after `WHERE ty` and `AS a ij` and after `WHERE 
 **List**: `InvokedList` (the own list from #144) has a second mode, the column picker: rows with a check box (`[ ]` / `[x]`), a heading per source, Space checks the selected column, Tab or Enter inserts the checked columns (the selected one when none is checked) laid out by the style, Esc closes, typing filters the columns, Select All and the check box *List in table order* (remembered in `behavior.pickerTableOrder`) are in a status bar under the list (`ListFooter` of `SqlCompletionPresenter`: the tabs *Column Picker* / *All Suggestions*, the buttons and a hint on a second line; the hint of the normal list, *Ctrl+Left: column picker*, can be closed with its x and is the option `behavior.showColumnPickerHint`). In `GROUP BY` the picker starts with the item *All non-aggregated columns*; checking it adds those items to the inserted list without repeating columns.
 **Keys:** the SDK of SSMS 22 has no command arguments for Ctrl+Left / Ctrl+Right (`WordPreviousCommandArgs` and `WordNextCommandArgs` exist only in the runtime assembly), so they are bound (scope `SQL Query Editor`, only when free, like Ctrl+Space) to two hidden commands (`CommandWellOnly`, *Picker Left* and *Picker Right*). Ctrl+Left switches the own list to the picker, or, when the editor's own list is open where columns are picked (`InvokedList.CanPick`), dismisses it and opens the own list as the picker (the typed text becomes its filter); Ctrl+Right goes back to all suggestions; everywhere else the commands run `Edit.WordPrevious` / `Edit.WordNext`, so the keys keep their old meaning. Verified in SSMS 22: Ctrl+Space after `SELECT ` of a two-table query shows the list with the status bar and the hint; Ctrl+Left shows the picker with headings `p` and `c`, check boxes, Select All and the order box; Space + Down + Space + Tab inserted `p.Code` and `, p.IdProduct` laid out with commas before; `GROUP BY |` showed the item and inserted `p.IdCategory, p.Name`, the same through the picker; `INSERT INTO dbo.Products (IdCategory, |)` hid the identity and the written columns; `SELECT na` (editor's list) + Ctrl+Left switched to the picker filtered by `na`.
 **Not done in this step:** the normal list does not group the columns by source with heading rows (the sort order of the list puts the columns of the sources first, as before); the picker is not offered after `ORDER BY` / `GROUP BY` by an own hint (it works, Ctrl+Left); a mouse click on a row only selects it in the normal list and toggles the check in the picker on double click; the status bar of the editor's own session list has no tabs (the tabs and the hint exist only in the own list).
+
+## Smart suggestions: the position map (#178)
+
+`KeywordMap` (Core, `Analysis`) reads the tokens of the current block before the word being typed (a parenthesized group counts as one token; a caret inside a function call has no position) and says which keywords can follow: `First` (the likeliest), `Then` (possible as well) and `Exclusive` (nothing else can follow: table hints, a CTE). `ContextAnalyzer` stores them in `CaretContext.PreferredKeywords` / `NextKeywords` / `OnlyExpectedKeywords`; `SuggestionBuilder.KeywordSuggestions` ranks them: in the keyword and fallback lists *first* before *then* before the rest; in an expression the keywords of a position after a complete operand (`SELECT a |`, `WHERE x = 1 |`, `CASE … END |`) rank above the columns, the others (`SELECT |`: `TOP`, `DISTINCT`) next to the aliases. Where exactly one keyword can follow (`AS` after a CTE name, `SET` after `UPDATE t`, `ON` after a joined table with its alias) the item is preselected, but only when the typed text is empty or starts that keyword (an alias being typed must not be replaced). Usage ranking still orders items within a group.
+
+| Position | First | Then |
+|---|---|---|
+| `SELECT |` | `TOP`, `DISTINCT` (with the columns, aliases) | functions, variables, keywords |
+| after a select item | `FROM` (not when one follows), `AS` (not after an alias), `INTO` | |
+| `SELECT … INTO #t |` | `FROM` | |
+| `FROM t |` | `AS`, `WITH`, `WHERE`, `JOIN` variants, `CROSS/OUTER APPLY` | `GROUP BY`, `ORDER BY`, `OPTION`, `UNION …`, `EXCEPT`, `INTERSECT`, `FOR XML/JSON` (no `HAVING`) |
+| `FROM t a |`, after hints | `WHERE`, `JOIN` variants, `WITH` (not after hints) | as above |
+| `FROM t WITH (|` | table hints (only) | |
+| `JOIN t |` / `JOIN t a |` | `ON`, `AS` / `ON` (not after `CROSS JOIN`) | `WITH` |
+| after the `ON` condition | `AND`, `OR` | `JOIN` variants, `WHERE`, tails |
+| `WHERE c |` (complete comparison) | `AND`, `OR`, `GROUP BY`, `ORDER BY` | tails; `BETWEEN x |` offers only `AND`; in `UPDATE`/`DELETE` no `GROUP BY` |
+| `GROUP BY list |` | `HAVING`, `ORDER BY` | tails |
+| `HAVING c |` | `AND`, `OR`, `ORDER BY` | tails |
+| `ORDER BY item |` | `ASC`, `DESC`, `OFFSET` (after the direction only `OFFSET`) | tails |
+| `UNION |` / `UNION ALL |` | `ALL`, `SELECT` / `SELECT` | |
+| `WITH c |`, `WITH c (cols) |` | `AS` (only) | |
+| `WITH c AS (|` | `SELECT` (only) | |
+| `WITH c AS (…) |` | `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `MERGE` (only); after them the statement is analyzed as usual | |
+| `INSERT |` / `INSERT INTO t [(cols)] |` | `INTO` / `VALUES`, `SELECT`, `EXEC` | `DEFAULT VALUES`, `OUTPUT` |
+| `UPDATE t |` | `SET` | |
+| `UPDATE t SET a = 1 |` | `FROM`, `WHERE` | `OUTPUT`, `OPTION` |
+| `DELETE |` / `DELETE FROM t |` / `DELETE t |` | `FROM`, `TOP` / `WHERE` / `FROM`, `WHERE` | `OUTPUT`, `OPTION` |
+| `CREATE |` / `ALTER |` / `DROP |` | `TABLE`, `VIEW`, `PROCEDURE`, `FUNCTION`, `INDEX`, `TRIGGER` (+ `OR ALTER` after `CREATE`) | `SCHEMA`, `DATABASE`, `TYPE`, `SEQUENCE` |
+| `CREATE OR |`, `DROP TABLE |` | `ALTER`, `IF EXISTS` | |
+| `BEGIN |` / `END TRY BEGIN |` | `TRANSACTION`, `TRAN`, `TRY` / `CATCH` | `CATCH`, statement keywords |
+| `CASE |`, `CASE x |` | `WHEN` | |
+| `CASE WHEN c |` | `THEN` (`BETWEEN x` → `AND`) | `AND`, `OR` |
+| `… THEN x |` / `… ELSE x |` | `WHEN`, `ELSE`, `END` / `END` | |
+| statement start | `SELECT`, `INSERT INTO`, `UPDATE`, `DELETE FROM`, `WITH`, `DECLARE`, `SET`, `EXEC`, `IF`, `BEGIN` | the other statement keywords |
+
+Cases are in `KeywordMapTests`. **Not covered yet:** `MERGE` clauses, `PIVOT`, `OVER (` contents, `IF`/`WHILE` conditions, `EXEC` parameters, `OFFSET … FETCH`, `FOR XML` options; a position unknown to the map keeps the old behavior (all keywords, with those the analyzer preferred before first). Verified only by unit tests until the user tests the VSIX in SSMS 22.

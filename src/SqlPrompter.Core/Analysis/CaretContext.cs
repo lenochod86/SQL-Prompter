@@ -202,6 +202,34 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>Keywords that take precedence at this position.</summary>
         public IReadOnlyList<string> PreferredKeywords { get; internal set; } = Array.Empty<string>();
 
+        /// <summary>Keywords that can follow here as well, offered after <see cref="PreferredKeywords"/> and before the other keywords.</summary>
+        public IReadOnlyList<string> NextKeywords { get; internal set; } = Array.Empty<string>();
+
+        /// <summary>Only the preferred and next keywords can follow here (table hints, a CTE): nothing else is offered.</summary>
+        public bool OnlyExpectedKeywords { get; internal set; }
+
+        /// <summary>The keyword position was read after a complete operand (e.g. a select item), so its keywords rank above the columns.</summary>
+        public bool KeywordsAfterOperand { get; internal set; }
+
+        internal void ApplyPosition(KeywordPosition position, bool afterOperand)
+        {
+            if (position == null || position.IsEmpty)
+            {
+                return;
+            }
+
+            PreferredKeywords = position.First;
+            NextKeywords = position.Then;
+            OnlyExpectedKeywords = position.Exclusive;
+            KeywordsAfterOperand = afterOperand;
+            if (position.First.Count == 1 && position.Then.Count == 0 &&
+                (TypedPrefix.Length == 0 || position.First[0].StartsWith(TypedPrefix, StringComparison.OrdinalIgnoreCase)))
+            {
+                // Exactly one keyword can follow: it is preselected.
+                SoftSelection = false;
+            }
+        }
+
         /// <summary>
         /// The user is probably typing a name of their own (an alias), so the selection must not be firm
         /// and Enter must not insert the first suggestion.
