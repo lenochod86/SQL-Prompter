@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Text.RegularExpressions;
 using SqlPrompter.Core.Settings;
 
@@ -9,8 +10,9 @@ namespace SqlPrompter.Core.Coloring
     public static class EnvironmentMatcher
     {
         /// <summary>
-        /// The environment of the first matching rule, or null when coloring is off or nothing matches. Rules that name a database
-        /// come before rules for a whole server, so that "server X" does not hide "server X, database Y".
+        /// The environment of the most specific matching rule, or null when coloring is off or nothing matches. The order of the rules does not
+        /// matter: a rule with a database beats a rule for the whole server, then a rule without wildcards beats one with wildcards, then the
+        /// rule with more literal characters wins; what is still equal is decided by the names, so the result is always the same.
         /// </summary>
         public static ColorEnvironment Find(ColorSettings settings, string server, string database)
         {
@@ -19,29 +21,58 @@ namespace SqlPrompter.Core.Coloring
                 return null;
             }
 
-            foreach (var withDatabase in new[] { true, false })
+            ColorEnvironment best = null;
+            ColorRule bestRule = null;
+            foreach (var rule in settings.Rules)
             {
-                foreach (var rule in settings.Rules)
+                if (!Matches(rule.Server, server) || !Matches(rule.Database, database ?? string.Empty))
                 {
-                    if (string.IsNullOrEmpty(rule.Database) == withDatabase
-                        || !Matches(rule.Server, server) || !Matches(rule.Database, database ?? string.Empty))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    foreach (var environment in settings.Environments)
-                    {
-                        if (string.Equals(environment.Name, rule.Environment, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return environment;
-                        }
-                    }
+                var environment = settings.Environments.FirstOrDefault(e => string.Equals(e.Name, rule.Environment, StringComparison.OrdinalIgnoreCase));
+                if (environment != null && (bestRule == null || Compare(rule, bestRule) < 0))
+                {
+                    best = environment;
+                    bestRule = rule;
                 }
             }
 
-            return null;
+            return best;
         }
 
+        /// <summary>Negative when <paramref name="a"/> is the more specific rule.</summary>
+        private static int Compare(ColorRule a, ColorRule b)
+        {
+            var result = HasDatabase(b).CompareTo(HasDatabase(a));
+            if (result == 0)
+            {
+                result = HasWildcards(a).CompareTo(HasWildcards(b));
+            }
+
+            if (result == 0)
+            {
+                result = LiteralLength(b).CompareTo(LiteralLength(a));
+            }
+
+            if (result == 0)
+            {
+                result = string.Compare(a.Environment, b.Environment, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (result == 0)
+            {
+                result = string.Compare(a.Server, b.Server, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return result == 0 ? string.Compare(a.Database, b.Database, StringComparison.OrdinalIgnoreCase) : result;
+        }
+
+        private static bool HasDatabase(ColorRule rule) => !string.IsNullOrEmpty(rule.Database);
+
+        private static bool HasWildcards(ColorRule rule) => ((rule.Server ?? string.Empty) + (rule.Database ?? string.Empty)).IndexOfAny(new[] { '*', '?' }) >= 0;
+
+        private static int LiteralLength(ColorRule rule) => ((rule.Server ?? string.Empty).Trim() + (rule.Database ?? string.Empty).Trim()).Count(c => c != '*' && c != '?');
         /// <summary>Case-insensitive match with * (any text) and ? (one character); an empty pattern matches everything.</summary>
         public static bool Matches(string pattern, string value)
         {

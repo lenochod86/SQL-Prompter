@@ -53,6 +53,14 @@ namespace SqlPrompter.Core.Coloring
             return problems;
         }
 
+        /// <summary>A copy of the settings that keeps only the environments some rule uses (the editor creates environments from a rule, so an unused one is a leftover).</summary>
+        public static ColorSettings WithoutUnusedEnvironments(ColorSettings settings)
+        {
+            var copy = settings.Clone();
+            var used = new HashSet<string>(copy.Rules.Select(r => (r.Environment ?? string.Empty).Trim()), StringComparer.OrdinalIgnoreCase);
+            copy.Environments.RemoveAll(e => !used.Contains((e.Name ?? string.Empty).Trim()));
+            return copy;
+        }
         /// <summary>The color as <c>#RRGGBB</c> in upper case, or null when the text is not a color.</summary>
         public static string Normalize(string color) =>
             color != null && EnvironmentMatcher.TryParseColor(color, out _, out _, out _) ? "#" + color.Trim().TrimStart('#').ToUpperInvariant() : null;
