@@ -67,6 +67,8 @@ namespace SqlPrompter.Ssms
         /// <summary>Session property: true when Enter may insert the selected suggestion (not a place where a name of the user's own is typed).</summary>
         /// <summary>Item property: the item is a heading of the column picker (the value is the text of the heading); it cannot be chosen.</summary>
         internal const string PickerHeaderKey = "SqlPrompter.PickerHeader";
+        /// <summary>Session property: true when the column picker is available at the caret.</summary>
+        internal const string PickerAvailableKey = "SqlPrompter.PickerAvailable";
         internal const string HardSelectionKey = "SqlPrompter.HardSelection";
         internal const string SnippetKey = "SqlPrompter.Snippet";
         internal const string DescriptionPropertyKey = DescriptionKey;
@@ -137,8 +139,10 @@ namespace SqlPrompter.Ssms
             try
             {
                 // The script model (CTEs, temporary tables, variables) is built here, off the UI thread.
-                var items = BuildItems(prepared);
+                var items = BuildItems(prepared, out var scriptModel, out var builtOptions);
                 session.Properties[HardSelectionKey] = !prepared.Context.SoftSelection;
+                // Where columns are picked the list says so in its status bar and Ctrl+Left / the tab open the column picker.
+                session.Properties[PickerAvailableKey] = ColumnPicker.TryBuild(prepared.Batch, prepared.CaretInBatch, prepared.Context, prepared.Metadata, scriptModel, builtOptions) != null;
                 var hint = prepared.Context.SoftSelection ? InitialSelectionHint.SoftSelection : InitialSelectionHint.RegularSelection;
                 // Where the user probably types a name of their own (an alias), Enter must keep what was typed instead of inserting
                 // a suggestion: the editor then offers the typed text as a "suggestion item" and only Tab inserts a real suggestion.
