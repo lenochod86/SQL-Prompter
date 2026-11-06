@@ -203,13 +203,41 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        private static IEnumerable<Suggestion> FunctionSuggestions(CaretContext context, int group)
+        /// <summary>Functions that return the current date and time: first after a comparison with a date column.</summary>
+        private static readonly HashSet<string> DateFunctions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "GETDATE", "SYSDATETIME", "GETUTCDATE", "SYSUTCDATETIME", "CURRENT_TIMESTAMP",
+        };
+
+        /// <summary>The column named by a condition operand (qualifier first) in the sources of the block, or null.</summary>
+        private static DbColumn FindOperandColumn(IReadOnlyList<string> parts, IReadOnlyList<SourceColumns> resolved)
+        {
+            var name = parts[parts.Count - 1];
+            var qualifier = parts.Count > 1 ? parts[parts.Count - 2] : null;
+            foreach (var x in resolved.OrderBy(r => r.Source.ScopeLevel))
+            {
+                if (qualifier != null && !string.Equals(x.Source.ReferenceName, qualifier, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var column = x.Columns.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (column != null)
+                {
+                    return column;
+                }
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<Suggestion> FunctionSuggestions(CaretContext context, int group, ISet<string> preferred = null)
         {
             foreach (var function in Keywords.BuiltInFunctions)
             {
                 var text = Keywords.ApplyCase(function, context.TypedPrefix);
                 // The name comes with parentheses; the caret goes between them unless the function takes no arguments.
-                yield return new Suggestion(SuggestionKind.Function, text, text + "()", text, null, "built-in function", group, caretBack: Keywords.TakesNoArguments(function) ? 0 : 1);
+                yield return new Suggestion(SuggestionKind.Function, text, text + "()", text, null, "built-in function", preferred != null && preferred.Contains(function) ? 0 : group, caretBack: Keywords.TakesNoArguments(function) ? 0 : 1);
             }
         }
 
@@ -280,14 +308,16 @@ namespace SqlPrompter.Core.Completion
             return lines.Length > 12 ? text + "\n…" : text;
         }
 
-        private static IEnumerable<Suggestion> VariableSuggestions(CaretContext context, ScriptModel script, int group)
+        private static IEnumerable<Suggestion> VariableSuggestions(CaretContext context, ScriptModel script, int group, TypeClass valueType = TypeClass.Unknown)
         {
             foreach (var variable in script.Variables)
             {
+                // After a comparison the variables of the type of the column come first.
+                var fits = valueType != TypeClass.Unknown && OperatorSuggestions.Classify(variable.TypeName) == valueType;
                 var description = (variable.IsParameter ? "parameter " : "variable ") + variable.Name +
                     (variable.TypeName.Length > 0 ? " " + variable.TypeName : string.Empty);
                 yield return new Suggestion(SuggestionKind.Variable, variable.Name, variable.Name, variable.Name,
-                    variable.TypeName.Length > 0 ? variable.TypeName : null, description, group);
+                    variable.TypeName.Length > 0 ? variable.TypeName : null, description, fits ? 0 : group);
             }
         }
 
@@ -680,6 +710,17 @@ namespace SqlPrompter.Core.Completion
                 .Where(x => x != null)
                 .ToList();
 
+            // In a condition: the operators that fit the column before the caret, or after a comparison the values of its type first.
+            var operand = context.ConditionOperand == null ? null : FindOperandColumn(context.ConditionOperand, resolved);
+            var valueType = operand != null && context.AfterComparison ? OperatorSuggestions.Classify(operand.TypeName) : TypeClass.Unknown;
+            if (operand != null && !context.AfterComparison)
+            {
+                foreach (var op in OperatorSuggestions.Build(operand))
+                {
+                    yield return op;
+                }
+            }
+
             // GROUP BY |: one item repeats the select-list items that are not aggregates.
             if (context.Text != null && context.TypedPrefix.Length == 0 && ColumnClauses.At(context.Text, context.Caret) == ColumnClause.GroupBy)
             {
@@ -709,7 +750,8 @@ namespace SqlPrompter.Core.Completion
                     var name = SqlIdentifier.Quote(column.Name, quote);
                     var qualify = !inner || ambiguous.Contains(column.Name) || options.Aliases.QualifyColumnsWithAliases;
                     var insert = qualify ? SqlIdentifier.Quote(reference, quote) + "." + name : name;
-                    yield return ColumnSuggestion(column, insert, reference, x.Owner, inner ? 0 : 2, x.KeyOf(column));
+                    var mismatch = valueType != TypeClass.Unknown && OperatorSuggestions.Classify(column.TypeName) != valueType;
+                    yield return ColumnSuggestion(column, insert, reference, x.Owner, inner && !mismatch ? 0 : 2, x.KeyOf(column));
                 }
             }
 
@@ -737,7 +779,7 @@ namespace SqlPrompter.Core.Completion
                 }
             }
 
-            foreach (var variable in VariableSuggestions(context, script, 2))
+            foreach (var variable in VariableSuggestions(context, script, 2, valueType))
             {
                 yield return variable;
             }
@@ -747,7 +789,7 @@ namespace SqlPrompter.Core.Completion
                 yield return snippet;
             }
 
-            foreach (var function in FunctionSuggestions(context, 3))
+            foreach (var function in FunctionSuggestions(context, 3, valueType == TypeClass.Date ? DateFunctions : null))
             {
                 yield return function;
             }

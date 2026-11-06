@@ -318,6 +318,16 @@ namespace SqlPrompter.Core.Analysis
             expression.SoftSelection = operandBefore;
             expression.ApplyPosition(position, operandBefore || anchor.IsWord("END") || anchor.IsWord("ASC") || anchor.IsWord("DESC"));
             expression.SoftSelection = operandBefore;
+            if (qualifier.Count == 0)
+            {
+                var operand = ConditionOperandBefore(tokens, anchorIndex, block.Start, clauseState.Clause, out var afterComparison);
+                if (operand != null)
+                {
+                    expression.ConditionOperand = operand;
+                    expression.AfterComparison = afterComparison;
+                }
+            }
+
             if (qualifier.Count == 0 && clauseState.Clause == Clause.Select && !sources.Any(src => src.ScopeLevel == 0))
             {
                 expression.SelectWithoutFrom = true;
@@ -375,6 +385,61 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return null;
+        }
+
+        private static readonly string[] ComparisonOperators = { "=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>" };
+
+        private static readonly HashSet<string> ConditionStarters = new HashSet<string>(StringComparer.Ordinal) { "WHERE", "AND", "OR", "ON", "HAVING", "WHEN", "NOT" };
+
+        /// <summary>
+        /// In a condition: the column the caret follows (<c>WHERE col |</c>, <c>AND a.col |</c>, <c>CASE WHEN col |</c>) or, with
+        /// <paramref name="afterComparison"/>, the column left of the comparison operator the caret follows (<c>WHERE col = |</c>). Null elsewhere.
+        /// </summary>
+        private static List<string> ConditionOperandBefore(List<Token> tokens, int anchorIndex, int blockStart, Clause clause, out bool afterComparison)
+        {
+            afterComparison = false;
+            var i = anchorIndex;
+            if (i >= blockStart && tokens[i].IsWord("LIKE"))
+            {
+                afterComparison = true;
+                i--;
+            }
+            else if (i >= blockStart && tokens[i].Kind == TokenKind.Operator && ComparisonOperators.Contains(tokens[i].Text))
+            {
+                // The lexer may split >= into two operator tokens.
+                afterComparison = true;
+                i--;
+                while (i >= blockStart && tokens[i].Kind == TokenKind.Operator && (tokens[i].Text == "<" || tokens[i].Text == ">" || tokens[i].Text == "!" || tokens[i].Text == "="))
+                {
+                    i--;
+                }
+            }
+
+            if (i < blockStart || !tokens[i].IsNamePart || (tokens[i].Kind == TokenKind.Word && Keywords.CannotBeAlias(tokens[i].Text)))
+            {
+                return null;
+            }
+
+            var parts = new List<string> { tokens[i].IdentifierValue };
+            while (i - 2 >= blockStart && tokens[i - 1].Kind == TokenKind.Dot && tokens[i - 2].IsNamePart)
+            {
+                parts.Insert(0, tokens[i - 2].IdentifierValue);
+                i -= 2;
+            }
+
+            var before = i - 1;
+            while (before >= blockStart && tokens[before].Kind == TokenKind.OpenParen)
+            {
+                before--;
+            }
+
+            if (before < blockStart || tokens[before].Upper == null || !ConditionStarters.Contains(tokens[before].Upper))
+            {
+                return null;
+            }
+
+            var condition = clause == Clause.Where || clause == Clause.On || clause == Clause.Having;
+            return condition || tokens[before].IsWord("WHEN") ? parts : null;
         }
 
         /// <summary>AS inside CAST(…) or TRY_CAST(…), followed by a data type.</summary>
