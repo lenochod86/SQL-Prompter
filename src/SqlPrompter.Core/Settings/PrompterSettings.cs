@@ -266,6 +266,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "warnUpdateWithoutWhere")]
         public bool WarnUpdateWithoutWhere { get; set; }
 
+        /// <summary>Running a script that begins a transaction and never ends it asks for confirmation first (#209).</summary>
+        [DataMember(Name = "warnOpenTransaction")]
+        public bool WarnOpenTransaction { get; set; }
+
         public KeywordCase KeywordCase { get; set; }
 
         /// <summary>The JSON serializer writes enums as numbers; the file holds the readable name instead.</summary>
@@ -314,6 +318,7 @@ namespace SqlPrompter.Core.Settings
             RestoreTabs = true;
             WarnDeleteWithoutWhere = true;
             WarnUpdateWithoutWhere = true;
+            WarnOpenTransaction = true;
         }
     }
 }

@@ -14,8 +14,18 @@ namespace SqlPrompter.Core.Coloring
         /// matter: a rule with a database beats a rule for the whole server, then a rule without wildcards beats one with wildcards, then the
         /// rule with more literal characters wins; what is still equal is decided by the names, so the result is always the same.
         /// </summary>
-        public static ColorEnvironment Find(ColorSettings settings, string server, string database)
+        public static ColorEnvironment Find(ColorSettings settings, string server, string database) => FindMatch(settings, server, database, out _);
+
+        /// <summary>The rule that <see cref="Find"/> picks, or null.</summary>
+        public static ColorRule FindRule(ColorSettings settings, string server, string database)
         {
+            FindMatch(settings, server, database, out var rule);
+            return rule;
+        }
+
+        private static ColorEnvironment FindMatch(ColorSettings settings, string server, string database, out ColorRule matched)
+        {
+            matched = null;
             if (settings == null || !settings.Enabled || string.IsNullOrEmpty(server))
             {
                 return null;
@@ -38,6 +48,7 @@ namespace SqlPrompter.Core.Coloring
                 }
             }
 
+            matched = bestRule;
             return best;
         }
 

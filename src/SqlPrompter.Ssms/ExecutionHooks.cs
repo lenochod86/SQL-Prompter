@@ -4,6 +4,7 @@ using System.Windows;
 using EnvDTE;
 using Microsoft.VisualStudio.Shell;
 using SqlPrompter.Core.Analysis;
+using SqlPrompter.Core.Coloring;
 
 namespace SqlPrompter.Ssms
 {
@@ -72,16 +73,38 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var behavior = SettingsService.Current.Behavior;
-            var warnings = ExecutionWarnings.Find(text, behavior.WarnDeleteWithoutWhere, behavior.WarnUpdateWithoutWhere);
-            if (warnings.Count == 0)
+            var messages = ExecutionWarnings.Find(text, behavior.WarnDeleteWithoutWhere, behavior.WarnUpdateWithoutWhere).Select(w => w.Message).ToList();
+            var heading = "This script contains:";
+            var connection = SsmsConnection.GetActive();
+            var rule = connection == null ? null : EnvironmentMatcher.FindRule(SettingsService.Current.Coloring, connection.Server, connection.Database);
+            if (rule != null && rule.AskBeforeChanges)
+            {
+                var changes = ChangeWarnings.FindChanges(text).Select(c => c.Message).Where(m => !messages.Any(x => x.Contains(m.Substring(m.IndexOf('('), m.IndexOf(')') - m.IndexOf('(') + 1)))).ToList();
+                if (changes.Count > 0)
+                {
+                    heading = "Environment " + rule.Environment + " (server " + connection.Server + ", database " + connection.Database + ") asks before changes. This script contains:";
+                    messages.AddRange(changes);
+                }
+            }
+
+            if (behavior.WarnOpenTransaction)
+            {
+                var open = ChangeWarnings.OpenTransactionLine(text);
+                if (open > 0)
+                {
+                    messages.Add("The transaction begun on line " + open + " is left open (no COMMIT or ROLLBACK in the batch).");
+                }
+            }
+
+            if (messages.Count == 0)
             {
                 return true;
             }
 
-            var lines = warnings.Take(6).Select(w => w.Message).ToList();
-            var more = warnings.Count > lines.Count ? "\n...and " + (warnings.Count - lines.Count) + " more." : string.Empty;
+            var lines = messages.Take(8).ToList();
+            var more = messages.Count > lines.Count ? "\n...and " + (messages.Count - lines.Count) + " more." : string.Empty;
             var answer = MessageBox.Show(
-                "This script contains:\n\n" + string.Join("\n", lines) + more + "\n\nRun it anyway?",
+                heading + "\n\n" + string.Join("\n", lines) + more + "\n\nRun it anyway?",
                 "SQL Prompter: execution warning",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,

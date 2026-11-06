@@ -44,6 +44,7 @@ namespace SqlPrompter.Ssms
             rules.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Database", Name = "Database", FillWeight = 32 });
             rules.Columns.Add(environmentColumn);
             rules.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Color (click to change)", Name = "Color", ReadOnly = true, FillWeight = 22 });
+            rules.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Ask before changes", Name = "Ask", FillWeight = 14, ToolTipText = "Running an UPDATE, DELETE, TRUNCATE, DROP, ALTER, MERGE or sp_rename in a window of this rule asks for confirmation first." });
             rules.DataError += (s, e) => e.ThrowException = false;
             rules.CurrentCellDirtyStateChanged += (s, e) =>
             {
@@ -91,7 +92,7 @@ namespace SqlPrompter.Ssms
             previous.Clear();
             foreach (var rule in settings.Rules)
             {
-                var index = rules.Rows.Add(rule.Server, rule.Database, rule.Environment);
+                var index = rules.Rows.Add(rule.Server, rule.Database, rule.Environment, null, rule.AskBeforeChanges);
                 previous[rules.Rows[index]] = rule.Environment;
             }
 
@@ -121,6 +122,7 @@ namespace SqlPrompter.Ssms
                         Server = (Convert.ToString(row.Cells[0].Value) ?? string.Empty).Trim(),
                         Database = (Convert.ToString(row.Cells[1].Value) ?? string.Empty).Trim(),
                         Environment = (Convert.ToString(row.Cells[2].Value) ?? string.Empty).Trim(),
+                        AskBeforeChanges = row.Cells[4].Value is bool ask && ask,
                     });
                 }
             }
