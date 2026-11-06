@@ -217,6 +217,14 @@ namespace SqlPrompter.Core.Completion
             "GETDATE", "SYSDATETIME", "GETUTCDATE", "SYSUTCDATETIME", "CURRENT_TIMESTAMP",
         };
 
+        /// <summary>The functions that only make sense in a CATCH block: first there.</summary>
+        private static readonly HashSet<string> ErrorFunctions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ERROR_NUMBER", "ERROR_MESSAGE", "ERROR_SEVERITY", "ERROR_STATE", "ERROR_LINE", "ERROR_PROCEDURE", "XACT_STATE",
+        };
+
+        private static bool InCatch(CaretContext context) => context.Text != null && CatchBlock.IsInside(context.Text, context.Caret);
+
         /// <summary>The column named by a condition operand (qualifier first) in the sources of the block, or null.</summary>
         private static DbColumn FindOperandColumn(IReadOnlyList<string> parts, IReadOnlyList<SourceColumns> resolved)
         {
@@ -906,7 +914,7 @@ namespace SqlPrompter.Core.Completion
                 yield return snippet;
             }
 
-            foreach (var function in FunctionSuggestions(context, 3, valueType == TypeClass.Date ? DateFunctions : null))
+            foreach (var function in FunctionSuggestions(context, 3, valueType == TypeClass.Date ? DateFunctions : InCatch(context) ? ErrorFunctions : null))
             {
                 yield return function;
             }

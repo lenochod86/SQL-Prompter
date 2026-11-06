@@ -107,6 +107,11 @@ namespace SqlPrompter.Core.Analysis
                 return InWindow(new List<Token>());
             }
 
+            if (top.Count >= 2 && top[top.Count - 1].Kind == TokenKind.OpenParen && top[top.Count - 2].IsWord("OPTION"))
+            {
+                return SetAndHints.InOption(new List<Token>());
+            }
+
             if (top[top.Count - 1].Kind == TokenKind.OpenParen)
             {
                 var index = IndexDdl.Inside(top.GetRange(0, top.Count - 1), new List<Token>());
@@ -173,6 +178,11 @@ namespace SqlPrompter.Core.Analysis
                 {
                     return index;
                 }
+            }
+
+            if (before.IsWord("OPTION"))
+            {
+                return SetAndHints.InOption(inner) ?? KeywordPosition.None;
             }
 
             if (before.IsWord("OVER"))
@@ -277,6 +287,15 @@ namespace SqlPrompter.Core.Analysis
                 return head == "CREATE"
                     ? Of(new[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION", "INDEX", "TRIGGER", "OR ALTER" }, new[] { "UNIQUE", "CLUSTERED", "NONCLUSTERED", "COLUMNSTORE", "SCHEMA", "DATABASE", "TYPE", "SEQUENCE" })
                     : Of(kinds, new[] { "SCHEMA", "DATABASE", "TYPE", "SEQUENCE" });
+            }
+
+            if (head == "SET")
+            {
+                var set = SetAndHints.AfterSet(top);
+                if (set != null)
+                {
+                    return set;
+                }
             }
 
             if (head == "CREATE" || head == "ALTER" || head == "DROP")

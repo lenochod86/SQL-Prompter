@@ -695,6 +695,8 @@ namespace SqlPrompter.Core.Analysis
                     return IndexDdl.IndexKeyword(tokens, statementStart) >= 0 && !tokens.Skip(statementStart).Take(anchorIndex - statementStart).Any(t => t.Kind == TokenKind.OpenParen)
                         ? Array.Empty<string>()
                         : null;
+                case "IDENTITY_INSERT":
+                    return prevWord == "SET" ? Array.Empty<string>() : null;
                 case "TABLE":
                     return prevWord == "DROP" ? new[] { "IF EXISTS" } : prevWord == "TRUNCATE" || prevWord == "ALTER" ? Array.Empty<string>() : null;
                 default:

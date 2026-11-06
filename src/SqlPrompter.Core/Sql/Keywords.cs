@@ -73,17 +73,17 @@ namespace SqlPrompter.Core.Sql
             "ABS", "AVG", "CAST", "CEILING", "CHARINDEX", "CHOOSE", "COALESCE", "CONCAT", "CONCAT_WS", "CONVERT",
             "COUNT", "COUNT_BIG", "DATALENGTH", "DATEADD", "DATEDIFF", "DATEFROMPARTS", "DATENAME", "DATEPART", "DAY",
             "DB_NAME", "DENSE_RANK", "EOMONTH", "FIRST_VALUE", "FLOOR", "FORMAT", "GETDATE", "GETUTCDATE", "IIF",
-            "ISJSON", "ISNULL", "JSON_QUERY", "JSON_VALUE", "LAG", "LAST_VALUE", "LEAD", "LEN", "LOWER", "LTRIM",
+            "ERROR_LINE", "ERROR_MESSAGE", "ERROR_NUMBER", "ERROR_PROCEDURE", "ERROR_SEVERITY", "ERROR_STATE", "ISJSON", "ISNULL", "JSON_QUERY", "JSON_VALUE", "LAG", "LAST_VALUE", "LEAD", "LEN", "LOWER", "LTRIM",
             "MAX", "MIN", "MONTH", "NEWID", "NTILE", "NULLIF", "OBJECT_ID", "OBJECT_NAME", "PATINDEX", "POWER", "RANK",
             "REPLACE", "REPLICATE", "REVERSE", "ROUND", "ROW_NUMBER", "RTRIM", "SCHEMA_NAME", "SCOPE_IDENTITY",
             "SQRT", "STRING_AGG", "STRING_SPLIT", "STUFF", "SUBSTRING", "SUM", "SYSDATETIME", "SYSUTCDATETIME",
-            "TRANSLATE", "TRIM", "TRY_CAST", "TRY_CONVERT", "UPPER", "YEAR",
+            "TRANSLATE", "TRIM", "TRY_CAST", "TRY_CONVERT", "UPPER", "XACT_STATE", "YEAR",
         };
 
         private static readonly HashSet<string> NoArguments = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "DB_NAME", "DENSE_RANK", "GETDATE", "GETUTCDATE", "NEWID", "RANK", "ROW_NUMBER", "SCHEMA_NAME", "SCOPE_IDENTITY",
-            "SYSDATETIME", "SYSUTCDATETIME",
+            "DB_NAME", "DENSE_RANK", "ERROR_LINE", "ERROR_MESSAGE", "ERROR_NUMBER", "ERROR_PROCEDURE", "ERROR_SEVERITY", "ERROR_STATE", "GETDATE", "GETUTCDATE", "NEWID", "RANK", "ROW_NUMBER", "SCHEMA_NAME", "SCOPE_IDENTITY",
+            "SYSDATETIME", "SYSUTCDATETIME", "XACT_STATE",
         };
 
         /// <summary>True for built-in functions that are usually called without arguments, so the caret goes after the parentheses.</summary>
