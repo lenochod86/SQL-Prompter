@@ -85,7 +85,7 @@ namespace SqlPrompter.Tests
         [Fact]
         public void ColumnsThatAreNotLoadedGiveNothing()
         {
-            Assert.Empty(Items("DECLARE @Total |", Database(withColumns: false)).Where(i => i.Group < 0));
+            Assert.DoesNotContain(Items("DECLARE @Total |", Database(withColumns: false)), i => i.Group < 0);
         }
     }
 }
