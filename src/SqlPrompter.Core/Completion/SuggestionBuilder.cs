@@ -163,7 +163,7 @@ namespace SqlPrompter.Core.Completion
 
         private static Suggestion ForceCase(Suggestion s, KeywordCase keywordCase)
         {
-            if (s.Kind != SuggestionKind.Keyword && s.Kind != SuggestionKind.Function && s.Kind != SuggestionKind.DataType)
+            if (s.IsBlock || (s.Kind != SuggestionKind.Keyword && s.Kind != SuggestionKind.Function && s.Kind != SuggestionKind.DataType))
             {
                 return s;
             }

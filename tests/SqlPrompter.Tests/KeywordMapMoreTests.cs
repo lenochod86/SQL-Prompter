@@ -12,12 +12,12 @@ namespace SqlPrompter.Tests
     {
         private static IReadOnlyList<Suggestion> Items(string sql) => SuggestionBuilder.Build(Analyze(sql), SampleDatabase());
 
-        private static string[] Ranked(string sql) => Items(sql).Where(i => i.Kind == SuggestionKind.Keyword).OrderBy(i => i.Group).Select(i => i.InsertText).ToArray();
+        private static string[] Ranked(string sql) => Items(sql).Where(i => i.Kind == SuggestionKind.Keyword && !i.IsBlock).OrderBy(i => i.Group).Select(i => i.InsertText).ToArray();
 
         /// <summary>The keywords of the best keyword group.</summary>
         private static string[] First(string sql)
         {
-            var keywords = Items(sql).Where(i => i.Kind == SuggestionKind.Keyword).ToList();
+            var keywords = Items(sql).Where(i => i.Kind == SuggestionKind.Keyword && !i.IsBlock).ToList();
             var group = keywords.Min(k => k.Group);
             return keywords.Where(k => k.Group == group).Select(k => k.InsertText).ToArray();
         }
@@ -27,7 +27,7 @@ namespace SqlPrompter.Tests
         {
             var items = Items(sql);
             var others = items.Where(i => i.Kind != SuggestionKind.Keyword).Select(i => i.Group).DefaultIfEmpty(int.MaxValue).Min();
-            return items.Where(i => i.Kind == SuggestionKind.Keyword && i.Group < others).Select(i => i.InsertText).ToArray();
+            return items.Where(i => i.Kind == SuggestionKind.Keyword && !i.IsBlock && i.Group < others).Select(i => i.InsertText).ToArray();
         }
 
         private static void AssertFirst(string sql, params string[] expected)
