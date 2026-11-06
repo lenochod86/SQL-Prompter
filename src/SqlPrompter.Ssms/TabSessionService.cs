@@ -4,7 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Windows.Threading;
 using EnvDTE;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 using SqlPrompter.Core.History;
 using SqlPrompter.Metadata;
 
@@ -12,8 +14,10 @@ namespace SqlPrompter.Ssms
 {
     /// <summary>
     /// Keeps the open query tabs in %APPDATA%\SqlPrompter\tabs.json (text and connection, never a password) and opens them again when SSMS
-    /// starts. Saving runs every few seconds on the UI thread (reading the text of a few documents is cheap) and stops when SSMS begins to
-    /// shut down, so that closing the windows one by one does not empty the file. The connection of a window is only readable while it is
+    /// starts. The list is written when the user opens or saves a query window, shortly after one is closed (so a tab closed by hand is gone from the
+    /// file and a crash loses nothing) and every few seconds for the text of unsaved queries. At shutdown SSMS closes all the windows in a burst and
+    /// announces the shutdown a few milliseconds later, so the write that follows a close waits a moment and is dropped when the shutdown is
+    /// announced; the file then keeps the tabs that were open before the burst (TabSessionPolicy). The connection of a window is only readable while it is
     /// the active one, so it is remembered per document the moment the window is in front.
     /// </summary>
     internal sealed class TabSessionService
@@ -28,6 +32,9 @@ namespace SqlPrompter.Ssms
         private readonly Dictionary<string, ConnectionSettings> connections = new Dictionary<string, ConnectionSettings>(StringComparer.OrdinalIgnoreCase);
         private DispatcherTimer timer;
         private DTEEvents dteEvents;
+        private IVsRunningDocumentTable rdt;
+        private uint rdtCookie;
+        private DispatcherTimer closeTimer;
         private bool shuttingDown;
         private bool sawTabs;
         private int emptyTicks;
@@ -49,7 +56,13 @@ namespace SqlPrompter.Ssms
             try
             {
                 service.dteEvents = dte.Events.DTEEvents;
-                service.dteEvents.OnBeginShutdown += () => service.shuttingDown = true;
+                service.dteEvents.OnBeginShutdown += () =>
+                {
+                    // The windows were closed a moment ago by SSMS, not by the user: the write that waits for them is dropped.
+                    service.closeTimer?.Stop();
+                    service.shuttingDown = true;
+                    Log.Write("Shutdown: SSMS announces the shutdown; the tabs of the last write are kept.");
+                };
 
                 // Wait until the shell has opened what it opens by itself, then restore and only afterwards start saving, so that the
                 // empty start does not overwrite the saved tabs.
@@ -68,6 +81,7 @@ namespace SqlPrompter.Ssms
                     service.timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(5) };
                     service.timer.Tick += (s2, e2) => service.Save();
                     service.timer.Start();
+                    service.Subscribe();
                 };
                 wait.Start();
             }
@@ -77,6 +91,93 @@ namespace SqlPrompter.Ssms
             }
 
             return service;
+        }
+
+        /// <summary>Follows the windows being opened, saved and closed through the running document table (DTE document events did not fire for a window the user closed).</summary>
+        private void Subscribe()
+        {
+            try
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                rdt = (IVsRunningDocumentTable)Package.GetGlobalService(typeof(SVsRunningDocumentTable));
+                rdt.AdviseRunningDocTableEvents(new TableEvents(this), out rdtCookie);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Subscribing to the running document table failed", ex);
+            }
+        }
+
+        /// <summary>A window was opened or saved: write the list now.</summary>
+        private void OnOpenedOrSaved()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            Save(true);
+        }
+
+        /// <summary>A window is closing: write the list in a moment, unless SSMS announces the shutdown first (it closes every window then).</summary>
+        private void OnClosing()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (shuttingDown)
+            {
+                return;
+            }
+
+            if (closeTimer == null)
+            {
+                closeTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(700) };
+                closeTimer.Tick += (s, e) =>
+                {
+                    closeTimer.Stop();
+                    Save(true);
+                };
+            }
+
+            closeTimer.Stop();
+            closeTimer.Start();
+        }
+
+        /// <summary>The events of the running document table.</summary>
+        private sealed class TableEvents : IVsRunningDocTableEvents
+        {
+            private readonly TabSessionService owner;
+
+            public TableEvents(TabSessionService owner)
+            {
+                this.owner = owner;
+            }
+
+            public int OnAfterFirstDocumentLock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                owner.OnOpenedOrSaved();
+                return VSConstants.S_OK;
+            }
+
+            public int OnBeforeLastDocumentUnlock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (dwReadLocksRemaining == 0 && dwEditLocksRemaining == 0)
+                {
+                    owner.OnClosing();
+                }
+
+                return VSConstants.S_OK;
+            }
+
+            public int OnAfterSave(uint docCookie)
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                owner.OnOpenedOrSaved();
+                return VSConstants.S_OK;
+            }
+
+            public int OnAfterAttributeChange(uint docCookie, uint grfAttribs) => VSConstants.S_OK;
+
+            public int OnBeforeDocumentWindowShow(uint docCookie, int fFirstShow, IVsWindowFrame pFrame) => VSConstants.S_OK;
+
+            public int OnAfterDocumentWindowHide(uint docCookie, IVsWindowFrame pFrame) => VSConstants.S_OK;
         }
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -144,7 +245,7 @@ namespace SqlPrompter.Ssms
             return SsmsConnection.OpenSavedTab(tab);
         }
 
-        private void Save()
+        private void Save(bool userChange = false)
         {
             try
             {
@@ -189,8 +290,8 @@ namespace SqlPrompter.Ssms
 
                 // SSMS closes the documents before it announces the shutdown, so a list that has just become empty may be the end of the
                 // session; it is saved only when it stays empty for a second tick (the user really closed every tab).
-                emptyTicks = tabs.Count == 0 ? emptyTicks + 1 : 0;
-                if (sawTabs && (tabs.Count > 0 || emptyTicks >= 2))
+                emptyTicks = tabs.Count == 0 && !userChange ? emptyTicks + 1 : (tabs.Count == 0 ? emptyTicks : 0);
+                if (TabSessionPolicy.ShouldSave(tabs.Count, sawTabs, shuttingDown, userChange, emptyTicks))
                 {
                     store.Save(tabs);
                 }
