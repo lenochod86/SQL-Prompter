@@ -183,7 +183,7 @@ namespace SqlPrompter.Ssms
                 }
 
                 // The editor sorts the items of its own sessions by their sort text; the own list has to do it itself.
-                var items = BuildItems(prepared, out var script, out var options).OrderBy(i => i.SortText, StringComparer.Ordinal).ToImmutableArray();
+                var items = ListOrdering.Sort(BuildItems(prepared, out var script, out var options), i => i.SortText).ToImmutableArray();
                 var picker = ColumnPicker.TryBuild(prepared.Batch, prepared.CaretInBatch, prepared.Context, prepared.Metadata, script, options);
                 return new InvokedSuggestions(items, location.Snapshot.CreateTrackingSpan(start.ApplicableToSpan, SpanTrackingMode.EdgeInclusive), prepared.Context.SoftSelection, picker, options, this);
             }
