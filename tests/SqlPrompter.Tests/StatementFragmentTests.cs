@@ -108,6 +108,18 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void ForcedKeywordCaseDoesNotChangeTheNamesInAFragment()
+        {
+            var options = new SuggestionOptions(SqlPrompter.Core.Settings.KeywordCase.Upper, new SqlPrompter.Core.Settings.AliasSettings(),
+                inserts: new SqlPrompter.Core.Settings.InsertSettings { Layout = SqlPrompter.Core.Settings.ListLayout.OneLine });
+
+            var text = Item(MergeHead + "ON t.Id = s.Id |", "WHEN NOT MATCHED", options).InsertText;
+
+            Assert.Contains("(Name, Email)", text);
+            Assert.Contains("s.Name", text);
+        }
+
+        [Fact]
         public void MergeNotMatchedBySourceDeletes()
         {
             Assert.Equal("WHEN NOT MATCHED BY SOURCE THEN DELETE", Item(MergeHead + "ON t.Id = s.Id |", "WHEN NOT MATCHED BY SOURCE").InsertText);
