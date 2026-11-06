@@ -183,6 +183,12 @@
           <ButtonText>Show Dependencies</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidReopenClosedTab" priority="0x011C" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Reopen Closed Query Tab</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidFormatDocument" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
         <Strings>
@@ -313,6 +319,7 @@
       <IDSymbol name="cmdidQuickOpen" value="0x012D" />
       <IDSymbol name="cmdidFindInCode" value="0x012E" />
       <IDSymbol name="cmdidShowDependencies" value="0x012F" />
+      <IDSymbol name="cmdidReopenClosedTab" value="0x0130" />
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />

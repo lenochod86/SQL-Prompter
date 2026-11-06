@@ -36,6 +36,8 @@ namespace SqlPrompter.Ssms
         private uint rdtCookie;
         private DispatcherTimer closeTimer;
         private bool shuttingDown;
+        private string lastSummary;
+        private readonly ClosedTabs closedTabs = new ClosedTabs();
         private bool sawTabs;
         private int emptyTicks;
         private readonly HashSet<string> describeFailures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -223,6 +225,39 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>Opens the query tab that was closed last again, with its text and connection (#226).</summary>
+        public void ReopenClosedTab()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            string message;
+            try
+            {
+                var tab = closedTabs.Pop();
+                if (tab == null)
+                {
+                    message = "SQL Prompter: there is no closed query tab to reopen.";
+                }
+                else if (OpenTab(tab))
+                {
+                    message = "SQL Prompter: reopened a closed query tab (" + closedTabs.Count + " more can be reopened).";
+                }
+                else
+                {
+                    message = "SQL Prompter: the closed tab could not be reopened (its file is gone or it has no connection to copy).";
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reopening a closed tab failed", ex);
+                message = "SQL Prompter: reopening the tab failed (see the log).";
+            }
+
+            if (Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsStatusbar)) is Microsoft.VisualStudio.Shell.Interop.IVsStatusbar statusBar)
+            {
+                statusBar.SetText(message);
+            }
+        }
+
         private bool OpenTab(SavedTab tab)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -271,6 +306,7 @@ namespace SqlPrompter.Ssms
                 }
 
                 var tabs = new List<SavedTab>();
+                var openKeys = new List<KeyValuePair<string, SavedTab>>();
                 foreach (Document document in dte.Documents)
                 {
                     if (!IsQuery(document))
@@ -295,7 +331,21 @@ namespace SqlPrompter.Ssms
                     if (saved != null)
                     {
                         tabs.Add(saved);
+                        openKeys.Add(new KeyValuePair<string, SavedTab>(document.FullName, saved));
                     }
+                }
+
+                var summary = string.Join(", ", openKeys.Select(k => Path.GetFileName(k.Key)));
+                if (summary != lastSummary)
+                {
+                    lastSummary = summary;
+                    Log.Write("Tabs open (described): " + summary);
+                }
+
+                var newlyClosed = closedTabs.Update(openKeys);
+                if (newlyClosed > 0)
+                {
+                    Log.Write("Tabs: " + newlyClosed + " closed; " + closedTabs.Count + " can be reopened.");
                 }
 
                 // An empty list is saved only after tabs were seen in this session (or restored), so a start that restored nothing never
