@@ -240,6 +240,7 @@ namespace SqlPrompter.Core.Analysis
                     objectName.AliasAllowed = true;
                     objectName.AfterJoin = anchor.IsWord("JOIN") && qualifier.Count == 0;
                     objectName.Sources = CollectSources(structure, scopes);
+                    objectName.CorrelatedFrom = anchor.IsWord("FROM") && qualifier.Count == 0 && scopes.Count > 1 && !objectName.Sources.Any(src => src.ScopeLevel == 0 && !string.Equals(src.ObjectName, typed, StringComparison.OrdinalIgnoreCase));
                 }
 
                 return objectName;
@@ -300,6 +301,12 @@ namespace SqlPrompter.Core.Analysis
                     after.SoftSelection = true;
                     after.ApplyPosition(position, false);
                     after.Sources = sources;
+                    var own = sources.Where(src => src.ScopeLevel == 0 && src.Kind == TableSourceKind.Object).ToList();
+                    if (scopes.Count > 1 && own.Count == 1 && sources.Any(src => src.ScopeLevel >= 1))
+                    {
+                        // The first table of a subquery: its correlation with the outer query is offered as a WHERE condition.
+                        after.Correlation = own[0];
+                    }
                     after.Merge = MergeStageOf(tokens, statementStart, position);
                     return after;
                 }

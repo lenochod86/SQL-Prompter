@@ -221,6 +221,15 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>The name follows JOIN, so tables related by a foreign key to the tables of the query can be offered first.</summary>
         public bool AfterJoin { get; internal set; }
 
+        /// <summary>The name is the first table of a subquery (after FROM) that has outer queries: the tables related to the outer ones are offered first.</summary>
+        public bool CorrelatedFrom { get; internal set; }
+
+        /// <summary>After the table (and alias) that starts a subquery: the table, so that the correlation with the outer query can be offered as a WHERE condition.</summary>
+        public TableSource Correlation { get; internal set; }
+
+        /// <summary>The conditions are made between the table of a subquery and the tables of the outer queries too.</summary>
+        public bool Correlated { get; internal set; }
+
         /// <summary>
         /// At the start of a condition after ON (or AND, OR following it): the table the JOIN introduces. Conditions that link it to the
         /// tables before it in the query are offered.

@@ -460,6 +460,14 @@ namespace SqlPrompter.Core.Completion
                 }
             }
 
+            if (context.CorrelatedFrom)
+            {
+                foreach (var related in JoinSuggestions.Build(context, metadata, options, correlated: true))
+                {
+                    yield return related;
+                }
+            }
+
             foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem && o.Kind != DbObjectKind.ScalarFunction))
             {
                 var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(dbObject.Schema, quote) + "." : string.Empty) +

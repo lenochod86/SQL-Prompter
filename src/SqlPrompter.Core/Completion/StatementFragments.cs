@@ -31,6 +31,14 @@ namespace SqlPrompter.Core.Completion
                 }
             }
 
+            if (context.Correlation != null)
+            {
+                foreach (var item in Correlation(context, metadata, options))
+                {
+                    yield return item;
+                }
+            }
+
             if (context.Merge != MergeStage.None)
             {
                 foreach (var item in Merge(context, metadata, options))
@@ -64,6 +72,24 @@ namespace SqlPrompter.Core.Completion
             var selectText = "SELECT " + FormattedList.Join(names, editor.LinePrefix + "SELECT ", editor) + editor.NewLine + editor.LineIndent + "FROM ";
             yield return new Suggestion(SuggestionKind.Keyword, "SELECT ... FROM", selectText, "SELECT", null,
                 "the listed columns of " + table + " selected from a source", Group, isBlock: true);
+        }
+
+        /// <summary>After the first table of a subquery: <c>WHERE sub.IdOrder = o.IdOrder</c> from the foreign keys to the tables of the outer queries.</summary>
+        private static IEnumerable<Suggestion> Correlation(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        {
+            var joined = new CaretContext(ContextKind.Expression, context.ReplaceStart, context.ReplaceLength, context.TypedPrefix)
+            {
+                Sources = context.Sources,
+                JoinTarget = context.Correlation,
+                QuoteIdentifiers = context.QuoteIdentifiers,
+                Correlated = true,
+            };
+            foreach (var condition in JoinSuggestions.Conditions(joined, metadata, options))
+            {
+                var where = options.KeywordCase == Settings.KeywordCase.Lower ? "where" : "WHERE";
+                yield return new Suggestion(SuggestionKind.JoinCondition, where + " " + condition.DisplayText, where + " " + condition.InsertText, "WHERE", condition.Suffix,
+                    condition.Description, Group + condition.Group);
+            }
         }
 
         private static IEnumerable<Suggestion> Merge(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)

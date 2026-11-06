@@ -17,7 +17,8 @@ namespace SqlPrompter.Core.Completion
         /// <summary>The group of these items: before everything else (negative groups sort first).</summary>
         public const int Group = -1;
 
-        public static IEnumerable<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        /// <param name="correlated">The first table of a subquery: the tables of the outer queries are the ones to relate to, and the item has no ON (the condition belongs in WHERE).</param>
+        public static IEnumerable<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options, bool correlated = false)
         {
             if (metadata == null || metadata.ForeignKeys.Count == 0)
             {
@@ -28,7 +29,7 @@ namespace SqlPrompter.Core.Completion
             var quote = context.QuoteIdentifiers;
             var used = context.ReferenceNamesInUse().ToList();
             var sources = context.Sources
-                .Where(s => s.ScopeLevel == 0 && s.Kind == TableSourceKind.Object)
+                .Where(s => (correlated ? s.ScopeLevel >= 1 : s.ScopeLevel == 0) && s.Kind == TableSourceKind.Object)
                 .Select(s => new { Source = s, Object = Readiness.Resolve(s, metadata) })
                 .Where(x => x.Object != null && x.Object.Kind != DbObjectKind.Synonym)
                 .ToList();
@@ -42,7 +43,7 @@ namespace SqlPrompter.Core.Completion
                     if (fk.ChildObjectId == x.Object.Id && byId.TryGetValue(fk.ReferencedObjectId, out var referenced))
                     {
                         var pairs = fk.Columns.Select(c => new KeyValuePair<string, string>(c.ReferencedColumn, c.Column)).ToList();
-                        var item = Item(context, options, x.Source, referenced, fk, pairs, quote, used);
+                        var item = Item(context, options, x.Source, referenced, fk, pairs, quote, used, correlated);
                         if (item != null && seen.Add(item.InsertText))
                         {
                             yield return item;
@@ -53,7 +54,7 @@ namespace SqlPrompter.Core.Completion
                     if (fk.ReferencedObjectId == x.Object.Id && byId.TryGetValue(fk.ChildObjectId, out var child))
                     {
                         var pairs = fk.Columns.Select(c => new KeyValuePair<string, string>(c.Column, c.ReferencedColumn)).ToList();
-                        var item = Item(context, options, x.Source, child, fk, pairs, quote, used);
+                        var item = Item(context, options, x.Source, child, fk, pairs, quote, used, correlated);
                         if (item != null && seen.Add(item.InsertText))
                         {
                             yield return item;
@@ -107,7 +108,7 @@ namespace SqlPrompter.Core.Completion
                 metadata.ForeignKeys.Where(k => k.ChildObjectId == targetObject.Id).SelectMany(k => k.Columns.Select(c => c.Column)),
                 StringComparer.OrdinalIgnoreCase);
 
-            foreach (var other in context.Sources.Where(s => s.ScopeLevel == 0 && s.Kind == TableSourceKind.Object && s.TokenIndex >= 0 && s.TokenIndex < target.TokenIndex))
+            foreach (var other in context.Sources.Where(s => (s.ScopeLevel == 0 || context.Correlated) && s.Kind == TableSourceKind.Object && s.TokenIndex >= 0 && s.TokenIndex < target.TokenIndex))
             {
                 var otherObject = Readiness.Resolve(other, metadata);
                 if (otherObject == null || otherObject.Kind == DbObjectKind.Synonym)
@@ -205,7 +206,8 @@ namespace SqlPrompter.Core.Completion
             DbForeignKey fk,
             IReadOnlyList<KeyValuePair<string, string>> pairs,
             bool quote,
-            IReadOnlyList<string> used)
+            IReadOnlyList<string> used,
+            bool correlated = false)
         {
             if (table.IsSystem)
             {
@@ -220,8 +222,13 @@ namespace SqlPrompter.Core.Completion
             var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(table.Schema, quote) + "." : string.Empty) +
                 SqlIdentifier.Quote(table.Name, quote) +
                 (alias != null ? SuggestionBuilder.AliasDefinition(alias, options, quote) : string.Empty) +
-                " " + on + " " + condition;
+                (correlated ? string.Empty : " " + on + " " + condition);
             var kind = table.Kind == DbObjectKind.View ? SuggestionKind.View : SuggestionKind.Table;
+            if (correlated)
+            {
+                return new Suggestion(kind, table.Name, insert, table.Name, fk.Name, "related to " + source.ReferenceName + " by foreign key " + fk.Name + ": " + condition, Group, null, condition);
+            }
+
             return new Suggestion(kind, table.Name, insert, table.Name, fk.Name, "join by foreign key " + fk.Name + " " + on + " " + condition, Group, null, on + " " + condition);
         }
     }
