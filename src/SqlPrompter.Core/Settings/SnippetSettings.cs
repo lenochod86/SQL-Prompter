@@ -9,7 +9,12 @@ namespace SqlPrompter.Core.Settings
         public SnippetSettings()
         {
             Folder = string.Empty;
+            InstallBuiltIn = true;
         }
+
+        /// <summary>Put the snippets that ship with SQL Prompter into the folder (each one once; edited or deleted ones are left alone).</summary>
+        [DataMember(Name = "installBuiltIn")]
+        public bool InstallBuiltIn { get; set; }
 
         /// <summary>Folder with the snippet files (SQL Prompt's JSON format); empty means the default folder next to the settings file.</summary>
         [DataMember(Name = "folder")]
@@ -18,7 +23,11 @@ namespace SqlPrompter.Core.Settings
         public SnippetSettings Clone() => (SnippetSettings)MemberwiseClone();
 
         [OnDeserializing]
-        private void OnDeserializing(StreamingContext context) => Folder = string.Empty;
+        private void OnDeserializing(StreamingContext context)
+        {
+            Folder = string.Empty;
+            InstallBuiltIn = true;
+        }
 
         [OnDeserialized]
         private void OnDeserialized(StreamingContext context) => Folder = Folder ?? string.Empty;

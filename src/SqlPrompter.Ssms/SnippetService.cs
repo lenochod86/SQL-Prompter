@@ -74,7 +74,17 @@ namespace SqlPrompter.Ssms
                 {
                     var folder = Folder;
                     Watch(folder);
-                    var result = new SnippetStore(folder).Load();
+                    var store = new SnippetStore(folder);
+                    if (SettingsService.Current.Snippets.InstallBuiltIn)
+                    {
+                        var installed = new BuiltInInstaller(store).Install();
+                        if (installed > 0)
+                        {
+                            Log.Write("Snippets: installed " + installed + " built-in snippets into " + folder + ".");
+                        }
+                    }
+
+                    var result = store.Load();
                     lock (Gate)
                     {
                         snippets = result.Snippets;
