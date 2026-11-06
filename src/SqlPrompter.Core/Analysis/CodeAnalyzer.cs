@@ -14,6 +14,7 @@ namespace SqlPrompter.Core.Analysis
         UnusedVariable,
         SelectStar,
         LockHint,
+        UnexpectedEnd,
     }
 
     public enum CodeIssueSeverity
@@ -77,7 +78,13 @@ namespace SqlPrompter.Core.Analysis
                 return issues;
             }
 
-            var tokens = Lexer.Tokenize(script).Where(t => t.Kind != TokenKind.Comment).ToList();
+            var allTokens = Lexer.Tokenize(script).ToList();
+            var tokens = allTokens.Where(t => t.Kind != TokenKind.Comment).ToList();
+            if (settings.UnexpectedEnd)
+            {
+                UnexpectedEnd.Find(script, allTokens, issues);
+            }
+
             if (settings.EqualsNull)
             {
                 FindEqualsNull(tokens, issues);

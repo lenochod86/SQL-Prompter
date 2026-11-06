@@ -33,6 +33,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "lockHint")]
         public bool LockHint { get; set; }
 
+        /// <summary>A script that stops in the middle of a construct (unclosed parenthesis, CTE without a statement, FROM without a table ...).</summary>
+        [DataMember(Name = "unexpectedEnd")]
+        public bool UnexpectedEnd { get; set; }
+
         public AnalysisSettings Clone() => (AnalysisSettings)MemberwiseClone();
 
         [OnDeserializing]
@@ -48,6 +52,7 @@ namespace SqlPrompter.Core.Settings
             UnusedVariable = true;
             SelectStar = false;
             LockHint = false;
+            UnexpectedEnd = true;
         }
     }
 }
