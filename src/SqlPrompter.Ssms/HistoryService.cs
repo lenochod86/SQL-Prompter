@@ -128,5 +128,7 @@ namespace SqlPrompter.Ssms
         }
 
         public static void Delete(IEnumerable<string> ids) => Store.Delete(ids);
+
+        public static void SetPinned(IEnumerable<string> ids, bool pinned) => Store.SetPinned(ids, pinned);
     }
 }

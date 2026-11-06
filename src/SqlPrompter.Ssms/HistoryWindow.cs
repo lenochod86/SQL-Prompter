@@ -37,6 +37,7 @@ namespace SqlPrompter.Ssms
             status.SetResourceReference(TextBlock.ForegroundProperty, Microsoft.VisualStudio.Shell.VsBrushes.WindowTextKey);
 
             var grid = new GridView();
+            grid.Columns.Add(Column("Pin", "Pin", 30));
             grid.Columns.Add(Column("Run", "Run", 140));
             grid.Columns.Add(Column("Tab", "Tab", 130));
             grid.Columns.Add(Column("Closed", "Closed", 140));
@@ -109,6 +110,16 @@ namespace SqlPrompter.Ssms
             var bottom = new StackPanel();
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             buttons.Children.Add(SnippetUi.Button("Open In New Tab", Choose));
+            buttons.Children.Add(SnippetUi.Button("Pin / Unpin", TogglePin));
+            buttons.Children.Add(SnippetUi.Button("Make A Snippet", () =>
+            {
+                if (list.SelectedItem is Row picked)
+                {
+                    Chosen = picked.Entry;
+                    MakeSnippet = true;
+                    Close();
+                }
+            }));
             buttons.Children.Add(SnippetUi.Button("Delete", Delete));
             buttons.Children.Add(SnippetUi.Button("Close", Close));
             bottom.Children.Add(buttons);
@@ -123,6 +134,29 @@ namespace SqlPrompter.Ssms
 
         /// <summary>The run the user chose, or null.</summary>
         public HistoryEntry Chosen { get; private set; }
+
+        /// <summary>The run is to become a snippet instead of being opened in a tab.</summary>
+        public bool MakeSnippet { get; private set; }
+
+        private void TogglePin()
+        {
+            if (!(list.SelectedItem is Row row))
+            {
+                return;
+            }
+
+            HistoryService.SetPinned(new[] { row.Entry.Id }, !row.Entry.Pinned);
+            var id = row.Entry.Id;
+            Fill();
+            foreach (Row item in list.Items)
+            {
+                if (item.Entry.Id == id)
+                {
+                    list.SelectedItem = item;
+                    break;
+                }
+            }
+        }
 
         private static GridViewColumn Column(string header, string binding, double width) =>
             new GridViewColumn { Header = header, Width = width, DisplayMemberBinding = new System.Windows.Data.Binding(binding) };
@@ -194,6 +228,8 @@ namespace SqlPrompter.Ssms
             }
 
             public HistoryEntry Entry { get; }
+
+            public string Pin => Entry.Pinned ? "*" : string.Empty;
 
             public string Run => Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
 
