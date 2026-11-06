@@ -29,6 +29,10 @@ namespace SqlPrompter.Core.Settings
 
         [DataMember(Name = "environment")]
         public string Environment { get; set; }
+
+        /// <summary>Running a statement that changes data or schema in a window that matches this rule asks for confirmation first (#209).</summary>
+        [DataMember(Name = "askBeforeChanges")]
+        public bool AskBeforeChanges { get; set; }
     }
 
     /// <summary>Coloring of query windows by their connection.</summary>
@@ -54,7 +58,7 @@ namespace SqlPrompter.Core.Settings
         {
             Enabled = Enabled,
             Environments = Environments.Select(e => new ColorEnvironment { Name = e.Name, Color = e.Color }).ToList(),
-            Rules = Rules.Select(r => new ColorRule { Server = r.Server, Database = r.Database, Environment = r.Environment }).ToList(),
+            Rules = Rules.Select(r => new ColorRule { Server = r.Server, Database = r.Database, Environment = r.Environment, AskBeforeChanges = r.AskBeforeChanges }).ToList(),
         };
 
         [OnDeserializing]

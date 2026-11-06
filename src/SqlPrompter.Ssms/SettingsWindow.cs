@@ -273,6 +273,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.WarnDeleteWithoutWhere, v => work.Behavior.WarnDeleteWithoutWhere = v);
             warnings.Check("Warn about UPDATE without WHERE", "Running a script with an UPDATE that has no WHERE (and no TOP, and does not change a temporary table or table variable) asks for confirmation first.",
                 () => work.Behavior.WarnUpdateWithoutWhere, v => work.Behavior.WarnUpdateWithoutWhere = v);
+            warnings.Check("Warn about an open transaction", "Running a script with a BEGIN TRAN that has no COMMIT or ROLLBACK in the same batch asks for confirmation first.",
+                () => work.Behavior.WarnOpenTransaction, v => work.Behavior.WarnOpenTransaction = v);
 
             var editor = Add("Editor helpers");
             editor.Check("Auto-close quotes, brackets and parentheses", "Typing ' [ or ( also inserts the closing character; typing it again steps over it, and Backspace between an empty pair removes both. Nothing is closed inside strings, comments and bracketed names.",
