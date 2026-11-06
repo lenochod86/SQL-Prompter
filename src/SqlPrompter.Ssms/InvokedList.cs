@@ -242,18 +242,7 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            var all = suggestions.Items;
-            IEnumerable<CompletionItem> matches;
-            if (typed.Length == 0)
-            {
-                matches = all;
-            }
-            else
-            {
-                matches = all.Where(i => i.FilterText.IndexOf(typed, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .OrderBy(i => i.FilterText.StartsWith(typed, StringComparison.OrdinalIgnoreCase) ? 0 : 1);
-            }
-
+            var matches = ListOrdering.Filter(suggestions.Items, typed, i => i.FilterText);
             shown = matches.Select(i => new CompletionItemWithHighlight(i, Highlight(i, typed))).ToList();
             selected = Math.Min(selected, Math.Max(0, shown.Count - 1));
         }
@@ -271,7 +260,7 @@ namespace SqlPrompter.Ssms
                     continue;
                 }
 
-                if (typed.Length > 0 && item != nonAggregatedItem && item.FilterText.IndexOf(typed, StringComparison.OrdinalIgnoreCase) < 0)
+                if (item != nonAggregatedItem && !ListOrdering.Matches(item.FilterText, typed))
                 {
                     continue;
                 }
