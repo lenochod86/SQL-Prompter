@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -15,7 +16,7 @@ namespace SqlPrompter.Ssms
     {
         private static readonly object Gate = new object();
         private static IReadOnlyList<Snippet> snippets = new Snippet[0];
-        private static FileSystemWatcher watcher;
+        private static readonly List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         private static Timer debounce;
         private static string watchedFolder;
         private static bool started;
@@ -73,7 +74,8 @@ namespace SqlPrompter.Ssms
                 try
                 {
                     var folder = Folder;
-                    Watch(folder);
+                    var shared = SettingsService.Current.Snippets.SharedFolderList().Select(f => Environment.ExpandEnvironmentVariables(f)).ToList();
+                    Watch(new[] { folder }.Concat(shared).ToList());
                     var store = new SnippetStore(folder);
                     if (SettingsService.Current.Snippets.InstallBuiltIn)
                     {
@@ -85,12 +87,24 @@ namespace SqlPrompter.Ssms
                     }
 
                     var result = store.Load();
-                    lock (Gate)
+                    var sharedLoaded = new List<IReadOnlyList<Snippet>>();
+                    foreach (var sharedFolder in shared)
                     {
-                        snippets = result.Snippets;
+                        var loaded = new SnippetStore(sharedFolder).Load();
+                        sharedLoaded.Add(loaded.Snippets);
+                        if (loaded.Errors.Count > 0)
+                        {
+                            Log.Write("Snippets: " + loaded.Errors.Count + " files of the shared folder " + sharedFolder + " could not be read.");
+                        }
                     }
 
-                    Log.Write("Snippets: loaded " + result.Snippets.Count + " from " + folder + (result.Errors.Count > 0 ? "; " + result.Errors.Count + " files could not be read: " + string.Join("; ", result.Errors) : "."));
+                    var merged = SnippetMerge.Merge(result.Snippets, sharedLoaded);
+                    lock (Gate)
+                    {
+                        snippets = merged;
+                    }
+
+                    Log.Write("Snippets: loaded " + merged.Count + " (" + shared.Count + " shared folders) from " + folder + (result.Errors.Count > 0 ? "; " + result.Errors.Count + " files could not be read: " + string.Join("; ", result.Errors) : "."));
                     Changed?.Invoke(null, EventArgs.Empty);
                 }
                 catch (Exception ex)
@@ -100,32 +114,49 @@ namespace SqlPrompter.Ssms
             });
         }
 
-        private static void Watch(string folder)
+        private static void Watch(System.Collections.Generic.IReadOnlyList<string> folders)
         {
             lock (Gate)
             {
-                if (string.Equals(folder, watchedFolder, StringComparison.OrdinalIgnoreCase) && watcher != null)
+                var key = string.Join("|", folders);
+                if (string.Equals(key, watchedFolder, StringComparison.OrdinalIgnoreCase) && watchers.Count > 0)
                 {
                     return;
                 }
 
-                watcher?.Dispose();
-                watcher = null;
-                watchedFolder = folder;
-                if (!Directory.Exists(folder))
+                foreach (var old in watchers)
                 {
-                    return;
+                    old.Dispose();
                 }
+
+                watchers.Clear();
+                watchedFolder = key;
 
                 // A burst of changes (copying many files) reloads once.
                 debounce = debounce ?? new Timer(_ => Reload(), null, Timeout.Infinite, Timeout.Infinite);
-                watcher = new FileSystemWatcher(folder, "*.json") { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size };
-                FileSystemEventHandler onChange = (s, e) => debounce.Change(700, Timeout.Infinite);
-                watcher.Changed += onChange;
-                watcher.Created += onChange;
-                watcher.Deleted += onChange;
-                watcher.Renamed += (s, e) => debounce.Change(700, Timeout.Infinite);
-                watcher.EnableRaisingEvents = true;
+                foreach (var folder in folders)
+                {
+                    try
+                    {
+                        if (!Directory.Exists(folder))
+                        {
+                            continue;
+                        }
+
+                        var watcher = new FileSystemWatcher(folder, "*.json") { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size };
+                        FileSystemEventHandler onChange = (s, e) => debounce.Change(700, Timeout.Infinite);
+                        watcher.Changed += onChange;
+                        watcher.Created += onChange;
+                        watcher.Deleted += onChange;
+                        watcher.Renamed += (s, e) => debounce.Change(700, Timeout.Infinite);
+                        watcher.EnableRaisingEvents = true;
+                        watchers.Add(watcher);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Watching the snippet folder " + folder + " failed", ex);
+                    }
+                }
             }
         }
     }

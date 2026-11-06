@@ -44,6 +44,9 @@ namespace SqlPrompter.Core.Snippets
         [DataMember(Name = "placeholders", Order = 4, EmitDefaultValue = false)]
         public List<SnippetPlaceholder> Placeholders { get; set; }
 
+        /// <summary>The snippet comes from a shared folder (not saved in the file).</summary>
+        public bool IsShared { get; set; }
+
         public static Snippet Create(string prefix, string description, string body, IEnumerable<SnippetPlaceholder> placeholders = null) => new Snippet
         {
             Id = Guid.NewGuid().ToString(),
