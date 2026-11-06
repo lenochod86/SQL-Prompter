@@ -274,6 +274,18 @@ namespace SqlPrompter.Ssms
             Open(popup);
         }
 
+        /// <summary>A fixed list of (name, description, action) in the popup, for results such as those of Find in Database Code (#212).</summary>
+        public static void ShowItems(IWpfTextView view, IEnumerable<Tuple<string, string, Action>> items, string hint)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (open != null)
+            {
+                return;
+            }
+
+            Open(new QuickActionsPopup(view, items.Select(i => new Entry(i.Item1, i.Item2, i.Item3)).ToList(), hint));
+        }
+
         private static void Open(QuickActionsPopup popup)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
