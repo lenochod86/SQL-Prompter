@@ -34,19 +34,17 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
-        public void ALongListIsWrappedAtTheLineWidth()
+        public void ALongListHasOneValuePerLine()
         {
             var text = "Id\n" + string.Join("\n", Enumerable.Range(1000, 30)) + "\n";
 
             var lines = GridFormats.AsInList(text, lineWidth: 40, newLine: "\n").Split('\n');
 
-            Assert.True(lines.Length > 3);
+            Assert.Equal(32, lines.Length);
             Assert.Equal("IN (", lines[0]);
-            Assert.Equal(")", lines[lines.Length - 1]);
-            var inner = lines.Skip(1).Take(lines.Length - 2).ToList();
-            Assert.All(inner, l => Assert.True(l.Length <= 40 && l.StartsWith("    ")));
-            Assert.EndsWith(",", inner[0]);
-            Assert.Equal(Enumerable.Range(1000, 30).Select(n => n.ToString()), string.Join(" ", inner).Replace(",", string.Empty).Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries));
+            Assert.Equal(")", lines[31]);
+            Assert.Equal("    1000,", lines[1]);
+            Assert.Equal("    1029", lines[30]);
         }
 
         [Fact]

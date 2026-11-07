@@ -63,7 +63,7 @@ namespace SqlPrompter.Core.Editing
         }
 
         /// <summary>
-        /// The first column as <c>IN ('a', 'b', 'c')</c>. A list that does not fit on one line of <paramref name="lineWidth"/> goes on lines of its own
+        /// The first column as <c>IN ('a', 'b', 'c')</c>. A list that does not fit on one line of <paramref name="lineWidth"/> has one value per line
         /// between <c>IN (</c> and <c>)</c>, indented by four spaces. Null when the text has no rows.
         /// </summary>
         public static string AsInList(string gridText, bool distinct = true, int lineWidth = 100, string newLine = "\r\n")
@@ -86,31 +86,7 @@ namespace SqlPrompter.Core.Editing
                 return whole;
             }
 
-            const string indent = "    ";
-            var text = new StringBuilder();
-            var column = 0;
-            for (var i = 0; i < values.Count; i++)
-            {
-                var piece = values[i] + (i < values.Count - 1 ? "," : string.Empty);
-                if (i > 0)
-                {
-                    if (indent.Length + column + 1 + piece.Length > lineWidth)
-                    {
-                        text.Append(newLine).Append(indent);
-                        column = 0;
-                    }
-                    else
-                    {
-                        text.Append(' ');
-                        column++;
-                    }
-                }
-
-                text.Append(piece);
-                column += piece.Length;
-            }
-
-            return "IN (" + newLine + indent + text + newLine + ")";
+            return "IN (" + newLine + string.Join("," + newLine, values.Select(v => "    " + v)) + newLine + ")";
         }
 
         /// <summary>The rows as <c>VALUES (1, 'a'), (2, 'b')</c>, one row per line.</summary>
