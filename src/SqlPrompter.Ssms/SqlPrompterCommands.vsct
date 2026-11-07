@@ -169,7 +169,7 @@
       <Button guid="guidSqlPrompterCmdSet" id="cmdidScriptGridAsInsert" priority="0x0102" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
         <Strings>
-          <ButtonText>Script Results Grid Selection As Temp Table</ButtonText>
+          <ButtonText>Script As Temp Table</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidScriptOutline" priority="0x0118" type="Button">
