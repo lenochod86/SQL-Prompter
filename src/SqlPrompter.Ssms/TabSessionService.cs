@@ -221,6 +221,27 @@ namespace SqlPrompter.Ssms
                 var window = System.Windows.Application.Current?.MainWindow;
                 var source = window == null ? null : System.Windows.PresentationSource.FromVisual(window) as System.Windows.Interop.HwndSource;
                 source?.AddHook(WindowMessage);
+                var uiContext = System.Threading.SynchronizationContext.Current;
+                Microsoft.Win32.SystemEvents.PowerModeChanged += (sender, args) =>
+                {
+                    if (args.Mode == Microsoft.Win32.PowerModes.Resume)
+                    {
+                        // The event comes on another thread: continue on the UI thread, after a pause (the network is not back at once).
+#pragma warning disable VSTHRD001 // the power event has no task to switch with; the context captured on the UI thread posts back to it
+                        uiContext?.Post(state =>
+                        {
+                            ThreadHelper.ThrowIfNotOnUIThread();
+                            var later = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(8) };
+                            later.Tick += (s, e) =>
+                            {
+                                later.Stop();
+                                OnResume();
+                            };
+                            later.Start();
+                        }, null);
+#pragma warning restore VSTHRD001
+                    }
+                };
                 WatchTabDoubleClick(window);
                 commandEvents = dte.Events.CommandEvents;
                 commandEvents.BeforeExecute += (string guid, int id, object customIn, object customOut, ref bool cancelDefault) =>
@@ -321,6 +342,100 @@ namespace SqlPrompter.Ssms
             catch (Exception ex)
             {
                 Log.Error("Starting the shutdown failed", ex);
+            }
+        }
+
+        private DispatcherTimer resumeTimer;
+        private DateTime resumeUntil;
+        private readonly Dictionary<string, int> resumeAttempts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The computer has resumed from sleep or hibernation (#335): for ten minutes the tab in front is connected again when it was restored without a
+        /// connection (`intended`) and the credentials are at hand (a live connection of the same login or a password SSMS remembered; no dialog),
+        /// which covers a restore that failed because the network was not back yet. A tab is tried every three seconds, at most twenty times, and
+        /// only while it is in front. Connections that broke during the sleep cannot be seen from outside (the window still says connected) and SSMS
+        /// reconnects them when the next query runs.
+        /// </summary>
+        public void OnResume()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (!SettingsService.Current.Behavior.ReconnectSqlTabs || intended.Count == 0)
+            {
+                return;
+            }
+
+            Log.Write("The computer resumed: tabs that are not connected will be tried again (" + intended.Count + ").");
+            resumeAttempts.Clear();
+            resumeUntil = DateTime.UtcNow.AddMinutes(10);
+            if (resumeTimer == null)
+            {
+                resumeTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(3) };
+                resumeTimer.Tick += (s, e) => TryReconnectFront();
+            }
+
+            resumeTimer.Start();
+        }
+
+        private void TryReconnectFront()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (DateTime.UtcNow > resumeUntil || intended.Count == 0 || shuttingDown)
+                {
+                    resumeTimer.Stop();
+                    return;
+                }
+
+                var document = dte.ActiveDocument;
+                var main = System.Windows.Application.Current?.MainWindow;
+                if (document == null || main == null || !intended.TryGetValue(document.FullName, out var want))
+                {
+                    return;
+                }
+
+                var handle = new System.Windows.Interop.WindowInteropHelper(main).Handle;
+                if (!WindowStatusColoring.TryGetFront(handle, out var connected, out _) || connected)
+                {
+                    return;
+                }
+
+                resumeAttempts.TryGetValue(document.FullName, out var attempts);
+                if (attempts >= 20)
+                {
+                    return;
+                }
+
+                resumeAttempts[document.FullName] = attempts + 1;
+                if (!SsmsConnection.ReconnectEditor(WindowStatusColoring.FrontEditor(handle), want, out var why))
+                {
+                    if (attempts == 0)
+                    {
+                        Log.Write("The tab " + System.IO.Path.GetFileName(document.FullName) + " is not reconnected: " + why + ".");
+                    }
+
+                    return;
+                }
+
+                if (WindowStatusColoring.TryGetFront(handle, out connected, out _) && connected)
+                {
+                    intended.Remove(document.FullName);
+                    if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view)
+                    {
+                        var text = view.TextBuffer.CurrentSnapshot.GetText();
+                        var without = SsmsConnection.WithoutReconnectComment(text);
+                        if (without != text)
+                        {
+                            view.TextBuffer.Replace(new Microsoft.VisualStudio.Text.Span(0, text.Length - without.Length), string.Empty);
+                        }
+                    }
+
+                    Log.Write("The tab " + System.IO.Path.GetFileName(document.FullName) + " was connected again to " + want.Server + ".");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reconnecting the tab after the resume failed", ex);
             }
         }
 

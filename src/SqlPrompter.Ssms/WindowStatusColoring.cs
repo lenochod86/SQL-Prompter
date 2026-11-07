@@ -29,6 +29,21 @@ namespace SqlPrompter.Ssms
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hwnd);
 
+        internal static object FrontEditor(IntPtr mainWindow)
+        {
+            object editor = null;
+            EnumChildWindows(mainWindow, (handle, lParam) =>
+            {
+                if (editor == null && Control.FromHandle(handle) is StatusStrip strip && strip.Parent != null && strip.Parent.GetType().Name == EditorControlType && IsWindowVisible(handle))
+                {
+                    editor = strip.Parent;
+                }
+
+                return true;
+            }, IntPtr.Zero);
+            return editor;
+        }
+
         /// <summary>The connection state of the query window that is shown: <c>IsConnected</c> and the <c>Connection</c> (UIConnectionInfo) of its editor control; false when no query window is shown.</summary>
         public static bool TryGetFront(IntPtr mainWindow, out bool connected, out object info)
         {
