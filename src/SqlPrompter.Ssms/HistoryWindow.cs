@@ -20,6 +20,7 @@ namespace SqlPrompter.Ssms
         private readonly ListView list = new ListView();
         private readonly SnippetBodyEditor preview = new SnippetBodyEditor { Margin = new Thickness(0), Padding = new Thickness(4), BorderThickness = new Thickness(1) };
         private readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 6, 0, 0) };
+        private HistoryView view = HistoryView.All;
 
         public HistoryWindow()
         {
@@ -82,7 +83,18 @@ namespace SqlPrompter.Ssms
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.Children.Add(SnippetUi.Label("Type words to filter (text, tab, server, database). Enter or a double click opens the query in a new tab; Esc closes."));
+            var heading = new DockPanel { LastChildFill = true };
+            var views = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            DockPanel.SetDock(views, Dock.Right);
+            views.Children.Add(ViewButton("\uE72C", "All runs", HistoryView.All, true));
+            views.Children.Add(ViewButton("\uE718", "Pinned runs", HistoryView.Pinned, false));
+            views.Children.Add(ViewButton("\uE838", "Runs of tabs that are still open", HistoryView.Open, false));
+            views.Children.Add(ViewButton("\uE8B7", "Runs of tabs that were closed", HistoryView.Closed, false));
+            heading.Children.Add(views);
+            var hint = SnippetUi.Label("Type words to filter (text, tab, server, database). Enter or a double click opens the query in a new tab; Esc closes.");
+            hint.VerticalAlignment = VerticalAlignment.Center;
+            heading.Children.Add(hint);
+            root.Children.Add(heading);
             Grid.SetRow(filter, 1);
             root.Children.Add(filter);
 
@@ -158,13 +170,45 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        private const string ViewButtonTemplate =
+            "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'>" +
+            "<Border x:Name='frame' Width='32' Height='32' Margin='2,0,0,0' BorderThickness='2' CornerRadius='3' BorderBrush='Transparent' Background='Transparent'>" +
+            "<ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border>" +
+            "<ControlTemplate.Triggers>" +
+            "<Trigger Property='IsMouseOver' Value='True'><Setter TargetName='frame' Property='Background' Value='#22808080'/></Trigger>" +
+            "<Trigger Property='IsChecked' Value='True'><Setter TargetName='frame' Property='BorderBrush' Value='#3794FF'/></Trigger>" +
+            "</ControlTemplate.Triggers></ControlTemplate>";
+
+        /// <summary>One of the toggle buttons that choose the view of the history; the one that is checked has a blue frame (#284).</summary>
+        private RadioButton ViewButton(string glyph, string tooltip, HistoryView target, bool isChecked)
+        {
+            var icon = new TextBlock { Text = glyph, FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"), FontSize = 16 };
+            icon.SetResourceReference(TextBlock.ForegroundProperty, Microsoft.VisualStudio.Shell.VsBrushes.WindowTextKey);
+            var button = new RadioButton
+            {
+                GroupName = "HistoryViews",
+                Content = icon,
+                ToolTip = tooltip,
+                IsChecked = isChecked,
+                Focusable = false,
+                Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(ViewButtonTemplate),
+            };
+            System.Windows.Automation.AutomationProperties.SetName(button, tooltip);
+            button.Checked += (s, e) =>
+            {
+                view = target;
+                Fill();
+            };
+            return button;
+        }
+
         private static GridViewColumn Column(string header, string binding, double width) =>
             new GridViewColumn { Header = header, Width = width, DisplayMemberBinding = new System.Windows.Data.Binding(binding) };
 
         private void Fill()
         {
             var everything = HistoryService.Entries;
-            var found = HistoryStore.Filter(everything, filter.Text);
+            var found = HistoryStore.Filter(everything, filter.Text, view);
             list.Items.Clear();
             foreach (var entry in found.Take(MaxShown))
             {

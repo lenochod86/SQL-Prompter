@@ -10,6 +10,19 @@ using System.Text;
 namespace SqlPrompter.Core.History
 {
     /// <summary>One executed query. The login is the SQL login name (null for Windows authentication); a password is never stored.</summary>
+    /// <summary>The views of the query history window (#284).</summary>
+    public enum HistoryView
+    {
+        All,
+        Pinned,
+
+        /// <summary>The tab of the run is still open.</summary>
+        Open,
+
+        /// <summary>The tab of the run was closed.</summary>
+        Closed,
+    }
+
     public sealed class HistoryEntry
     {
         public HistoryEntry(string id, string text, string server, string database, string login, DateTime ranAtUtc, DateTime? closedAtUtc = null, string tab = null)
@@ -219,10 +232,14 @@ namespace SqlPrompter.Core.History
         /// The entries that contain every word of <paramref name="filter"/> (ignoring case) in the text, the server or the database,
         /// newest first. An empty filter gives everything.
         /// </summary>
-        public static IReadOnlyList<HistoryEntry> Filter(IEnumerable<HistoryEntry> source, string filter)
+        public static IReadOnlyList<HistoryEntry> Filter(IEnumerable<HistoryEntry> source, string filter) => Filter(source, filter, HistoryView.All);
+
+        /// <summary>The runs that belong to the <paramref name="view"/> and contain every word of <paramref name="filter"/>; pinned runs first, then newest first.</summary>
+        public static IReadOnlyList<HistoryEntry> Filter(IEnumerable<HistoryEntry> source, string filter, HistoryView view)
         {
             var words = (filter ?? string.Empty).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
             return source
+                .Where(e => InView(e, view))
                 .Where(e => words.All(w =>
                     e.Text.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     e.Server.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -231,6 +248,18 @@ namespace SqlPrompter.Core.History
                 .OrderByDescending(e => e.Pinned)
                 .ThenByDescending(e => e.RanAtUtc)
                 .ToList();
+        }
+
+        /// <summary>Whether the run belongs to the view: all, pinned, open (its tab is not closed) or closed (the tab was closed).</summary>
+        public static bool InView(HistoryEntry entry, HistoryView view)
+        {
+            switch (view)
+            {
+                case HistoryView.Pinned: return entry.Pinned;
+                case HistoryView.Open: return !entry.ClosedAtUtc.HasValue;
+                case HistoryView.Closed: return entry.ClosedAtUtc.HasValue;
+                default: return true;
+            }
         }
 
         private void Append(string line)
