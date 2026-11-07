@@ -69,6 +69,8 @@ namespace SqlPrompter.Metadata
 
         public IReadOnlyList<DbTrigger> Triggers => Array.Empty<DbTrigger>();
 
+        public IReadOnlyList<DbIndex> Indexes => Array.Empty<DbIndex>();
+
         public IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function) => Array.Empty<DbParameter>();
 
         public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) => Array.Empty<string>();

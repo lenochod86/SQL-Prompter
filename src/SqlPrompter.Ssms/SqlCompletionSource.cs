@@ -97,6 +97,7 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.ScriptTable] = Icon(KnownMonikers.TableScript, "Table defined in the script"),
             [SuggestionKind.Variable] = Icon(KnownMonikers.LocalVariable, "Variable"),
             [SuggestionKind.Procedure] = Icon(KnownMonikers.StoredProcedure, "Stored procedure"),
+            [SuggestionKind.Index] = Icon(KnownMonikers.Key, "Index"),
         };
 
         private readonly MetadataService service;
