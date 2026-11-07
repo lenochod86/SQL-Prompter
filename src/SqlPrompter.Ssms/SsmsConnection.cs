@@ -490,6 +490,72 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>
+        /// Connects an existing query window (its <c>SqlScriptEditorControl</c>) with the data of a saved tab, silently: Windows authentication, or a SQL
+        /// login whose password is that of a live connection or the one SSMS remembered. No dialog is ever opened. Returns false (and the reason) when
+        /// there is nothing to connect with. Uses the public <c>SqlScriptEditorControl.SetConnection(UIConnectionInfo)</c> (#335).
+        /// </summary>
+        public static bool ReconnectEditor(object editor, SavedTab tab, out string why)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            why = null;
+            var infoType = editor?.GetType().GetProperty("Connection")?.PropertyType;
+            var setConnection = infoType == null ? null : editor.GetType().GetMethod("SetConnection", new[] { infoType });
+            if (setConnection == null || !tab.IsConnected)
+            {
+                why = "the window cannot be connected from here";
+                return false;
+            }
+
+            var sql = !string.IsNullOrEmpty(tab.Login);
+            ConnectionSettings known = null;
+            if (sql)
+            {
+                if (!LiveSqlLogins.TryGetValue(LoginKey(tab.Server, tab.Login), out known))
+                {
+                    known = FindRemembered(tab.Server, tab.Login, tab.Database);
+                }
+
+                if (known == null)
+                {
+                    why = "no password to connect with (no live connection and none remembered by SSMS)";
+                    return false;
+                }
+            }
+
+            var info = Activator.CreateInstance(infoType);
+            SetProperty(info, "ServerName", tab.Server);
+            SetProperty(info, "ServerType", new Guid("8c91a03d-f9b4-46c0-a305-b5dcc79ff907"));
+            SetProperty(info, "ApplicationName", "Microsoft SQL Server Management Studio");
+            SetProperty(info, "AuthenticationType", sql ? 1 : 0);
+            if (sql)
+            {
+                SetProperty(info, "UserName", tab.Login);
+                SetProperty(info, "Password", known.Password);
+            }
+
+            LastSeenByServer.TryGetValue((tab.Server ?? string.Empty).ToUpperInvariant(), out var seen);
+            var options = (NameValueCollection)infoType.GetProperty("AdvancedOptions").GetValue(info);
+            options["DATABASE"] = tab.Database ?? string.Empty;
+            var encrypt = !string.IsNullOrEmpty(tab.Encrypt) ? tab.Encrypt : known?.Encrypt ?? seen?.Encrypt;
+            var trust = !string.IsNullOrEmpty(tab.TrustServerCertificate) ? tab.TrustServerCertificate : known?.TrustServerCertificate ?? seen?.TrustServerCertificate;
+            if (!string.IsNullOrEmpty(encrypt))
+            {
+                options["ENCRYPT_CONNECTION"] = encrypt;
+            }
+
+            if (!string.IsNullOrEmpty(trust))
+            {
+                options["TRUST_SERVER_CERTIFICATE"] = trust;
+            }
+
+            // SetConnection only hands the new connection info to the window; its (non-public) Connect() makes the connection (verified: after
+            // SetConnection alone the window stayed disconnected).
+            setConnection.Invoke(editor, new[] { info });
+            editor.GetType().GetMethod("Connect", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, Type.EmptyTypes, null)?.Invoke(editor, null);
+            return true;
+        }
+
         private const string ReconnectComment = "-- SQL Prompter: this tab was connected";
 
         /// <summary>The text without the comment line that a tab gets when it could not be reconnected (it is connected now).</summary>
