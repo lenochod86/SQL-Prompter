@@ -247,15 +247,43 @@ namespace SqlPrompter.Ssms
                     ActiveEditor.SetOwner(manager);
                     manager.ShowDialog();
                 }
-                else if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login))
+                else if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login) && !OpenWithoutActiveConnection(chosen))
                 {
-                    ShowMessage("Open a query window connected to a server first; the new tab is opened like it.");
+                    ShowMessage("The query could not be opened in a new tab (see the log).");
                 }
             }
             catch (Exception ex)
             {
                 Log.Error("Opening the query history failed", ex);
                 ShowMessage("Opening the query history failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// No window is connected to copy the connection from (#327): the query is opened in a new tab with the server, database and login it had,
+        /// connected like a restored tab (a live connection of the same login, Windows authentication, or SSMS's own Connect dialog filled in); when
+        /// even that is not possible a new query tab is requested from SSMS, which asks for a connection itself, and the text is put into it.
+        /// </summary>
+        private static bool OpenWithoutActiveConnection(SqlPrompter.Core.History.HistoryEntry chosen)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var tab = new SqlPrompter.Core.History.SavedTab { Text = chosen.Text, Server = chosen.Server, Database = chosen.Database, Login = chosen.Login };
+            if (!string.IsNullOrEmpty(chosen.Server) && SsmsConnection.OpenSavedTab(tab, out _))
+            {
+                return true;
+            }
+
+            try
+            {
+                (GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("File.NewQuery");
+                var view = ActiveEditor.GetView();
+                view?.TextBuffer.Insert(0, chosen.Text ?? string.Empty);
+                return view != null;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening a new query tab for the history entry failed", ex);
+                return false;
             }
         }
 
