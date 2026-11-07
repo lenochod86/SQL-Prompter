@@ -184,6 +184,14 @@ namespace SqlPrompter.Core.Analysis
                 return start;
             }
 
+            // DROP TABLE IF EXISTS |: the same names as after DROP TABLE, the anchor is the kind of object.
+            var afterIfExists = false;
+            if (anchorIndex >= statementStart + 3 && tokens[anchorIndex].IsWord("EXISTS") && tokens[anchorIndex - 1].IsWord("IF") && tokens[statementStart].IsWord("DROP"))
+            {
+                anchorIndex -= 2;
+                afterIfExists = true;
+            }
+
             var structure = new Structure(tokens, statementStart, statementEnd);
             var anchor = tokens[anchorIndex];
             var scopes = structure.ScopesAt(nameStart);
@@ -215,13 +223,18 @@ namespace SqlPrompter.Core.Analysis
                 module.Module = moduleKind;
                 module.ModuleAction = moduleAction;
                 module.ModuleHeaderStart = tokens[statementStart].Start;
-                module.PreferredKeywords = moduleAction == ModuleAction.Drop ? new[] { "IF EXISTS" } : Array.Empty<string>();
-                module.OnlyExpectedKeywords = moduleAction == ModuleAction.Drop;
+                module.PreferredKeywords = moduleAction == ModuleAction.Drop && !afterIfExists ? new[] { "IF EXISTS" } : Array.Empty<string>();
+                module.OnlyExpectedKeywords = moduleAction == ModuleAction.Drop && !afterIfExists;
                 return module;
             }
 
             // 1. Object name after FROM, JOIN, UPDATE, INTO …
             var objectKeywords = ObjectNameAnchor(tokens, anchorIndex, statementStart);
+            if (afterIfExists && objectKeywords != null)
+            {
+                objectKeywords = Array.Empty<string>();
+            }
+
             var commaInFrom = anchor.Kind == TokenKind.Comma && anchorAtBlockLevel && clauseState.InFrom && clauseState.Clause == Clause.From;
             if (objectKeywords != null || commaInFrom)
             {

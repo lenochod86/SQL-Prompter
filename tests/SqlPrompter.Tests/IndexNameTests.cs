@@ -35,6 +35,10 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void DropIndexIfExistsOffersTheIndexesToo() =>
+            Assert.Contains(Items("DROP INDEX IF EXISTS |"), i => i.DisplayText == "IX_Users_Name");
+
+        [Fact]
         public void TheInsertTextNamesTheTable()
         {
             var item = Items("DROP INDEX |").First(i => i.DisplayText == "IX_Users_Name");
