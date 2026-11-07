@@ -263,7 +263,23 @@ namespace SqlPrompter.Core.Completion
                     // The call with its OVER clause; the caret goes to the first slot (the argument, or PARTITION BY for the functions without one).
                     var noArguments = Keywords.IsRankingWithoutArguments(function);
                     var tail = noArguments ? " ORDER BY )" : ") OVER (PARTITION BY  ORDER BY )";
-                    yield return new Suggestion(SuggestionKind.Function, text + "() OVER (...)", text + "() OVER (PARTITION BY  ORDER BY )", text, null, "window function with OVER", group, caretBack: tail.Length);
+                    // As a snippet the slots are fields: Tab goes from the argument to PARTITION BY and to ORDER BY (#196).
+                    var body = noArguments
+                        ? text + "() OVER (PARTITION BY $partition$ ORDER BY $order$)$CURSOR$"
+                        : text + "($argument$) OVER (PARTITION BY $partition$ ORDER BY $order$)$CURSOR$";
+                    var fields = new List<SqlPrompter.Core.Snippets.SnippetPlaceholder>
+                    {
+                        new SqlPrompter.Core.Snippets.SnippetPlaceholder { Name = "partition", DefaultValue = "partition_column" },
+                        new SqlPrompter.Core.Snippets.SnippetPlaceholder { Name = "order", DefaultValue = "order_column" },
+                    };
+                    if (!noArguments)
+                    {
+                        fields.Insert(0, new SqlPrompter.Core.Snippets.SnippetPlaceholder { Name = "argument", DefaultValue = Keywords.TakesNoArguments(function) ? string.Empty : "column" });
+                    }
+
+                    var windowSnippet = SqlPrompter.Core.Snippets.Snippet.Create(string.Empty, "window function with OVER", body, fields);
+                    yield return new Suggestion(SuggestionKind.Function, text + "() OVER (...)", text + "() OVER (PARTITION BY  ORDER BY )", text, null, "window function with OVER", group,
+                        caretBack: tail.Length, tag: windowSnippet);
                 }
             }
         }
