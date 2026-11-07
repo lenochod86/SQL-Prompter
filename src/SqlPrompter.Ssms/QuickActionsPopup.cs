@@ -371,6 +371,23 @@ namespace SqlPrompter.Ssms
                 result.Add(new Entry(action.Name, action.Description, () => { ThreadHelper.ThrowIfNotOnUIThread(); Run(view, id, hasSelection); }));
             }
 
+            result.Add(new Entry("Rename Query Tab...", "Gives the active query tab a name that is shown on the tab and kept after a restart.", () => { ThreadHelper.ThrowIfNotOnUIThread(); TabSessionService.Current?.RenameActiveTab(); }));
+
+            // The tabs that were closed lately (#226), the last one first.
+            var closedTabs = TabSessionService.Current?.ClosedTabsList ?? new SqlPrompter.Core.History.SavedTab[0];
+            foreach (var tab in closedTabs.Take(8))
+            {
+                var closed = tab;
+                var title = !string.IsNullOrEmpty(closed.Name) ? closed.Name : (closed.Text ?? string.Empty).Trim().Split('\n')[0].Trim();
+                if (title.Length > 50)
+                {
+                    title = title.Substring(0, 50) + "...";
+                }
+
+                var where = closed.IsConnected ? closed.Server + (string.IsNullOrEmpty(closed.Database) ? string.Empty : ", " + closed.Database) : "not connected";
+                result.Add(new Entry("Reopen closed tab: " + (title.Length > 0 ? title : "(empty)"), where, () => { ThreadHelper.ThrowIfNotOnUIThread(); TabSessionService.Current?.ReopenClosedTab(closed); }));
+            }
+
             foreach (var snippet in QuickActionCatalog.SnippetsFor(SnippetService.Snippets, hasSelection))
             {
                 var current = snippet;

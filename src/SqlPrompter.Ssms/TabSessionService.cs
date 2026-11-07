@@ -42,9 +42,81 @@ namespace SqlPrompter.Ssms
         private int emptyTicks;
         private readonly HashSet<string> describeFailures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        private readonly Dictionary<string, string> names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The service of this SSMS instance (the commands and the quick actions reach it through this).</summary>
+        public static TabSessionService Current { get; private set; }
+
         private TabSessionService(DTE dte)
         {
             this.dte = dte;
+            Current = this;
+        }
+
+        /// <summary>The tabs that can be reopened, the one closed last first.</summary>
+        public IReadOnlyList<SavedTab> ClosedTabsList
+        {
+            get
+            {
+                ApplyClosedTabLimits();
+                return closedTabs.Items;
+            }
+        }
+
+        private void ApplyClosedTabLimits()
+        {
+            var behavior = SettingsService.Current.Behavior;
+            closedTabs.Capacity = Math.Max(1, behavior.ClosedTabsKept);
+            closedTabs.MaxAge = behavior.ClosedTabsHours > 0 ? TimeSpan.FromHours(behavior.ClosedTabsHours) : TimeSpan.Zero;
+        }
+
+        /// <summary>Asks for a name for the active query tab and shows it as the caption; the name is saved with the tab and comes back after a restart (#226).</summary>
+        public void RenameActiveTab()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var document = dte.ActiveDocument;
+            if (document == null || !IsQuery(document))
+            {
+                TellStatus("SQL Prompter: there is no query tab to rename.");
+                return;
+            }
+
+            names.TryGetValue(document.FullName, out var current);
+            var window = new TextPromptWindow("Rename query tab", "Name of the tab (empty gives the name SSMS chose back):", current ?? System.IO.Path.GetFileName(document.FullName));
+            ActiveEditor.SetOwner(window);
+            if (window.ShowDialog() != true)
+            {
+                return;
+            }
+
+            var name = window.Value;
+            var temporaryName = System.IO.Path.GetFileName(document.FullName);
+            if (name.Length == 0 || string.Equals(name, temporaryName, StringComparison.OrdinalIgnoreCase))
+            {
+                names.Remove(document.FullName);
+                TabCaption.Apply(document.FullName, null);
+            }
+            else
+            {
+                names[document.FullName] = name;
+                if (!TabCaption.Apply(document.FullName, name))
+                {
+                    TellStatus("SQL Prompter: the tab could not be renamed (see the log).");
+                    return;
+                }
+            }
+
+            Save(true);
+            TellStatus("SQL Prompter: the tab is named " + (name.Length == 0 ? temporaryName : name) + ".");
+        }
+
+        private static void TellStatus(string message)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsStatusbar)) is Microsoft.VisualStudio.Shell.Interop.IVsStatusbar statusBar)
+            {
+                statusBar.SetText(message);
+            }
         }
 
         public static TabSessionService Start(DTE dte)
@@ -226,13 +298,14 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>Opens the query tab that was closed last again, with its text and connection (#226).</summary>
-        public void ReopenClosedTab()
+        public void ReopenClosedTab(SavedTab chosen = null)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             string message;
             try
             {
-                var tab = closedTabs.Pop();
+                ApplyClosedTabLimits();
+                var tab = chosen != null && closedTabs.Remove(chosen) ? chosen : closedTabs.Pop();
                 if (tab == null)
                 {
                     message = "SQL Prompter: there is no closed query tab to reopen.";
@@ -259,6 +332,19 @@ namespace SqlPrompter.Ssms
         }
 
         private bool OpenTab(SavedTab tab)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var opened = OpenTabCore(tab);
+            if (opened && !string.IsNullOrEmpty(tab.Name) && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
+            {
+                names[dte.ActiveDocument.FullName] = tab.Name;
+                TabCaption.Apply(dte.ActiveDocument.FullName, tab.Name);
+            }
+
+            return opened;
+        }
+
+        private bool OpenTabCore(SavedTab tab)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             if (!string.IsNullOrEmpty(tab.File))
@@ -335,13 +421,27 @@ namespace SqlPrompter.Ssms
                     }
                 }
 
-                var summary = string.Join(", ", openKeys.Select(k => Path.GetFileName(k.Key)));
+                var documentNames = new List<string>();
+                foreach (Document listed in dte.Documents)
+                {
+                    try
+                    {
+                        documentNames.Add(Path.GetFileName(listed.FullName));
+                    }
+                    catch (Exception)
+                    {
+                        documentNames.Add("?");
+                    }
+                }
+
+                var summary = string.Join(", ", openKeys.Select(k => Path.GetFileName(k.Key))) + " of " + string.Join(", ", documentNames);
                 if (summary != lastSummary)
                 {
                     lastSummary = summary;
                     Log.Write("Tabs open (described): " + summary);
                 }
 
+                ApplyClosedTabLimits();
                 var newlyClosed = closedTabs.Update(openKeys);
                 if (newlyClosed > 0)
                 {
@@ -402,6 +502,7 @@ namespace SqlPrompter.Ssms
                 Encrypt = connection?.Encrypt,
                 TrustServerCertificate = connection?.TrustServerCertificate,
                 Active = active,
+                Name = names.TryGetValue(name, out var tabName) ? tabName : null,
             };
         }
     }

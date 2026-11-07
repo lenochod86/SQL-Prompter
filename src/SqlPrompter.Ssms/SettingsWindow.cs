@@ -266,6 +266,10 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.KeepHistory, v => work.Behavior.KeepHistory = v);
             history.Number("Keep history for", "History older than this is removed when SSMS starts. 0 keeps it forever.", 0, 36500,
                 () => work.Behavior.HistoryDays, v => work.Behavior.HistoryDays = v, "days", () => work.Behavior.KeepHistory);
+            history.Number("Closed tabs to remember", "How many closed query tabs Reopen Closed Query Tab (and the quick actions) can bring back. The list lives until SSMS ends.", 1, 200,
+                () => work.Behavior.ClosedTabsKept, v => work.Behavior.ClosedTabsKept = v, "tabs");
+            history.Number("Remember a closed tab for", "A closed query tab can be reopened for this many hours. 0 keeps it until SSMS ends.", 0, 8760,
+                () => work.Behavior.ClosedTabsHours, v => work.Behavior.ClosedTabsHours = v, "hours");
             history.Check("Restore query tabs at start", "The open query tabs, with their text and connection, are saved every few seconds to %APPDATA%\\SqlPrompter\\tabs.json and opened again when SSMS starts. " +
                 "Windows authentication reconnects; a tab with a SQL login opens unconnected (passwords are never stored) with a comment naming the server and database.",
                 () => work.Behavior.RestoreTabs, v => work.Behavior.RestoreTabs = v);

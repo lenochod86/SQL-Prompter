@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 40)]
+    [ProvideMenuResource("Menus.ctmenu", 41)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class SqlPrompterPackage : AsyncPackage
@@ -57,6 +57,7 @@ namespace SqlPrompter.Ssms
         public const int FindInCodeId = 0x012E;
         public const int ShowDependenciesId = 0x012F;
         public const int ReopenClosedTabId = 0x0130;
+        public const int RenameQueryTabId = 0x0132;
         public const int CopyGridAsInListId = 0x0127;
         public const int CopyGridAsValuesId = 0x0128;
         public const int CopyGridAsJsonId = 0x0129;
@@ -108,6 +109,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => FindInCode.Run(ActiveEditor.GetView()), new CommandID(CommandSet, FindInCodeId)));
                 commands.AddCommand(new MenuCommand((s, e) => ShowDependencies.Run(ActiveEditor.GetView()), new CommandID(CommandSet, ShowDependenciesId)));
                 commands.AddCommand(new MenuCommand((s, e) => tabSession?.ReopenClosedTab(), new CommandID(CommandSet, ReopenClosedTabId)));
+                commands.AddCommand(new MenuCommand((s, e) => tabSession?.RenameActiveTab(), new CommandID(CommandSet, RenameQueryTabId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsInList(t), "an IN list"), new CommandID(CommandSet, CopyGridAsInListId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsValues(t), "VALUES"), new CommandID(CommandSet, CopyGridAsValuesId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsJson(t), "JSON"), new CommandID(CommandSet, CopyGridAsJsonId)));

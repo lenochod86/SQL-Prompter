@@ -38,6 +38,10 @@ namespace SqlPrompter.Core.History
         [DataMember(Name = "trustServerCertificate")]
         public string TrustServerCertificate { get; set; }
 
+        /// <summary>The name the user gave the tab (#226); empty for the name SSMS gives.</summary>
+        [DataMember(Name = "name", EmitDefaultValue = false)]
+        public string Name { get; set; }
+
         /// <summary>The tab was the one in front.</summary>
         [DataMember(Name = "active")]
         public bool Active { get; set; }
