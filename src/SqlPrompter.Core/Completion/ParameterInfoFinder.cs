@@ -35,7 +35,7 @@ namespace SqlPrompter.Core.Completion
     {
         public static ParameterInfo Find(string text, int caret, IDatabaseMetadata metadata)
         {
-            if (text == null || caret < 0 || caret > text.Length || metadata == null)
+            if (text == null || caret < 0 || caret > text.Length)
             {
                 return null;
             }
@@ -80,7 +80,7 @@ namespace SqlPrompter.Core.Completion
                     }
 
                     var name = NameBefore(tokens, j);
-                    var function = name == null ? null : metadata.FindObject(name.Count > 1 ? name[name.Count - 2] : null, name[name.Count - 1]);
+                    var function = name == null || metadata == null ? null : metadata.FindObject(name.Count > 1 ? name[name.Count - 2] : null, name[name.Count - 1]);
                     if (function != null && (function.Kind == DbObjectKind.ScalarFunction || function.Kind == DbObjectKind.TableFunction))
                     {
                         var parameters = metadata.GetFunctionParameters(function);
@@ -88,6 +88,12 @@ namespace SqlPrompter.Core.Completion
                         {
                             return new ParameterInfo(string.Join(".", name), parameters.Select(Describe).ToList(), commas < parameters.Count ? commas : -1);
                         }
+                    }
+
+                    // A window function that takes arguments (#215): its signature, from the table of the built-in ones.
+                    if (name != null && name.Count == 1 && WindowFunctionSignatures.TryGetValue(name[0], out var signature))
+                    {
+                        return new ParameterInfo(name[0].ToUpperInvariant(), signature, commas < signature.Length ? commas : -1);
                     }
 
                     // A built-in function, IN (…), a subquery: look at the call around it.
@@ -98,9 +104,23 @@ namespace SqlPrompter.Core.Completion
             return null;
         }
 
+        private static readonly Dictionary<string, string[]> WindowFunctionSignatures = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["NTILE"] = new[] { "integer_expression" },
+            ["LAG"] = new[] { "scalar_expression", "offset int = 1", "default = NULL" },
+            ["LEAD"] = new[] { "scalar_expression", "offset int = 1", "default = NULL" },
+            ["FIRST_VALUE"] = new[] { "scalar_expression" },
+            ["LAST_VALUE"] = new[] { "scalar_expression" },
+            ["SUM"] = new[] { "[ALL | DISTINCT] expression" },
+            ["AVG"] = new[] { "[ALL | DISTINCT] expression" },
+            ["MIN"] = new[] { "[ALL | DISTINCT] expression" },
+            ["MAX"] = new[] { "[ALL | DISTINCT] expression" },
+            ["COUNT"] = new[] { "[ALL | DISTINCT] expression | *" },
+        };
+
         private static ParameterInfo FindProcedureCall(List<Token> tokens, int before, int caret, IDatabaseMetadata metadata)
         {
-            if (before == 0)
+            if (before == 0 || metadata == null)
             {
                 return null;
             }
