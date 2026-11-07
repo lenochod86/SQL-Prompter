@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6" Version="0.101.0" Language="en-US" Publisher="SQL Prompter" />
+    <Identity Id="SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6" Version="0.102.0" Language="en-US" Publisher="SQL Prompter" />
     <DisplayName>SQL Prompter</DisplayName>
     <Description xml:space="preserve">Custom IntelliSense for the SQL editor in SSMS 22: keywords, schemas, tables, columns and aliases. Log: %LOCALAPPDATA%\SqlPrompter\sqlprompter.log</Description>
   </Metadata>
