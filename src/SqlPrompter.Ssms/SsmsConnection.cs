@@ -133,8 +133,53 @@ namespace SqlPrompter.Ssms
             return connection;
         }
 
+        private static object mruManager;
+
+        /// <summary>
+        /// The connection that SSMS itself remembered for a server and SQL login (the user ticked <i>Remember Password</i> in the Connect dialog): the
+        /// recent connections of the dialog (<c>IConnectionMruManager.GetMruList</c> of <c>VSConnectionMruManager</c>) hold the password, which is used in
+        /// memory for the reconnect and never written anywhere by SQL Prompter (#331). Null when there is none.
+        /// </summary>
+        private static ConnectionSettings FindRemembered(string server, string login, string database)
+        {
+            try
+            {
+                if (mruManager == null)
+                {
+                    var type = AssemblyTypes.FindLoaded("Microsoft.SqlServer.ConnectionDlg.VS.VSConnectionMruManager");
+                    mruManager = type == null ? null : Activator.CreateInstance(type);
+                }
+
+                var list = mruManager?.GetType().GetMethod("GetMruList", Type.EmptyTypes)?.Invoke(mruManager, null) as System.Collections.IEnumerable;
+                ConnectionSettings best = null;
+                foreach (var item in list ?? new object[0])
+                {
+                    var settings = ParseInfo(item.GetType().GetProperty("UIConnectionInfo")?.GetValue(item), false);
+                    if (settings != null && settings.Authentication == AuthenticationKind.SqlPassword && !string.IsNullOrEmpty(settings.Password) &&
+                        string.Equals(settings.Server, server, StringComparison.OrdinalIgnoreCase) && string.Equals(settings.UserName, login, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (string.Equals(settings.Database, database, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return settings;
+                        }
+
+                        best = best ?? settings;
+                    }
+                }
+
+                return best;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reading the connections remembered by SSMS failed", ex);
+                return null;
+            }
+        }
+
         /// <summary>The data of a <c>UIConnectionInfo</c>; remembers a SQL login that has a password for reconnecting restored tabs.</summary>
-        private static ConnectionSettings FromInfo(object info)
+        private static ConnectionSettings FromInfo(object info) => ParseInfo(info, true);
+
+        private static ConnectionSettings ParseInfo(object info, bool remember)
         {
             if (info == null)
             {
@@ -180,10 +225,13 @@ namespace SqlPrompter.Ssms
                 authentication == AuthenticationKind.SqlPassword ? Read("Password") : null,
                 options?["ENCRYPT_CONNECTION"],
                 options?["TRUST_SERVER_CERTIFICATE"]);
-            LastSeenByServer[(server ?? string.Empty).ToUpperInvariant()] = settings;
-            if (authentication == AuthenticationKind.SqlPassword && !string.IsNullOrEmpty(settings.Password))
+            if (remember)
             {
-                LiveSqlLogins[LoginKey(settings.Server, settings.UserName)] = settings;
+                LastSeenByServer[(server ?? string.Empty).ToUpperInvariant()] = settings;
+                if (authentication == AuthenticationKind.SqlPassword && !string.IsNullOrEmpty(settings.Password))
+                {
+                    LiveSqlLogins[LoginKey(settings.Server, settings.UserName)] = settings;
+                }
             }
 
             return settings;
@@ -285,9 +333,15 @@ namespace SqlPrompter.Ssms
             var sqlKey = tab.IsConnected && !string.IsNullOrEmpty(tab.Login) ? LoginKey(tab.Server, tab.Login) : null;
             var reconnect = sqlKey != null && SettingsService.Current.Behavior.ReconnectSqlTabs && !DeclinedSqlLogins.ContainsKey(sqlKey);
             ConnectionSettings live = null;
+            var remembered = false;
             if (reconnect)
             {
                 LiveSqlLogins.TryGetValue(sqlKey, out live);
+                if (live == null)
+                {
+                    live = FindRemembered(tab.Server, tab.Login, tab.Database);
+                    remembered = live != null;
+                }
             }
 
             if (tab.IsConnected && (string.IsNullOrEmpty(tab.Login) || reconnect))
@@ -374,7 +428,7 @@ namespace SqlPrompter.Ssms
                     FromInfo(front);
                     DeclinedSqlLogins.TryRemove(sqlKey, out _);
                     text = WithoutReconnectComment(text);
-                    Log.Write("A restored tab was connected as " + tab.Login + " to " + tab.Server + (live == null ? " (the user typed the password in the Connect dialog)." : " (with the live connection of the same login)."));
+                    Log.Write("A restored tab was connected as " + tab.Login + " to " + tab.Server + (live == null ? " (the user typed the password in the Connect dialog)." : remembered ? " (with the password SSMS remembered for the login)." : " (with the live connection of the same login)."));
                 }
                 else
                 {
