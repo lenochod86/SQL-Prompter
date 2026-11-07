@@ -147,5 +147,17 @@ namespace SqlPrompter.Tests
             Assert.True(old.Coloring.ColorWindowStatusBar);
             Assert.False(old.Coloring.ColorShellStatusBar);
         }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData("", "master")]
+        public void AWindowWithoutAConnectionMatchesNoEnvironment(string server, string database)
+        {
+            var settings = new ColorSettings();
+            settings.Environments.Add(new ColorEnvironment { Name = "Prod", Color = "#FF0000" });
+            settings.Rules.Add(new ColorRule { Server = "*", Database = "", Environment = "Prod" });
+
+            Assert.Null(EnvironmentMatcher.Find(settings, server, database));
+        }
     }
 }

@@ -26,15 +26,28 @@ namespace SqlPrompter.Ssms
         [DllImport("user32.dll")]
         private static extern bool EnumChildWindows(IntPtr parent, EnumProc proc, IntPtr lParam);
 
-        /// <summary>Colors the strips by the rules, or gives them their own color back when <paramref name="enabled"/> is false or no rule matches.</summary>
-        public static void Update(IntPtr mainWindow, ColorSettings coloring, bool enabled)
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hwnd);
+
+        /// <summary>
+        /// Colors the strips by the rules, or gives them their own color back when <paramref name="enabled"/> is false or no rule matches.
+        /// Returns what the window in front wants (<c>Found</c> false when no query window is shown): the tab and the shell status bar follow it,
+        /// decided from the connection state of that window itself (#317), never from the connection that was last active.
+        /// </summary>
+        public static Front Update(IntPtr mainWindow, ColorSettings coloring, bool enabled)
         {
+            var front = new Front();
             var strips = new List<StatusStrip>();
             EnumChildWindows(mainWindow, (handle, lParam) =>
             {
                 if (Control.FromHandle(handle) is StatusStrip strip && strip.Parent != null && strip.Parent.GetType().Name == EditorControlType)
                 {
                     strips.Add(strip);
+                    if (!front.Found && IsWindowVisible(strip.Handle))
+                    {
+                        front.Found = true;
+                        front.Color = Wanted(strip.Parent, coloring);
+                    }
                 }
 
                 return true;
@@ -51,6 +64,17 @@ namespace SqlPrompter.Ssms
                     Log.Error("Coloring the status bar of a query window failed", ex);
                 }
             }
+
+            return front;
+        }
+
+        /// <summary>The environment color wanted for the query window in front.</summary>
+        internal sealed class Front
+        {
+            public bool Found;
+
+            /// <summary>Null when the window has no connection or no rule matches it.</summary>
+            public Color? Color;
         }
 
         private static Color? Wanted(Control editor, ColorSettings coloring)
