@@ -95,6 +95,9 @@ namespace SqlPrompter.Ssms
         /// <summary>Server and login that the user cancelled the connect dialog for in this run: the other tabs of that login are not asked again.</summary>
         private static readonly ConcurrentDictionary<string, bool> DeclinedSqlLogins = new ConcurrentDictionary<string, bool>();
 
+        /// <summary>The encryption options of the last connection seen to each server (any login): a tab that is opened without its own options (a history entry) gets them.</summary>
+        private static readonly ConcurrentDictionary<string, ConnectionSettings> LastSeenByServer = new ConcurrentDictionary<string, ConnectionSettings>();
+
         private static string LoginKey(string server, string login) => ((server ?? string.Empty) + "|" + (login ?? string.Empty)).ToUpperInvariant();
 
         /// <summary>Connection data of the active window, or null if the window is not connected.</summary>
@@ -177,6 +180,7 @@ namespace SqlPrompter.Ssms
                 authentication == AuthenticationKind.SqlPassword ? Read("Password") : null,
                 options?["ENCRYPT_CONNECTION"],
                 options?["TRUST_SERVER_CERTIFICATE"]);
+            LastSeenByServer[(server ?? string.Empty).ToUpperInvariant()] = settings;
             if (authentication == AuthenticationKind.SqlPassword && !string.IsNullOrEmpty(settings.Password))
             {
                 LiveSqlLogins[LoginKey(settings.Server, settings.UserName)] = settings;
@@ -305,8 +309,9 @@ namespace SqlPrompter.Ssms
                 var options = (NameValueCollection)infoType.GetProperty("AdvancedOptions").GetValue(info);
                 options["DATABASE"] = tab.Database ?? string.Empty;
                 // The encryption options of the tab, or those of the live connection of the same login (a missing "trust the certificate" fails the login).
-                var encrypt = !string.IsNullOrEmpty(tab.Encrypt) ? tab.Encrypt : live?.Encrypt;
-                var trust = !string.IsNullOrEmpty(tab.TrustServerCertificate) ? tab.TrustServerCertificate : live?.TrustServerCertificate;
+                LastSeenByServer.TryGetValue((tab.Server ?? string.Empty).ToUpperInvariant(), out var seen);
+                var encrypt = !string.IsNullOrEmpty(tab.Encrypt) ? tab.Encrypt : live?.Encrypt ?? seen?.Encrypt;
+                var trust = !string.IsNullOrEmpty(tab.TrustServerCertificate) ? tab.TrustServerCertificate : live?.TrustServerCertificate ?? seen?.TrustServerCertificate;
                 if (!string.IsNullOrEmpty(encrypt))
                 {
                     options["ENCRYPT_CONNECTION"] = encrypt;
