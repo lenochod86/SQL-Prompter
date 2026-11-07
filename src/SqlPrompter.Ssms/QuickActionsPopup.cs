@@ -144,8 +144,16 @@ namespace SqlPrompter.Ssms
             PreviewKeyDown += OnCtrlDown;
             PreviewKeyUp += OnCtrlUp;
             PreviewMouseDown += (s, e) => closeTap.Interrupted();
-            Loaded += (s, e) => filter.Focus();
-            Closing += (s, e) => closing = true;
+            Loaded += (s, e) =>
+            {
+                filter.Focus();
+                StartOutsideClickWatch();
+            };
+            Closing += (s, e) =>
+            {
+                closing = true;
+                outsideTimer?.Stop();
+            };
             Deactivated += (s, e) =>
             {
                 if (!closing)
@@ -164,6 +172,52 @@ namespace SqlPrompter.Ssms
                 }
             };
             Fill();
+        }
+
+        private System.Windows.Threading.DispatcherTimer outsideTimer;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int key);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out System.Drawing.Point point);
+
+        /// <summary>
+        /// A click anywhere outside the popup closes it, also in the editor behind it: the popup is modal and owned by the SSMS window, so a click
+        /// there does not always take the activation away from it. The mouse buttons are polled (a hook would see the click only after SSMS did).
+        /// </summary>
+        private void StartOutsideClickWatch()
+        {
+            var wasDown = false;
+            outsideTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+            outsideTimer.Tick += (s, e) =>
+            {
+                if (closing)
+                {
+                    outsideTimer.Stop();
+                    return;
+                }
+
+                var down = (GetAsyncKeyState(0x01) & 0x8000) != 0 || (GetAsyncKeyState(0x02) & 0x8000) != 0 || (GetAsyncKeyState(0x04) & 0x8000) != 0;
+                if (down && !wasDown && GetCursorPos(out var cursor))
+                {
+                    var source = PresentationSource.FromVisual(this);
+                    var toDevice = source?.CompositionTarget?.TransformToDevice ?? Matrix.Identity;
+                    var topLeft = toDevice.Transform(new Point(Left, Top));
+                    var bottomRight = toDevice.Transform(new Point(Left + ActualWidth, Top + ActualHeight));
+                    if (cursor.X < topLeft.X || cursor.X > bottomRight.X || cursor.Y < topLeft.Y || cursor.Y > bottomRight.Y)
+                    {
+                        closing = true;
+                        chosen = null;
+                        outsideTimer.Stop();
+                        Close();
+                        return;
+                    }
+                }
+
+                wasDown = down;
+            };
+            outsideTimer.Start();
         }
 
         private static bool IsCtrl(Key key) => key == Key.LeftCtrl || key == Key.RightCtrl;
