@@ -47,11 +47,11 @@ Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator w
    - Imperative subject line of at most 72 characters.
    - The body says why and what, and ends with `Refs #<number>`.
    - Before every commit the tests pass (`dotnet test tests/SqlPrompter.Tests`). If `src/SqlPrompter.Ssms` changed and you are on Windows, the VSIX builds too.
-4. **Push** the branch regularly (`git push -u origin <branch>`) so the work can be picked up from another environment.
+4. **Push** the branch (`git push -u origin <branch>`) so the work can be picked up from another environment. Before a push run `pwsh .github/scripts/Verify-Local.ps1` (what CI runs: the tests, the version checks against `origin/main` and, on Windows, the VSIX build with warnings as errors; `-SkipVsix` when `src/SqlPrompter.Ssms` did not change): a red push wastes billed Actions minutes. Push a branch as few times as possible.
 5. **Pull request** to `main` when the work is ready for review.
    - Describe what changed, how to test it in SSMS, and what is verified and what is not.
    - Include `Closes #<number>`.
-   - CI runs the tests and the version checks on every push to the pull request, but the Windows VSIX build (it costs twice the billed minutes, the repository is private) only for a pull request with the label `build-vsix`. Push the branch as few times as possible, and add the label `build-vsix` when the work is ready, so that the VSIX of the final commit is built once; it is a required step before a merge.
+   - CI runs the tests and the version checks on every push to the pull request, but the Windows VSIX build (it costs twice the billed minutes, the repository is private) only for a pull request with the label `build-vsix`. Add the label `build-vsix` when the work is ready, so that the VSIX of the final commit is built once; it is a required step before a merge.
 6. **Approval.** Merge only after the user explicitly agrees. The user usually tests the VSIX from the branch in SSMS.
 7. **Squash merge** the pull request into `main` (the repository allows only squash merges).
    - The commit message is the PR title with the PR number; the body summarizes the change.
