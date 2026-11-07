@@ -32,6 +32,34 @@ namespace SqlPrompter.Core.Navigation
     public static class DefinitionScript
     {
         /// <summary>
+        /// SQL Server stores the text of a module as it was written, often with blank lines in front of CREATE; they would only push the script
+        /// down in the new window or in the editor. Lines that hold nothing but white space are removed from the start; the indent of the first
+        /// line with text stays.
+        /// </summary>
+        public static string WithoutLeadingBlankLines(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text ?? string.Empty;
+            }
+
+            var cut = 0;
+            for (var i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\n')
+                {
+                    cut = i + 1;
+                }
+                else if (!char.IsWhiteSpace(text[i]))
+                {
+                    break;
+                }
+            }
+
+            return text.Substring(cut);
+        }
+
+        /// <summary>
         /// Turns the stored text of a procedure, view, function or trigger into CREATE OR ALTER: the first CREATE (outside comments)
         /// gets OR ALTER. A text that already says CREATE OR ALTER, or does not start with CREATE, is returned unchanged.
         /// </summary>
@@ -41,6 +69,8 @@ namespace SqlPrompter.Core.Navigation
             {
                 return definition ?? string.Empty;
             }
+
+            definition = WithoutLeadingBlankLines(definition);
 
             var tokens = Lexer.Tokenize(definition);
             for (var i = 0; i < tokens.Count; i++)
@@ -74,6 +104,7 @@ namespace SqlPrompter.Core.Navigation
         /// </summary>
         public static string ToAlter(string definition, bool createOrAlter = false)
         {
+            definition = WithoutLeadingBlankLines(definition);
             if (createOrAlter || string.IsNullOrEmpty(definition))
             {
                 return createOrAlter ? ToCreateOrAlter(definition) : definition ?? string.Empty;
