@@ -14,7 +14,7 @@ namespace SqlPrompter.Ssms
 {
     /// <summary>
     /// Keeps the open query tabs in %APPDATA%\SqlPrompter\tabs.json (text and connection, never a password) and opens them again when SSMS
-    /// starts. The list is written when the user opens or saves a query window, shortly after one is closed (so a tab closed by hand is gone from the
+    /// starts. The list is written when the user opens or saves a query window, when one is closed (so a tab closed by hand is gone from the
     /// file and a crash loses nothing) and every few seconds for the text of unsaved queries. At shutdown SSMS closes all the windows in a burst and
     /// announces the shutdown a few milliseconds later, so the write that follows a close waits a moment and is dropped when the shutdown is
     /// announced; the file then keeps the tabs that were open before the burst (TabSessionPolicy). The connection of a window is only readable while it is
@@ -34,8 +34,10 @@ namespace SqlPrompter.Ssms
         private DTEEvents dteEvents;
         private IVsRunningDocumentTable rdt;
         private uint rdtCookie;
-        private DispatcherTimer closeTimer;
         private bool shuttingDown;
+        private readonly TabShutdownGuard shutdown = new TabShutdownGuard();
+        private DispatcherTimer shutdownTimer;
+        private CommandEvents commandEvents;
         private string lastSummary;
         private readonly ClosedTabs closedTabs = new ClosedTabs();
         private bool sawTabs;
@@ -133,10 +135,10 @@ namespace SqlPrompter.Ssms
                 service.dteEvents = dte.Events.DTEEvents;
                 service.dteEvents.OnBeginShutdown += () =>
                 {
-                    // The windows were closed a moment ago by SSMS, not by the user: the write that waits for them is dropped.
-                    service.closeTimer?.Stop();
+                    // SSMS is closing for good; the session was written when the shutdown began (BeginShutdown) and stays as it is.
                     service.shuttingDown = true;
-                    Log.Write("Shutdown: SSMS announces the shutdown; the tabs of the last write are kept.");
+                    service.shutdownTimer?.Stop();
+                    Log.Write("Shutdown: SSMS announces the shutdown; the tabs written when it began are kept.");
                 };
 
                 // Wait until the shell has opened what it opens by itself, then restore and only afterwards start saving, so that the
@@ -176,6 +178,7 @@ namespace SqlPrompter.Ssms
                 ThreadHelper.ThrowIfNotOnUIThread();
                 rdt = (IVsRunningDocumentTable)Package.GetGlobalService(typeof(SVsRunningDocumentTable));
                 rdt.AdviseRunningDocTableEvents(new TableEvents(this), out rdtCookie);
+                WatchShutdown();
             }
             catch (Exception ex)
             {
@@ -190,29 +193,108 @@ namespace SqlPrompter.Ssms
             Save(true);
         }
 
-        /// <summary>A window is closing: write the list in a moment, unless SSMS announces the shutdown first (it closes every window then).</summary>
-        private void OnClosing()
+        private const int WmClose = 0x0010;
+        private const int WmQueryEndSession = 0x0011;
+        private const int WmSysCommand = 0x0112;
+        private const int ScClose = 0xF060;
+
+        /// <summary>
+        /// SSMS closes every window of a shutdown in a burst and announces the shutdown only afterwards, so the signal that the shutdown has begun
+        /// has to come from earlier: the close messages of the main window (the X button, Alt+F4, the system menu, logging off) and the command
+        /// File.Exit. When one comes the open tabs are written at once (BeginShutdown).
+        /// </summary>
+        private void WatchShutdown()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            if (shuttingDown)
+            try
+            {
+                var window = System.Windows.Application.Current?.MainWindow;
+                var source = window == null ? null : System.Windows.PresentationSource.FromVisual(window) as System.Windows.Interop.HwndSource;
+                source?.AddHook(WindowMessage);
+                commandEvents = dte.Events.CommandEvents;
+                commandEvents.BeforeExecute += (string guid, int id, object customIn, object customOut, ref bool cancelDefault) =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    if (string.Equals(guid, "{5EFC7975-14BC-11CF-9B2B-00AA00573819}", StringComparison.OrdinalIgnoreCase) && id == 229)
+                    {
+                        BeginShutdown("File.Exit");
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Watching the shutdown failed", ex);
+            }
+        }
+
+        private IntPtr WindowMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (message == WmClose || message == WmQueryEndSession || (message == WmSysCommand && (wParam.ToInt64() & 0xFFF0) == ScClose))
+            {
+                BeginShutdown("window message 0x" + message.ToString("X"));
+            }
+
+            return IntPtr.Zero;
+        }
+
+        /// <summary>The main window is being closed: write the tabs that are open now, then leave the file alone while the windows close (until the shutdown is cancelled).</summary>
+        private void BeginShutdown(string reason)
+        {
+            try
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (shuttingDown || shutdown.Pending)
+                {
+                    return;
+                }
+
+                Log.Write("Shutdown begins (" + reason + "): the open tabs are written now.");
+                Save(true);
+                shutdown.Begin();
+                if (shutdownTimer == null)
+                {
+                    shutdownTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
+                    shutdownTimer.Tick += (s, e) =>
+                    {
+                        if (shutdown.Poll(DateTime.UtcNow, IsMainWindowEnabled()))
+                        {
+                            shutdownTimer.Stop();
+                            Log.Write("Shutdown was cancelled: the tabs that are open are written again.");
+                            Save(true);
+                        }
+                    };
+                }
+
+                shutdownTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Starting the shutdown failed", ex);
+            }
+        }
+
+        /// <summary>A window is closing by the user: write the list at once, without that window (an empty list is a valid session).</summary>
+        private void OnClosing(uint docCookie)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (shuttingDown || shutdown.Pending)
             {
                 return;
             }
 
-            if (closeTimer == null)
+            string moniker = null;
+            try
             {
-                closeTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(700) };
-                closeTimer.Tick += (s, e) =>
-                {
-                    closeTimer.Stop();
-                    Save(true);
-                };
+                rdt.GetDocumentInfo(docCookie, out _, out _, out _, out moniker, out _, out _, out _);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("The closing document could not be identified", ex);
             }
 
-            closeTimer.Stop();
-            closeTimer.Start();
+            Save(true, moniker);
         }
-
         /// <summary>The events of the running document table.</summary>
         private sealed class TableEvents : IVsRunningDocTableEvents
         {
@@ -235,7 +317,7 @@ namespace SqlPrompter.Ssms
                 ThreadHelper.ThrowIfNotOnUIThread();
                 if (dwReadLocksRemaining == 0 && dwEditLocksRemaining == 0)
                 {
-                    owner.OnClosing();
+                    owner.OnClosing(docCookie);
                 }
 
                 return VSConstants.S_OK;
@@ -367,12 +449,12 @@ namespace SqlPrompter.Ssms
             return SsmsConnection.OpenSavedTab(tab);
         }
 
-        private void Save(bool userChange = false)
+        private void Save(bool userChange = false, string closing = null)
         {
             try
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
-                if (shuttingDown || !SettingsService.Current.Behavior.RestoreTabs)
+                if (shuttingDown || shutdown.Pending || !SettingsService.Current.Behavior.RestoreTabs)
                 {
                     return;
                 }
@@ -395,7 +477,7 @@ namespace SqlPrompter.Ssms
                 var openKeys = new List<KeyValuePair<string, SavedTab>>();
                 foreach (Document document in dte.Documents)
                 {
-                    if (!IsQuery(document))
+                    if (!IsQuery(document) || (closing != null && string.Equals(document.FullName, closing, StringComparison.OrdinalIgnoreCase)))
                     {
                         continue;
                     }
