@@ -37,14 +37,10 @@ namespace SqlPrompter.Ssms
             preview.VerticalAlignment = VerticalAlignment.Stretch;
             status.SetResourceReference(TextBlock.ForegroundProperty, Microsoft.VisualStudio.Shell.VsBrushes.WindowTextKey);
 
-            var grid = new GridView();
-            grid.Columns.Add(Column("Pin", "Pin", 30));
-            grid.Columns.Add(Column("Run", "Run", 140));
-            grid.Columns.Add(Column("Tab", "Tab", 130));
-            grid.Columns.Add(Column("Closed", "Closed", 140));
-            grid.Columns.Add(Column("Database", "Database", 120));
-            grid.Columns.Add(Column("Server", "Server", 120));
-            list.View = grid;
+            // Two lines per run (#286): tab name and time of the run on the left, server and database on the right.
+            list.ItemTemplate = (DataTemplate)System.Windows.Markup.XamlReader.Parse(RowTemplate);
+            list.ItemContainerStyle = (Style)System.Windows.Markup.XamlReader.Parse(RowStyle);
+            ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
             list.SelectionChanged += (s, e) => ShowPreview();
             list.MouseDoubleClick += (s, e) => Choose();
             list.KeyDown += (s, e) =>
@@ -202,8 +198,26 @@ namespace SqlPrompter.Ssms
             return button;
         }
 
-        private static GridViewColumn Column(string header, string binding, double width) =>
-            new GridViewColumn { Header = header, Width = width, DisplayMemberBinding = new System.Windows.Data.Binding(binding) };
+        private const string RowStyle =
+            "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='ListViewItem'>" +
+            "<Setter Property='HorizontalContentAlignment' Value='Stretch'/><Setter Property='Padding' Value='2'/></Style>";
+
+        private const string RowTemplate =
+            "<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'>" +
+            "<Grid Margin='4,3,4,3' ToolTip='{Binding Tooltip}'>" +
+            "<Grid.ColumnDefinitions><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MaxWidth='260'/></Grid.ColumnDefinitions>" +
+            "<StackPanel Grid.Column='0'>" +
+            "<StackPanel Orientation='Horizontal'>" +
+            "<TextBlock Text='{Binding TabName}' FontSize='14' TextTrimming='CharacterEllipsis'/>" +
+            "<TextBlock Text='&#xE718;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E5484D' FontSize='12' Margin='6,3,0,0' Visibility='{Binding PinVisibility}'/>" +
+            "</StackPanel>" +
+            "<TextBlock Text='{Binding RunText}' FontSize='11' Opacity='0.65'/>" +
+            "</StackPanel>" +
+            "<StackPanel Grid.Column='1' Margin='12,0,0,0' HorizontalAlignment='Right'>" +
+            "<TextBlock Text='{Binding Server}' FontSize='14' HorizontalAlignment='Right' TextTrimming='CharacterEllipsis'/>" +
+            "<TextBlock Text='{Binding Database}' FontSize='11' Opacity='0.65' HorizontalAlignment='Right' TextTrimming='CharacterEllipsis'/>" +
+            "</StackPanel>" +
+            "</Grid></DataTemplate>";
 
         private void Fill()
         {
@@ -273,17 +287,22 @@ namespace SqlPrompter.Ssms
 
             public HistoryEntry Entry { get; }
 
-            public string Pin => Entry.Pinned ? "*" : string.Empty;
+            public string TabName => Entry.Tab.Length > 0 ? Entry.Tab : "(no tab name)";
 
-            public string Run => Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-
-            public string Closed => Entry.ClosedAtUtc.HasValue ? Entry.ClosedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") : string.Empty;
-
-            public string Database => Entry.Database;
+            /// <summary>The time of the run, to the minute.</summary>
+            public string RunText => Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
             public string Server => Entry.Server;
 
-            public string Tab => Entry.Tab;
+            public string Database => Entry.Database;
+
+            public Visibility PinVisibility => Entry.Pinned ? Visibility.Visible : Visibility.Collapsed;
+
+            /// <summary>The full texts of the row, including whether the tab is still open or when it was closed.</summary>
+            public string Tooltip =>
+                TabName + "\nRun: " + Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "\n" +
+                (Entry.ClosedAtUtc.HasValue ? "Tab closed: " + Entry.ClosedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") : "Tab is still open") +
+                "\nServer: " + Entry.Server + "\nDatabase: " + Entry.Database + (Entry.Pinned ? "\nPinned" : string.Empty);
         }
     }
 }
