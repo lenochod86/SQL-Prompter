@@ -52,6 +52,12 @@ namespace SqlPrompter.Core.History
         /// <summary>When the tab was closed; null while it is open.</summary>
         public DateTime? ClosedAtUtc { get; internal set; }
 
+        /// <summary>Pinned (#285): never removed by the retention.</summary>
+        public bool Pinned { get; internal set; }
+
+        /// <summary>A favourite: never removed by the retention.</summary>
+        public bool Favourite { get; internal set; }
+
         /// <summary>The versions of the text, oldest first.</summary>
         public List<TabVersion> Versions { get; } = new List<TabVersion>();
 
@@ -69,6 +75,8 @@ namespace SqlPrompter.Core.History
         {
             Kind = HistoryKind.Tab,
             Versions = Versions.ToList().AsReadOnly(),
+            Pinned = Pinned,
+            Favourite = Favourite,
         };
     }
 
@@ -210,6 +218,20 @@ namespace SqlPrompter.Core.History
                             }
 
                             break;
+                        case "pin":
+                            if (tab != null)
+                            {
+                                tab.Pinned = record.Text == "1";
+                            }
+
+                            break;
+                        case "fav":
+                            if (tab != null)
+                            {
+                                tab.Favourite = record.Text == "1";
+                            }
+
+                            break;
                         case "open":
                             if (tab != null)
                             {
@@ -341,6 +363,32 @@ namespace SqlPrompter.Core.History
             }
         }
 
+        /// <summary>Pins or unpins tabs; a pinned tab is kept by <see cref="Prune"/>.</summary>
+        public void SetPinned(IEnumerable<string> ids, bool pinned)
+        {
+            lock (sync)
+            {
+                foreach (var tab in tabs.Where(t => ids.Contains(t.Id) && t.Pinned != pinned))
+                {
+                    tab.Pinned = pinned;
+                    Append(new Record { Kind = "pin", Id = tab.Id, Text = pinned ? "1" : "0" });
+                }
+            }
+        }
+
+        /// <summary>Marks or unmarks tabs as favourites; a favourite is kept by <see cref="Prune"/>.</summary>
+        public void SetFavourite(IEnumerable<string> ids, bool favourite)
+        {
+            lock (sync)
+            {
+                foreach (var tab in tabs.Where(t => ids.Contains(t.Id) && t.Favourite != favourite))
+                {
+                    tab.Favourite = favourite;
+                    Append(new Record { Kind = "fav", Id = tab.Id, Text = favourite ? "1" : "0" });
+                }
+            }
+        }
+
         public void Delete(IEnumerable<string> ids)
         {
             var set = new HashSet<string>(ids, StringComparer.Ordinal);
@@ -364,7 +412,7 @@ namespace SqlPrompter.Core.History
             lock (sync)
             {
                 var limit = nowUtc.AddDays(-keepDays);
-                var removed = tabs.RemoveAll(t => t.ClosedAtUtc.HasValue && t.LastChangeUtc < limit);
+                var removed = tabs.RemoveAll(t => t.ClosedAtUtc.HasValue && !t.Pinned && !t.Favourite && t.LastChangeUtc < limit);
                 if (removed > 0)
                 {
                     Rewrite();
@@ -435,6 +483,16 @@ namespace SqlPrompter.Core.History
                     if (tab.ClosedAtUtc.HasValue)
                     {
                         lines.Add(Serialize(new Record { Kind = "close", Id = tab.Id, At = FormatTime(tab.ClosedAtUtc.Value) }));
+                    }
+
+                    if (tab.Pinned)
+                    {
+                        lines.Add(Serialize(new Record { Kind = "pin", Id = tab.Id, Text = "1" }));
+                    }
+
+                    if (tab.Favourite)
+                    {
+                        lines.Add(Serialize(new Record { Kind = "fav", Id = tab.Id, Text = "1" }));
                     }
                 }
 
