@@ -5,14 +5,14 @@ using Microsoft.VisualStudio.Shell;
 namespace SqlPrompter.Ssms
 {
     /// <summary>
-    /// Puts "Script Results Grid Selection As Temp Table" into the right-click menu of the results grid, next to Copy and Copy with Headers.
+    /// Puts "Script As Temp Table" into the right-click menu of the results grid, next to Copy and Copy with Headers.
     /// The menu is the command bar "SQL Results Grid Tab Context" (found through DTE; its GUID and ID are not needed because
     /// <c>Command.AddControl</c> takes the bar). Controls added through DTE are not stored, so this runs at every start.
     /// </summary>
     internal static class GridContextMenu
     {
         private const string BarName = "SQL Results Grid Tab Context";
-        private const string CommandName = "Script Results Grid Selection As Temp Table";
+        private const string CommandName = "Script As Temp Table";
 
         public static void Install()
         {
@@ -47,7 +47,7 @@ namespace SqlPrompter.Ssms
                 for (var i = 1; i <= bar.Controls.Count; i++)
                 {
                     var caption = bar.Controls[i].Caption ?? string.Empty;
-                    if (caption.IndexOf("Script Results Grid Selection", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (caption.IndexOf("Script As Temp Table", StringComparison.OrdinalIgnoreCase) >= 0 || caption.IndexOf("Script Results Grid Selection", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         // The command stays in the menu from an earlier start; the submenu is added next to it all the same.
                         AddCopyAs(dte, bar, i + 1);
