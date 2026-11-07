@@ -21,6 +21,13 @@
           <CommandName>Refactor</CommandName>
         </Strings>
       </Menu>
+      <Menu guid="guidSqlPrompterCmdSet" id="CopyAsMenu" priority="0x0100" type="Menu">
+        <Parent guid="guidSqlPrompterCmdSet" id="CopyAsHostGroup" />
+        <Strings>
+          <ButtonText>Copy Grid Selection As</ButtonText>
+          <CommandName>Copy Grid Selection As</CommandName>
+        </Strings>
+      </Menu>
     </Menus>
 
     <Groups>
@@ -48,6 +55,12 @@
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="RefactorHostGroup" priority="0x0560">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="CopyAsHostGroup" priority="0x0570">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="CopyAsGroup" priority="0x0100">
+        <Parent guid="guidSqlPrompterCmdSet" id="CopyAsMenu" />
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="RefactoringGroup" priority="0x0100">
         <Parent guid="guidSqlPrompterCmdSet" id="RefactorMenu" />
@@ -190,31 +203,31 @@
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsInList" priority="0x0110" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Parent guid="guidSqlPrompterCmdSet" id="CopyAsGroup" />
         <Strings>
           <ButtonText>Copy As IN List</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsValues" priority="0x0111" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Parent guid="guidSqlPrompterCmdSet" id="CopyAsGroup" />
         <Strings>
           <ButtonText>Copy As VALUES</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsJson" priority="0x0112" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Parent guid="guidSqlPrompterCmdSet" id="CopyAsGroup" />
         <Strings>
           <ButtonText>Copy As JSON</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsCsv" priority="0x0113" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Parent guid="guidSqlPrompterCmdSet" id="CopyAsGroup" />
         <Strings>
           <ButtonText>Copy As CSV</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsMarkdown" priority="0x0114" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Parent guid="guidSqlPrompterCmdSet" id="CopyAsGroup" />
         <Strings>
           <ButtonText>Copy As Markdown Table</ButtonText>
         </Strings>
@@ -322,6 +335,9 @@
       <IDSymbol name="SqlPrompterMenu" value="0x1001" />
       <IDSymbol name="RefactorMenu" value="0x1002" />
       <IDSymbol name="RefactorHostGroup" value="0x1019" />
+      <IDSymbol name="CopyAsMenu" value="0x1003" />
+      <IDSymbol name="CopyAsHostGroup" value="0x101A" />
+      <IDSymbol name="CopyAsGroup" value="0x101B" />
       <IDSymbol name="MetadataGroup" value="0x1010" />
       <IDSymbol name="DiagnosticsGroup" value="0x1011" />
       <IDSymbol name="SettingsGroup" value="0x1012" />
