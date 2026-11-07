@@ -48,7 +48,7 @@ namespace SqlPrompter.Core.Formatting
         public static NamedFormatStyle ImportInto(IList<NamedFormatStyle> styles, string json, string fileName, out StyleImportResult result, FormatStyle baseStyle = null)
         {
             result = Import(json, baseStyle);
-            var name = string.IsNullOrWhiteSpace(result.Name) ? System.IO.Path.GetFileNameWithoutExtension(fileName ?? string.Empty) : result.Name.Trim();
+            var name = string.IsNullOrWhiteSpace(result.Name) ? NameOfFile(fileName) : result.Name.Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
                 name = "Imported style";
@@ -63,6 +63,14 @@ namespace SqlPrompter.Core.Formatting
             var imported = new NamedFormatStyle(unique, result.Style);
             styles.Add(imported);
             return imported;
+        }
+
+        /// <summary>The file name without folder and extension; both kinds of path separator count, whatever the platform.</summary>
+        private static string NameOfFile(string fileName)
+        {
+            var name = (fileName ?? string.Empty).Substring((fileName ?? string.Empty).LastIndexOfAny(new[] { (char)92, '/' }) + 1);
+            var dot = name.LastIndexOf('.');
+            return (dot > 0 ? name.Substring(0, dot) : name).Trim();
         }
 
         /// <exception cref="FormatException">The text is not JSON, or is JSON that is not a style.</exception>
