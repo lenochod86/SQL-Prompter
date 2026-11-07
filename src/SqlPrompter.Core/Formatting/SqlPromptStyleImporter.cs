@@ -158,6 +158,13 @@ namespace SqlPrompter.Core.Formatting
                 applied.Add("groupOrderBySeparateLines = " + style.GroupOrderBySeparateLines);
             }
 
+            var alignAliases = Flag("lists.alignAliases");
+            if (alignAliases != null)
+            {
+                style.AlignAliases = alignAliases.Value;
+                applied.Add("alignAliases = " + alignAliases.Value);
+            }
+
             var onNewLine = Flag("joinStatements.on.placeOnNewLine");
             if (onNewLine != null)
             {
