@@ -238,9 +238,11 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             ReadSizeSettings();
+            ownerSession = session;
             Update(session, presentation);
             popup.IsOpen = true;
             descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
+            StartOutsideWatch();
         }
 
         public void Update(IAsyncCompletionSession session, CompletionPresentationViewModel presentation)
@@ -385,12 +387,110 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             ReadSizeSettings();
+            ownerSession = null;
             popup.IsOpen = true;
             descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
+            StartOutsideWatch();
+        }
+
+        /// <summary>Raised when a click outside the list (and its side popups) or leaving SSMS closes it; the owner of the list drops its own state.</summary>
+        public event EventHandler OutsideClicked;
+
+        /// <summary>The editor's completion session that shows the list (null for the list SQL Prompter runs itself).</summary>
+        private IAsyncCompletionSession ownerSession;
+
+        private DispatcherTimer outsideTimer;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int key);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out System.Drawing.Point point);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+        /// <summary>
+        /// The popups never take the activation (StaysOpen), so WPF does not close them on a click elsewhere. The mouse buttons are therefore polled
+        /// (the click itself is not touched: the caret still moves, the tab still switches) and the list closes when a button goes down outside the
+        /// list and its side popups, or when another application becomes the foreground window (Alt+Tab, minimize).
+        /// </summary>
+        private void StartOutsideWatch()
+        {
+            if (outsideTimer != null)
+            {
+                return;
+            }
+
+            var wasDown = true;
+            outsideTimer = new DispatcherTimer(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(15) };
+            outsideTimer.Tick += (s, e) =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (!popup.IsOpen)
+                {
+                    StopOutsideWatch();
+                    return;
+                }
+
+                var outside = false;
+                var down = (GetAsyncKeyState(0x01) & 0x8000) != 0 || (GetAsyncKeyState(0x02) & 0x8000) != 0 || (GetAsyncKeyState(0x04) & 0x8000) != 0;
+                if (down && !wasDown && GetCursorPos(out var cursor))
+                {
+                    outside = !Contains(popup, cursor) && !(descriptionPopup.IsOpen && Contains(descriptionPopup, cursor));
+                }
+
+                wasDown = down;
+                if (!outside)
+                {
+                    var foreground = GetForegroundWindow();
+                    if (foreground != IntPtr.Zero && GetWindowThreadProcessId(foreground, out var process) != 0 && process != (uint)System.Diagnostics.Process.GetCurrentProcess().Id)
+                    {
+                        outside = true;
+                    }
+                }
+
+                if (outside)
+                {
+                    Log.Write("The suggestion list closes: a click outside it or another application in front.");
+                    var session = ownerSession;
+                    Close();
+                    OutsideClicked?.Invoke(this, EventArgs.Empty);
+                    if (session != null && !session.IsDismissed)
+                    {
+                        session.Dismiss();
+                    }
+                }
+            };
+            outsideTimer.Start();
+        }
+
+        private void StopOutsideWatch()
+        {
+            outsideTimer?.Stop();
+            outsideTimer = null;
+        }
+
+        /// <summary>True when the screen point (device pixels) is inside the popup's content.</summary>
+        private static bool Contains(Popup target, System.Drawing.Point cursor)
+        {
+            if (!(target.Child is FrameworkElement child) || !child.IsVisible || PresentationSource.FromVisual(child) == null)
+            {
+                return false;
+            }
+
+            var topLeft = child.PointToScreen(new Point(0, 0));
+            var toDevice = PresentationSource.FromVisual(child).CompositionTarget.TransformToDevice;
+            var size = toDevice.Transform(new Point(child.ActualWidth, child.ActualHeight));
+            return cursor.X >= topLeft.X && cursor.X <= topLeft.X + size.X && cursor.Y >= topLeft.Y && cursor.Y <= topLeft.Y + size.Y;
         }
 
         public void Close()
         {
+            StopOutsideWatch();
             definitionTimer?.Stop();
             definitionItem = null;
             popup.IsOpen = false;
