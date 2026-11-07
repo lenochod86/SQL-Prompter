@@ -159,5 +159,16 @@ namespace SqlPrompter.Tests
 
             Assert.Null(EnvironmentMatcher.Find(settings, server, database));
         }
+
+        [Fact]
+        public void ReconnectingSqlLoginTabsIsOnByDefaultAndSurvivesClone()
+        {
+            var settings = new PrompterSettings();
+            Assert.True(settings.Behavior.ReconnectSqlTabs);
+
+            settings.Behavior.ReconnectSqlTabs = false;
+            Assert.False(settings.Clone().Behavior.ReconnectSqlTabs);
+            Assert.True(SettingsJson.Deserialize("{ \"behavior\": { } }").Behavior.ReconnectSqlTabs);
+        }
     }
 }

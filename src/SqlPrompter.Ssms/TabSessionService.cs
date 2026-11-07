@@ -46,6 +46,9 @@ namespace SqlPrompter.Ssms
 
         private readonly Dictionary<string, string> names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Tabs that were restored without a connection (a SQL login that could not be reconnected): what they had, by document, until they get a connection (#322).</summary>
+        private readonly Dictionary<string, SavedTab> intended = new Dictionary<string, SavedTab>(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>The service of this SSMS instance (the commands and the quick actions reach it through this).</summary>
         public static TabSessionService Current { get; private set; }
 
@@ -218,6 +221,7 @@ namespace SqlPrompter.Ssms
                 var window = System.Windows.Application.Current?.MainWindow;
                 var source = window == null ? null : System.Windows.PresentationSource.FromVisual(window) as System.Windows.Interop.HwndSource;
                 source?.AddHook(WindowMessage);
+                WatchTabDoubleClick(window);
                 commandEvents = dte.Events.CommandEvents;
                 commandEvents.BeforeExecute += (string guid, int id, object customIn, object customOut, ref bool cancelDefault) =>
                 {
@@ -232,6 +236,44 @@ namespace SqlPrompter.Ssms
             {
                 Log.Error("Watching the shutdown failed", ex);
             }
+        }
+
+        /// <summary>A double click on a document tab asks for a name for that tab (#226); the first click has already made it the active one.</summary>
+        private void WatchTabDoubleClick(System.Windows.Window window)
+        {
+            window?.AddHandler(System.Windows.UIElement.PreviewMouseLeftButtonDownEvent, new System.Windows.Input.MouseButtonEventHandler((sender, args) =>
+            {
+                if (args.ClickCount != 2 || !IsOnDocumentTab(args.OriginalSource as System.Windows.DependencyObject))
+                {
+                    return;
+                }
+
+                var later = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(60) };
+                later.Tick += (s, e) =>
+                {
+                    later.Stop();
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    RenameActiveTab();
+                };
+                later.Start();
+            }), true);
+        }
+
+        private static bool IsOnDocumentTab(System.Windows.DependencyObject element)
+        {
+            while (element != null)
+            {
+                if (element.GetType().Name == "DocumentTabItem")
+                {
+                    return true;
+                }
+
+                element = element is System.Windows.Media.Visual || element is System.Windows.Media.Media3D.Visual3D
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(element)
+                    : System.Windows.LogicalTreeHelper.GetParent(element);
+            }
+
+            return false;
         }
 
         private IntPtr WindowMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -401,6 +443,7 @@ namespace SqlPrompter.Ssms
                 ThreadHelper.ThrowIfNotOnUIThread();
                 var saved = store.Load();
                 var opened = 0;
+                SsmsConnection.GetActive(); // remembers the SQL login of the window the user connected at start, so that restored tabs of that login connect with it
 
                 // The tab that was in front is opened last so that it is in front again.
                 foreach (var tab in saved.Where(t => !t.Active).Concat(saved.Where(t => t.Active)))
@@ -464,19 +507,36 @@ namespace SqlPrompter.Ssms
         private bool OpenTab(SavedTab tab)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var opened = OpenTabCore(tab);
+            var opened = OpenTabCore(tab, out var connected);
             if (opened && !string.IsNullOrEmpty(tab.Name) && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
             {
                 names[dte.ActiveDocument.FullName] = tab.Name;
                 TabCaption.Apply(dte.ActiveDocument.FullName, tab.Name);
             }
 
+            if (opened && connected && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
+            {
+                // The window is in front and connected: its connection is only readable now, so it is remembered for the saves that follow.
+                var now = SsmsConnection.GetActiveOfWindow();
+                if (now != null)
+                {
+                    connections[dte.ActiveDocument.FullName] = now;
+                }
+            }
+
+            if (opened && !connected && tab.IsConnected && !string.IsNullOrEmpty(tab.Login) && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
+            {
+                // The tab stays disconnected, but it keeps the server, database and login it had, so that the next restart (or reopening) tries again.
+                intended[dte.ActiveDocument.FullName] = tab;
+            }
+
             return opened;
         }
 
-        private bool OpenTabCore(SavedTab tab)
+        private bool OpenTabCore(SavedTab tab, out bool connected)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            connected = false;
             if (!string.IsNullOrEmpty(tab.File))
             {
                 if (!File.Exists(tab.File))
@@ -494,7 +554,7 @@ namespace SqlPrompter.Ssms
                 return true;
             }
 
-            return SsmsConnection.OpenSavedTab(tab);
+            return SsmsConnection.OpenSavedTab(tab, out connected);
         }
 
         private void Save(bool userChange = false, string closing = null)
@@ -510,7 +570,7 @@ namespace SqlPrompter.Ssms
                 var active = dte.ActiveDocument;
                 if (active != null && IsQuery(active))
                 {
-                    var connection = SsmsConnection.GetActive();
+                    var connection = SsmsConnection.GetActiveOfWindow();
                     if (connection == null)
                     {
                         connections.Remove(active.FullName);
@@ -623,15 +683,22 @@ namespace SqlPrompter.Ssms
                 return null; // an empty new window is not worth restoring
             }
 
+            intended.TryGetValue(name, out var wanted);
+            if (connection != null)
+            {
+                intended.Remove(name);
+                wanted = null;
+            }
+
             return new SavedTab
             {
                 File = isFile ? name : string.Empty,
                 Text = text,
-                Server = connection?.Server,
-                Database = connection?.Database,
-                Login = connection != null && connection.Authentication == AuthenticationKind.SqlPassword ? connection.UserName : null,
-                Encrypt = connection?.Encrypt,
-                TrustServerCertificate = connection?.TrustServerCertificate,
+                Server = connection?.Server ?? wanted?.Server,
+                Database = connection?.Database ?? wanted?.Database,
+                Login = connection != null ? (connection.Authentication == AuthenticationKind.SqlPassword ? connection.UserName : null) : wanted?.Login,
+                Encrypt = connection?.Encrypt ?? wanted?.Encrypt,
+                TrustServerCertificate = connection?.TrustServerCertificate ?? wanted?.TrustServerCertificate,
                 Active = active,
                 Name = names.TryGetValue(name, out var tabName) ? tabName : null,
             };

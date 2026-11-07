@@ -279,6 +279,8 @@ namespace SqlPrompter.Ssms
             history.Check("Restore query tabs at start", "The open query tabs, with their text and connection, are saved every few seconds to %APPDATA%\\SqlPrompter\\tabs.json and opened again when SSMS starts. " +
                 "Windows authentication reconnects; a tab with a SQL login opens unconnected (passwords are never stored) with a comment naming the server and database.",
                 () => work.Behavior.RestoreTabs, v => work.Behavior.RestoreTabs = v);
+            history.Check("Reconnect tabs that used a SQL login", "A restored or reopened tab that was connected with a SQL login is connected again with the live connection of the same server and login. If there is none, SSMS opens its Connect dialog with the server and login filled in, once per server and login; the password is typed there and never stored by SQL Prompter. Off: such tabs open disconnected with a comment.",
+                () => work.Behavior.ReconnectSqlTabs, v => work.Behavior.ReconnectSqlTabs = v, () => work.Behavior.RestoreTabs);
 
             var warnings = Add("Warnings", "Asks for confirmation before a script runs.");
             warnings.Check("Warn about DELETE without WHERE", "Running a script with a DELETE that has no WHERE (and no TOP, and does not clear a temporary table or table variable) asks for confirmation first.",
