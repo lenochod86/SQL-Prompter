@@ -70,6 +70,22 @@ namespace SqlPrompter.Ssms
         /// <summary>The script factory type for the compatibility check (no log line when it is missing; the check logs).</summary>
         internal static Type ScriptFactoryTypeOrNull() => ScriptFactoryType();
 
+        /// <summary>Server and database of a window's <c>UIConnectionInfo</c> (the object of <c>SqlScriptEditorControl.Connection</c>); false when it has no server.</summary>
+        public static bool TryReadServerAndDatabase(object info, out string server, out string database)
+        {
+            server = null;
+            database = null;
+            if (info == null)
+            {
+                return false;
+            }
+
+            var type = info.GetType();
+            server = type.GetProperty("ServerName")?.GetValue(info)?.ToString();
+            database = (type.GetProperty("AdvancedOptions")?.GetValue(info) as NameValueCollection)?["DATABASE"];
+            return !string.IsNullOrEmpty(server);
+        }
+
         /// <summary>Connection data of the active window, or null if the window is not connected.</summary>
         public static ConnectionSettings GetActive()
         {

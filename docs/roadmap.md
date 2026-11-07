@@ -131,6 +131,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
 - [x] Tab color (#37)
 - [x] Query window frame color (the border of the editor pane follows the tab accent) (#37)
 - [x] Status bar color (the shell status bar; SSMS own per-window bar is not touched) (#37)
+- [x] Status bar of every query window (the strip with Connected, server, login and database) colored by its own connection; the shell status bar is optional and off by default; option which parts are colored (#314); verified in SSMS 22 except the options page
 - [x] Environments (name and color) and server + database → environment rules with wildcards (#38)
 - [ ] Import of SQL Prompt colors (#38): implemented and unit tested, not yet run through the menu in SSMS
 
