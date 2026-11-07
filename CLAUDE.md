@@ -51,6 +51,7 @@ Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator w
 5. **Pull request** to `main` when the work is ready for review.
    - Describe what changed, how to test it in SSMS, and what is verified and what is not.
    - Include `Closes #<number>`.
+   - CI runs the tests and the version checks on every push to the pull request, but the Windows VSIX build (it costs twice the billed minutes, the repository is private) only for a pull request with the label `build-vsix`. Push the branch as few times as possible, and add the label `build-vsix` when the work is ready, so that the VSIX of the final commit is built once; it is a required step before a merge.
 6. **Approval.** Merge only after the user explicitly agrees. The user usually tests the VSIX from the branch in SSMS.
 7. **Squash merge** the pull request into `main` (the repository allows only squash merges).
    - The commit message is the PR title with the PR number; the body summarizes the change.
@@ -104,12 +105,12 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
 - If `dotnet` is not on PATH, install the .NET SDK into the scratchpad with `dotnet-install.ps1` (no admin rights needed) and set `DOTNET_ROOT`.
 - For every VSIX handed to the user, bump the version in `source.extension.vsixmanifest` (otherwise it will not install over the old one) and check the version inside the `.vsix`.
 - After changing `.vsct`, bump the version in `ProvideMenuResource`.
-- CI enforces both bumps in pull requests (`.github/scripts/Check-Versions.ps1`): any change under `src/` needs a higher VSIX version than `main`. CI also builds with warnings as errors.
+- CI enforces both bumps in pull requests (`.github/scripts/Check-Versions.ps1`): any change under `src/` needs a higher VSIX version than `main`. CI also builds with warnings as errors. Billed Actions minutes are limited: a push to a pull request runs only the Ubuntu job (tests, version checks); the Windows VSIX build runs for a pull request with the label `build-vsix` (and manually with *Run workflow*); a push to `main` runs the tests only; the prototype workflow is manual only (#336).
 
 ## Environments
 
 - **Locally on Windows:** the VSIX can be built and installed into SSMS 22. You may install and uninstall the VSIX yourself (VSIXInstaller from the SSMS installation, with SSMS closed) and drive SSMS to verify your work: start it, connect to the test instance, take screenshots and read the log. Ask before changing SSMS configuration beyond that, and before closing an SSMS window that may hold the user's unsaved work. Never touch the user's own servers. A SQL Server test instance runs in Docker on `localhost,1433`; use the `test-database` skill (`.claude/skills/test-database/`) to create test databases and data yourself.
-- **In the cloud:** neither SSMS nor the VSIX build is available. Work on Core, Metadata and tests; CI builds the VSIX for pull requests and `main` (`.github/workflows/build.yml`); branch pushes without a pull request are not built, so open a draft pull request or run the workflow manually.
+- **In the cloud:** neither SSMS nor the VSIX build is available. Work on Core, Metadata and tests; CI builds the VSIX for pull requests that have the label `build-vsix` (`.github/workflows/build.yml`); branch pushes without a pull request are not built, so open a pull request or run the workflow manually.
 - **From mobile:** the user may not have SSMS at hand. Ask for SSMS results as a screenshot or the log (`%LOCALAPPDATA%\SqlPrompter\sqlprompter.log`).
 
 ## How to work

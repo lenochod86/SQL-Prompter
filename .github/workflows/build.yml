@@ -1,6 +1,9 @@
 name: Build
 
-# Branches are built through their pull request (or manually); pushes build only main.
+# Billed minutes matter (the repository is private, a Windows minute counts twice), so:
+# - every push to a pull request runs only the cheap Ubuntu job (tests and version checks);
+# - the Windows VSIX build runs for a pull request only when it has the label `build-vsix` (added when the work is ready, see CLAUDE.md), and manually;
+# - pushes to main run the tests only (the merged tree was built and tested in its pull request).
 on:
   push:
     branches: [main]
@@ -12,6 +15,7 @@ on:
       - '.github/workflows/build.yml'
       - '.github/scripts/**'
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - 'src/**'
       - 'tests/**'
@@ -30,28 +34,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Tests and, for a pull request, the version checks: one cheap Ubuntu job (labeling a pull request does not run it again).
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: '10.0.x'
-      - name: Core and metadata tests
-        run: dotnet test tests/SqlPrompter.Tests/SqlPrompter.Tests.csproj -v:minimal -warnaserror
-
-  versions:
-    if: github.event_name == 'pull_request'
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Core and metadata tests
+        run: dotnet test tests/SqlPrompter.Tests/SqlPrompter.Tests.csproj -v:minimal -warnaserror
       - name: Check VSIX and menu versions
+        if: github.event_name == 'pull_request'
         shell: pwsh
         run: ./.github/scripts/Check-Versions.ps1 -Base origin/${{ github.base_ref }}
 
+  # The Windows build (billed twice): only for a pull request with the label `build-vsix`, and on demand.
   vsix:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'build-vsix') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'build-vsix'))
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7

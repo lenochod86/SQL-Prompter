@@ -1,15 +1,7 @@
 name: Prototype VSIX
 
+# The prototype is obsolete: it builds only on demand (a Windows build costs twice the billed minutes).
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'prototype/**'
-      - '.github/workflows/prototype.yml'
-  pull_request:
-    paths:
-      - 'prototype/**'
-      - '.github/workflows/prototype.yml'
   workflow_dispatch:
 
 concurrency:
