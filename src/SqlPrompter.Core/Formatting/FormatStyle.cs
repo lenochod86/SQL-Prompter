@@ -102,6 +102,10 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "groupOrderBySeparateLines")]
         public bool GroupOrderBySeparateLines { get; set; }
 
+        /// <summary>The <c>AS alias</c> of the items of a SELECT list start in one column (#305); only items on one line with an explicit AS are aligned.</summary>
+        [DataMember(Name = "alignAliases")]
+        public bool AlignAliases { get; set; }
+
         /// <summary><c>ON</c> of a JOIN starts a line of its own, indented under the JOIN, instead of following the joined table (#305).</summary>
         [DataMember(Name = "onOnNewLine")]
         public bool OnOnNewLine { get; set; }
@@ -139,6 +143,7 @@ namespace SqlPrompter.Core.Formatting
             ConditionsOnSeparateLines = true;
             GroupOrderBySeparateLines = true;
             OnOnNewLine = false;
+            AlignAliases = false;
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;

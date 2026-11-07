@@ -685,6 +685,7 @@ namespace SqlPrompter.Core.Formatting
                     head = null;
                 }
 
+                var aliasAligned = name == "SELECT" && style.AlignAliases ? AlignedAliases(items) : null;
                 for (var k = 0; k < items.Count; k++)
                 {
                     var itemStart = contentColumn;
@@ -729,10 +730,70 @@ namespace SqlPrompter.Core.Formatting
                     }
 
                     var rendered = Expand(items[k], itemStart);
+                    if (aliasAligned != null && aliasAligned[k] != null && rendered.Count == 1)
+                    {
+                        rendered[0] = aliasAligned[k];
+                    }
+
                     rendered[0] = lead + rendered[0];
                     rendered[rendered.Count - 1] += trail;
                     lines.AddRange(rendered);
                 }
+            }
+
+            /// <summary>
+            /// For the items of a SELECT list that end with <c>AS alias</c>: the item written with the AS padded to the column after the longest expression; null for the
+            /// other items (and for everything when no item has an alias) (#305).
+            /// </summary>
+            private static string[] AlignedAliases(List<List<R>> items)
+            {
+                var split = new int[items.Count];
+                var width = 0;
+                var found = 0;
+                for (var k = 0; k < items.Count; k++)
+                {
+                    split[k] = -1;
+                    var item = items[k];
+                    var depth = 0;
+                    for (var i = 0; i < item.Count; i++)
+                    {
+                        if (item[i].Kind == TokenKind.OpenParen)
+                        {
+                            depth++;
+                        }
+                        else if (item[i].Kind == TokenKind.CloseParen)
+                        {
+                            depth--;
+                        }
+                        else if (depth == 0 && i > 0 && i == item.Count - 2 && item[i].IsWord("AS"))
+                        {
+                            split[k] = i;
+                        }
+                    }
+
+                    if (split[k] >= 0)
+                    {
+                        width = Math.Max(width, Flat(item, 0, split[k]).Length);
+                        found++;
+                    }
+                }
+
+                if (found == 0)
+                {
+                    return null;
+                }
+
+                var result = new string[items.Count];
+                for (var k = 0; k < items.Count; k++)
+                {
+                    if (split[k] >= 0)
+                    {
+                        var expression = Flat(items[k], 0, split[k]);
+                        result[k] = expression + new string(' ', width - expression.Length + 1) + Flat(items[k], split[k], items[k].Count);
+                    }
+                }
+
+                return result;
             }
 
             private void LayoutJoin(string head, int column, int contentColumn, List<R> body, List<string> lines)
