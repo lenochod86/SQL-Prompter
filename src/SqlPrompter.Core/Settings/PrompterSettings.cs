@@ -258,6 +258,14 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "historyDays")]
         public int HistoryDays { get; set; }
 
+        /// <summary>How many closed query tabs can be reopened with Reopen Closed Query Tab (#226).</summary>
+        [DataMember(Name = "closedTabsKept")]
+        public int ClosedTabsKept { get; set; }
+
+        /// <summary>A closed query tab can be reopened for this many hours; 0 keeps it until SSMS ends.</summary>
+        [DataMember(Name = "closedTabsHours")]
+        public int ClosedTabsHours { get; set; }
+
         /// <summary>The open query tabs, text and connection, are kept and come back when SSMS starts (no passwords).</summary>
         [DataMember(Name = "restoreTabs")]
         public bool RestoreTabs { get; set; }
@@ -320,6 +328,8 @@ namespace SqlPrompter.Core.Settings
             ShowHover = true;
             KeepHistory = true;
             HistoryDays = 0;
+            ClosedTabsKept = 20;
+            ClosedTabsHours = 24;
             RestoreTabs = true;
             WarnDeleteWithoutWhere = true;
             WarnUpdateWithoutWhere = true;

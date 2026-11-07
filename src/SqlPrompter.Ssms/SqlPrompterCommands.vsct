@@ -217,6 +217,12 @@
           <ButtonText>Reopen Closed Query Tab</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRenameQueryTab" priority="0x011D" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Rename Query Tab...</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidCopyGridAsInList" priority="0x0110" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="CopyAsGroup" />
         <Strings>
@@ -377,6 +383,7 @@
       <IDSymbol name="cmdidFindInCode" value="0x012E" />
       <IDSymbol name="cmdidShowDependencies" value="0x012F" />
       <IDSymbol name="cmdidReopenClosedTab" value="0x0130" />
+      <IDSymbol name="cmdidRenameQueryTab" value="0x0132" />
       <IDSymbol name="cmdidCopyGridAsInList" value="0x0127" />
       <IDSymbol name="cmdidCopyGridAsValues" value="0x0128" />
       <IDSymbol name="cmdidCopyGridAsJson" value="0x0129" />

@@ -34,6 +34,8 @@ namespace SqlPrompter.Ssms
                 Set(dte, "SQLPrompter.PickerLeft", "SQL Query Editor::Ctrl+Left Arrow");
                 Set(dte, "SQLPrompter.PickerRight", "SQL Query Editor::Ctrl+Right Arrow");
                 Set(dte, "SQLPrompter.FormatDocument", "SQL Query Editor::Ctrl+K, Y");
+                // Ctrl+Shift+T is Go To File in SSMS; the first of these that nothing uses becomes the key.
+                Set(dte, "SQLPrompter.ReopenClosedQueryTab", "Global::Ctrl+Shift+T", "Global::Ctrl+Alt+T", "Global::Ctrl+Shift+Alt+T");
             }
             catch (Exception ex)
             {
@@ -55,7 +57,8 @@ namespace SqlPrompter.Ssms
             return null;
         }
 
-        private static void Set(EnvDTE.DTE dte, string commandName, string binding)
+        /// <summary>Sets the first of the bindings that no command uses; the marker is written once one is set, or when none of them is free.</summary>
+        private static void Set(EnvDTE.DTE dte, string commandName, string binding, params string[] alternatives)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var marker = Path.Combine(MarkerFolder, "key-" + commandName + ".applied");
@@ -70,17 +73,23 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            var taken = FindOwner(dte, binding);
-            if (taken != null)
+            foreach (var candidate in new[] { binding }.Concat(alternatives))
             {
-                Log.Write("Default key " + binding + " is used by " + taken + "; " + commandName + " keeps no key.");
+                var taken = FindOwner(dte, candidate);
+                if (taken != null)
+                {
+                    Log.Write("Default key " + candidate + " is used by " + taken + ".");
+                    continue;
+                }
+
+                command.Bindings = new object[] { candidate };
+                Directory.CreateDirectory(MarkerFolder);
+                File.WriteAllText(marker, candidate);
+                Log.Write("Default key " + candidate + " set for " + commandName + ".");
                 return;
             }
 
-            command.Bindings = new object[] { binding };
-            Directory.CreateDirectory(MarkerFolder);
-            File.WriteAllText(marker, binding);
-            Log.Write("Default key " + binding + " set for " + commandName + ".");
+            Log.Write(commandName + " keeps no key: every default is used by another command.");
         }
     }
 }

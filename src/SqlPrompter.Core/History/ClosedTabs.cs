@@ -11,19 +11,41 @@ namespace SqlPrompter.Core.History
     /// </summary>
     public sealed class ClosedTabs
     {
-        private readonly int capacity;
+        private readonly Func<DateTime> clock;
         private readonly List<SavedTab> closed = new List<SavedTab>();
+        private readonly List<DateTime> closedAt = new List<DateTime>();
         private Dictionary<string, SavedTab> previous = new Dictionary<string, SavedTab>(StringComparer.OrdinalIgnoreCase);
 
-        public ClosedTabs(int capacity = 20)
+        public ClosedTabs(int capacity = 20, Func<DateTime> clock = null)
         {
-            this.capacity = Math.Max(1, capacity);
+            Capacity = Math.Max(1, capacity);
+            this.clock = clock ?? (() => DateTime.UtcNow);
         }
 
-        public int Count => closed.Count;
+        /// <summary>How many closed tabs are kept; the oldest go first (settings can change it while SSMS runs).</summary>
+        public int Capacity { get; set; }
+
+        /// <summary>A closed tab older than this is forgotten; zero keeps it as long as the list lives.</summary>
+        public TimeSpan MaxAge { get; set; }
+
+        public int Count
+        {
+            get
+            {
+                Prune();
+                return closed.Count;
+            }
+        }
 
         /// <summary>The closed tabs, the one closed last first.</summary>
-        public IReadOnlyList<SavedTab> Items => closed.ToList();
+        public IReadOnlyList<SavedTab> Items
+        {
+            get
+            {
+                Prune();
+                return closed.ToList();
+            }
+        }
 
         /// <summary>Gives the tabs that are open now, by a key that stays the same while a tab is open (its document name); returns how many were found closed.</summary>
         public int Update(IEnumerable<KeyValuePair<string, SavedTab>> open)
@@ -47,21 +69,28 @@ namespace SqlPrompter.Core.History
                 }
 
                 closed.Insert(0, tab);
+                closedAt.Insert(0, clock());
                 found++;
             }
 
-            while (closed.Count > capacity)
+            previous = current;
+            Prune();
+            return found;
+        }
+
+        private void Prune()
+        {
+            while (closed.Count > Math.Max(1, Capacity) || (MaxAge > TimeSpan.Zero && closed.Count > 0 && clock() - closedAt[closedAt.Count - 1] > MaxAge))
             {
                 closed.RemoveAt(closed.Count - 1);
+                closedAt.RemoveAt(closedAt.Count - 1);
             }
-
-            previous = current;
-            return found;
         }
 
         /// <summary>Takes the tab that was closed last, or null.</summary>
         public SavedTab Pop()
         {
+            Prune();
             if (closed.Count == 0)
             {
                 return null;
@@ -69,7 +98,22 @@ namespace SqlPrompter.Core.History
 
             var tab = closed[0];
             closed.RemoveAt(0);
+            closedAt.RemoveAt(0);
             return tab;
+        }
+
+        /// <summary>Takes a chosen closed tab out of the list (a pick from a list instead of the last one); false when it is not there.</summary>
+        public bool Remove(SavedTab tab)
+        {
+            var index = closed.IndexOf(tab);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            closed.RemoveAt(index);
+            closedAt.RemoveAt(index);
+            return true;
         }
     }
 }
