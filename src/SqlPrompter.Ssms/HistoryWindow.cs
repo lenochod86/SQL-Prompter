@@ -84,8 +84,8 @@ namespace SqlPrompter.Ssms
             DockPanel.SetDock(views, Dock.Right);
             views.Children.Add(ViewButton("\uE72C", "All runs", HistoryView.All, true));
             views.Children.Add(ViewButton("\uE718", "Pinned runs", HistoryView.Pinned, false));
-            views.Children.Add(ViewButton("\uE838", "Runs of tabs that are still open", HistoryView.Open, false));
-            views.Children.Add(ViewButton("\uE8B7", "Runs of tabs that were closed", HistoryView.Closed, false));
+            views.Children.Add(ViewButton("\uE838", "Open tabs", HistoryView.Open, false));
+            views.Children.Add(ViewButton("\uE8B7", "Closed tabs", HistoryView.Closed, false));
             heading.Children.Add(views);
             var hint = SnippetUi.Label("Type words to filter (text, tab, server, database). Enter or a double click opens the query in a new tab; Esc closes.");
             hint.VerticalAlignment = VerticalAlignment.Center;
