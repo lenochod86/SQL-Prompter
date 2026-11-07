@@ -196,6 +196,11 @@ namespace SqlPrompter.Core.Completion
                     return (columns == null ? all : all.Where(columns)).ToList();
                 }
                 case ContextKind.Name:
+                    if (context.ConstraintTable != null || context.ExistingConstraintsOf != null)
+                    {
+                        return ConstraintNameSuggestions(context, metadata).ToList();
+                    }
+
                     return context.UnknownExpressionQualifier && metadata != null
                         ? SchemaFunctionSuggestions(context, metadata).ToList()
                         : (IReadOnlyList<Suggestion>)Array.Empty<Suggestion>();
@@ -631,6 +636,62 @@ namespace SqlPrompter.Core.Completion
             yield return withColumns;
         }
 
+        /// <summary>
+        /// After CONSTRAINT (#213): names by convention made from the table and the column (PK_t, FK_t_col, DF_t_col, UQ_t_col, CK_t_col), or, after DROP /
+        /// CHECK / NOCHECK CONSTRAINT, the existing constraints of the table.
+        /// </summary>
+        private static IEnumerable<Suggestion> ConstraintNameSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        {
+            var quote = context.QuoteIdentifiers;
+            if (context.ExistingConstraintsOf != null)
+            {
+                if (metadata == null)
+                {
+                    yield break;
+                }
+
+                var parts = context.ExistingConstraintsOf;
+                var table = parts[parts.Count - 1];
+                var schema = parts.Count > 1 ? parts[parts.Count - 2] : null;
+                foreach (var constraint in metadata.Constraints.Where(c => string.Equals(c.Table, table, StringComparison.OrdinalIgnoreCase) &&
+                    (schema == null || string.Equals(c.Schema, schema, StringComparison.OrdinalIgnoreCase))))
+                {
+                    yield return new Suggestion(SuggestionKind.Index, constraint.Name, SqlIdentifier.Quote(constraint.Name, quote), constraint.Name, constraint.TypeText, constraint.TypeText + " constraint on " + constraint.Schema + "." + constraint.Table, 0);
+                }
+
+                yield break;
+            }
+
+            var t = context.ConstraintTable;
+            var c = context.ConstraintColumn;
+            var names = new List<(string Prefix, string Text)>();
+            if (c != null)
+            {
+                names.Add(("DF", "default of the column"));
+                names.Add(("UQ", "unique"));
+                names.Add(("FK", "foreign key"));
+                names.Add(("CK", "check"));
+                names.Add(("PK", "primary key (the table name only)"));
+            }
+            else
+            {
+                names.Add(("PK", "primary key"));
+                names.Add(("FK", "foreign key"));
+                names.Add(("UQ", "unique"));
+                names.Add(("CK", "check"));
+                names.Add(("DF", "default"));
+            }
+
+            for (var i = 0; i < names.Count; i++)
+            {
+                var (prefix, text) = names[i];
+                var name = prefix + "_" + t + (c != null && prefix != "PK" ? "_" + c : string.Empty);
+
+                // The group keeps the order of the most likely names.
+                yield return new Suggestion(SuggestionKind.Index, name, SqlIdentifier.Quote(name, quote), name, null, text + " constraint name", i);
+            }
+        }
+
         /// <summary>The columns an INSERT can supply, after "INSERT INTO table (", and an item that inserts all of them.</summary>
         private static IEnumerable<Suggestion> InsertColumnSuggestions(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
         {
@@ -655,6 +716,25 @@ namespace SqlPrompter.Core.Completion
                     "all insertable columns of " + dbObject + " (not identity, computed or rowversion)",
                     -1,
                     isBlock: true);
+            }
+
+            if (context.KeyColumnsOfReference)
+            {
+                // REFERENCES t (|: the primary key first (all of its columns as one item when there are several).
+                var key = metadata.GetPrimaryKey(dbObject);
+                if (key.Count > 1)
+                {
+                    yield return new Suggestion(SuggestionKind.Column, "(primary key)", string.Join(", ", key.Select(k => SqlIdentifier.Quote(k, context.QuoteIdentifiers))), "primary key", null,
+                        "the primary key columns of " + dbObject, -2);
+                }
+
+                foreach (var column in columns)
+                {
+                    var isKey = key.Contains(column.Name, StringComparer.OrdinalIgnoreCase);
+                    yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, context.QuoteIdentifiers), null, dbObject.Name, isKey ? -1 : 0, isKey ? KeyKind.Primary : KeyKind.None);
+                }
+
+                yield break;
             }
 
             foreach (var column in columns)

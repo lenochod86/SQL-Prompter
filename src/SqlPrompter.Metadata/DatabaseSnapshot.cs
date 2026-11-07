@@ -28,7 +28,8 @@ namespace SqlPrompter.Metadata
             IReadOnlyList<DbProcedure> procedures = null,
             IReadOnlyDictionary<int, IReadOnlyList<DbParameter>> functionParameters = null,
             IReadOnlyList<DbTrigger> triggers = null,
-            IReadOnlyList<DbIndex> indexes = null)
+            IReadOnlyList<DbIndex> indexes = null,
+            IReadOnlyList<DbConstraint> constraints = null)
         {
             DatabaseName = databaseName ?? string.Empty;
             DefaultSchema = string.IsNullOrEmpty(defaultSchema) ? "dbo" : defaultSchema;
@@ -40,6 +41,7 @@ namespace SqlPrompter.Metadata
             Procedures = procedures ?? Array.Empty<DbProcedure>();
             Triggers = triggers ?? Array.Empty<DbTrigger>();
             Indexes = indexes ?? Array.Empty<DbIndex>();
+            Constraints = constraints ?? Array.Empty<DbConstraint>();
             this.functionParameters = functionParameters ?? new Dictionary<int, IReadOnlyList<DbParameter>>();
             this.primaryKeys = primaryKeys ?? new Dictionary<int, IReadOnlyList<string>>();
             Version = version;
@@ -64,6 +66,7 @@ namespace SqlPrompter.Metadata
             Procedures = source.Procedures;
             Triggers = source.Triggers;
             Indexes = source.Indexes;
+            Constraints = source.Constraints;
             functionParameters = source.functionParameters;
             primaryKeys = source.primaryKeys;
             Version = source.Version;
@@ -91,6 +94,8 @@ namespace SqlPrompter.Metadata
         public IReadOnlyList<DbTrigger> Triggers { get; }
 
         public IReadOnlyList<DbIndex> Indexes { get; }
+
+        public IReadOnlyList<DbConstraint> Constraints { get; }
 
         public IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function) =>
             function != null && functionParameters.TryGetValue(function.Id, out var list) ? list : Array.Empty<DbParameter>();

@@ -551,7 +551,15 @@ namespace SqlPrompter.Core.Analysis
 
             if (qualifier.Count > 0 || ddl.Kind == ContextKind.Name)
             {
-                return make(ContextKind.Name);
+                var name = make(ContextKind.Name);
+                if (qualifier.Count == 0)
+                {
+                    name.ConstraintTable = ddl.ConstraintTable;
+                    name.ConstraintColumn = ddl.ConstraintColumn;
+                    name.ExistingConstraintsOf = ddl.ExistingConstraintsOf;
+                }
+
+                return name;
             }
 
             switch (ddl.Kind)
@@ -565,6 +573,7 @@ namespace SqlPrompter.Core.Analysis
                     var columns = make(ContextKind.InsertColumns);
                     columns.Sources = new[] { new TableSource(TableSourceKind.Object, ddl.Table, null, 0) };
                     columns.IndexColumns = true;
+                    columns.KeyColumnsOfReference = ddl.KeyColumnsOfReference;
                     return columns;
                 default:
                     var keywords = make(ddl.Keywords.Exclusive ? ContextKind.Keyword : ContextKind.Fallback);

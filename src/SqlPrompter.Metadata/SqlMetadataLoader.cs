@@ -118,7 +118,15 @@ FROM sys.indexes AS i
 JOIN sys.objects AS o ON o.object_id = i.object_id
 JOIN sys.schemas AS s ON s.schema_id = o.schema_id
 WHERE i.index_id > 0 AND i.name IS NOT NULL AND o.is_ms_shipped = 0 AND o.type IN ('U', 'V')
-ORDER BY i.name;";
+ORDER BY i.name;
+
+-- Named constraints of user tables (names after DROP CONSTRAINT, CHECK CONSTRAINT, NOCHECK CONSTRAINT).
+SELECT s.name, p.name, o.name, o.type_desc
+FROM sys.objects AS o
+JOIN sys.objects AS p ON p.object_id = o.parent_object_id
+JOIN sys.schemas AS s ON s.schema_id = p.schema_id
+WHERE o.type IN ('PK', 'UQ', 'F', 'D', 'C') AND p.is_ms_shipped = 0 AND p.type = 'U'
+ORDER BY o.name;";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -247,10 +255,18 @@ FROM sys.objects;";
                         indexes.Add(new DbIndex(reader.GetString(0), reader.GetString(1), reader.GetString(2), typeText));
                     }
 
+                    var constraints = new List<DbConstraint>();
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        var typeText = reader.GetString(3).Replace("_CONSTRAINT", string.Empty).Replace("_", " ").ToLowerInvariant();
+                        constraints.Add(new DbConstraint(reader.GetString(0), reader.GetString(1), reader.GetString(2), typeText));
+                    }
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
                     return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers, foreignKeys,
-                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures, functionParameters, triggers, indexes);
+                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures, functionParameters, triggers, indexes, constraints);
                 }
             }
         }
