@@ -62,7 +62,10 @@ namespace SqlPrompter.Core.Editing
             return prefix + "'" + value.Replace("'", "''") + "'";
         }
 
-        /// <summary>The first column as a list for <c>IN (...)</c>: <c>'a', 'b', 'c'</c>, wrapped at <paramref name="lineWidth"/>. Null when the text has no rows.</summary>
+        /// <summary>
+        /// The first column as <c>IN ('a', 'b', 'c')</c>. A list that does not fit on one line of <paramref name="lineWidth"/> goes on lines of its own
+        /// between <c>IN (</c> and <c>)</c>, indented by four spaces. Null when the text has no rows.
+        /// </summary>
         public static string AsInList(string gridText, bool distinct = true, int lineWidth = 100, string newLine = "\r\n")
         {
             var table = Read(gridText);
@@ -77,6 +80,13 @@ namespace SqlPrompter.Core.Editing
                 values = values.Distinct(StringComparer.Ordinal).ToList();
             }
 
+            var whole = "IN (" + string.Join(", ", values) + ")";
+            if (whole.Length <= lineWidth)
+            {
+                return whole;
+            }
+
+            const string indent = "    ";
             var text = new StringBuilder();
             var column = 0;
             for (var i = 0; i < values.Count; i++)
@@ -84,9 +94,9 @@ namespace SqlPrompter.Core.Editing
                 var piece = values[i] + (i < values.Count - 1 ? "," : string.Empty);
                 if (i > 0)
                 {
-                    if (column + 1 + piece.Length > lineWidth)
+                    if (indent.Length + column + 1 + piece.Length > lineWidth)
                     {
-                        text.Append(newLine);
+                        text.Append(newLine).Append(indent);
                         column = 0;
                     }
                     else
@@ -100,10 +110,10 @@ namespace SqlPrompter.Core.Editing
                 column += piece.Length;
             }
 
-            return text.ToString();
+            return "IN (" + newLine + indent + text + newLine + ")";
         }
 
-        /// <summary>The rows as <c>(1, 'a'), (2, 'b')</c>, one row per line.</summary>
+        /// <summary>The rows as <c>VALUES (1, 'a'), (2, 'b')</c>, one row per line.</summary>
         public static string AsValues(string gridText, string newLine = "\r\n")
         {
             var table = Read(gridText);
@@ -112,7 +122,7 @@ namespace SqlPrompter.Core.Editing
                 return null;
             }
 
-            return string.Join("," + newLine, table.Rows.Select(r => "(" + string.Join(", ", table.Names.Select((n, i) => Literal(Cell(r, i), table.Numeric[i]))) + ")"));
+            return "VALUES" + newLine + string.Join("," + newLine, table.Rows.Select(r => "(" + string.Join(", ", table.Names.Select((n, i) => Literal(Cell(r, i), table.Numeric[i]))) + ")"));
         }
 
         /// <summary>A JSON array of objects with the column names as keys; numbers bare, NULL as null.</summary>
