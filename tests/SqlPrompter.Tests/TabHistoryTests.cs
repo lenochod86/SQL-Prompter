@@ -284,6 +284,56 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void ATabCanBePinnedAndMarkedAsAFavouriteAndKeepsBothOverARestart()
+        {
+            var store = NewStore();
+            store.Track("a.sql", "a", "s", "d", "x", T0);
+            store.Close("a.sql", T0.AddMinutes(1));
+            var id = store.Tabs.Single().Id;
+
+            store.SetPinned(new[] { id }, true);
+            store.SetFavourite(new[] { id }, true);
+
+            var entry = store.Entries().Single();
+            Assert.True(entry.Pinned);
+            Assert.True(entry.Favourite);
+            Assert.Single(HistoryStore.Filter(store.Entries(), string.Empty, HistoryView.Pinned));
+            Assert.Single(HistoryStore.Filter(store.Entries(), string.Empty, HistoryView.Favourites));
+            var again = NewStore();
+            again.Load();
+            Assert.True(again.Entries().Single().Pinned);
+            Assert.True(again.Entries().Single().Favourite);
+
+            again.SetPinned(new[] { id }, false);
+            var third = NewStore();
+            third.Load();
+            Assert.False(third.Entries().Single().Pinned);
+            Assert.True(third.Entries().Single().Favourite);
+        }
+
+        [Fact]
+        public void PinnedAndFavouriteTabsSurviveThePruneAndARewrite()
+        {
+            var store = NewStore();
+            foreach (var name in new[] { "old", "pinned", "favourite" })
+            {
+                store.Track(name + ".sql", name, "s", "d", name, T0);
+                store.Flush(name + ".sql", name, T0);
+                store.Close(name + ".sql", T0.AddMinutes(1));
+            }
+
+            store.SetPinned(new[] { store.Tabs.Single(t => t.Name == "pinned").Id }, true);
+            store.SetFavourite(new[] { store.Tabs.Single(t => t.Name == "favourite").Id }, true);
+
+            Assert.Equal(1, store.Prune(30, T0.AddDays(60)));
+
+            var again = NewStore();
+            again.Load();
+            Assert.Equal(new[] { "favourite", "pinned" }, again.Tabs.Select(t => t.Name).OrderBy(n => n).ToArray());
+            Assert.True(again.Tabs.Single(t => t.Name == "pinned").Pinned);
+        }
+
+        [Fact]
         public void DeleteRemovesATabAndItsVersions()
         {
             var store = NewStore();

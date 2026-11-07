@@ -136,8 +136,18 @@ namespace SqlPrompter.Ssms
             TabHistoryService.Delete(list);
         }
 
-        public static void SetPinned(IEnumerable<string> ids, bool pinned) => Store.SetPinned(ids, pinned);
+        public static void SetPinned(IEnumerable<string> ids, bool pinned)
+        {
+            var list = ids.ToList();
+            Store.SetPinned(list, pinned);
+            TabHistoryService.SetPinned(list, pinned);
+        }
 
-        public static void SetFavourite(IEnumerable<string> ids, bool favourite) => Store.SetFavourite(ids, favourite);
+        public static void SetFavourite(IEnumerable<string> ids, bool favourite)
+        {
+            var list = ids.ToList();
+            Store.SetFavourite(list, favourite);
+            TabHistoryService.SetFavourite(list, favourite);
+        }
     }
 }

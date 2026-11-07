@@ -276,6 +276,7 @@ namespace SqlPrompter.Ssms
             }
 
             var text = tab.Text ?? string.Empty;
+            Log.Write("Opening a saved tab: server " + tab.Server + ", database " + tab.Database + ", login " + (string.IsNullOrEmpty(tab.Login) ? "(Windows authentication or none)" : tab.Login) + ", reconnect " + SettingsService.Current.Behavior.ReconnectSqlTabs + ".");
             object info = null;
             var sqlKey = tab.IsConnected && !string.IsNullOrEmpty(tab.Login) ? LoginKey(tab.Server, tab.Login) : null;
             var reconnect = sqlKey != null && SettingsService.Current.Behavior.ReconnectSqlTabs && !DeclinedSqlLogins.ContainsKey(sqlKey);
@@ -327,14 +328,28 @@ namespace SqlPrompter.Ssms
             connected = info != null;
             if (info == null)
             {
-                // With no connection given SSMS copies the one of the active window, so the new window is disconnected explicitly.
-                try
+                // With no connection given SSMS copies the one of the active window, so the new window is disconnected explicitly, and the result is
+                // checked: a window that stayed connected would run the tab's text on another server (#324).
+                for (var attempt = 1; attempt <= 3; attempt++)
                 {
-                    (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("Query.Disconnect");
-                }
-                catch (Exception ex)
-                {
-                    Log.Error("Disconnecting the restored tab failed", ex);
+                    try
+                    {
+                        (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("Query.Disconnect");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Disconnecting the restored tab failed", ex);
+                    }
+
+                    var window = System.Windows.Application.Current?.MainWindow;
+                    object ignored = null;
+                    var stillConnected = false;
+                    if (window == null || !WindowStatusColoring.TryGetFront(new System.Windows.Interop.WindowInteropHelper(window).Handle, out stillConnected, out ignored) || !stillConnected)
+                    {
+                        break;
+                    }
+
+                    Log.Write("The restored tab is still connected after Query.Disconnect (attempt " + attempt + ").");
                 }
             }
             else if (reconnect)
