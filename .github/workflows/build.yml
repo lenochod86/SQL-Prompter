@@ -52,14 +52,16 @@ jobs:
         shell: pwsh
         run: ./.github/scripts/Check-Versions.ps1 -Base origin/${{ github.base_ref }}
 
-  # The Windows build (billed twice): only for a pull request with the label `build-vsix`, and on demand.
+  # The Windows build runs on the self-hosted runner of the development PC (label `vsix`, no billed minutes; E:\actions-runner, started by the
+  # user): only for a pull request with the label `build-vsix`, and on demand. When the PC is off the job waits in the queue; to use GitHub's
+  # Windows runner instead (billed twice) change `runs-on` to `windows-latest`.
   vsix:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'build-vsix') &&
        (github.event.action != 'labeled' || github.event.label.name == 'build-vsix'))
-    runs-on: windows-latest
+    runs-on: [self-hosted, vsix]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
