@@ -178,7 +178,7 @@ namespace SqlPrompter.Ssms
             var active = dte.ActiveDocument;
             if (active != null && string.Equals(active.Language, "SQL", StringComparison.OrdinalIgnoreCase))
             {
-                var connection = SsmsConnection.GetActive();
+                var connection = SsmsConnection.GetActiveOfWindow();
                 lock (Connections)
                 {
                     if (connection == null)

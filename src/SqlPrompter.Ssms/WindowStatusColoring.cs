@@ -29,6 +29,29 @@ namespace SqlPrompter.Ssms
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hwnd);
 
+        /// <summary>The connection state of the query window that is shown: <c>IsConnected</c> and the <c>Connection</c> (UIConnectionInfo) of its editor control; false when no query window is shown.</summary>
+        public static bool TryGetFront(IntPtr mainWindow, out bool connected, out object info)
+        {
+            var found = false;
+            var isConnected = false;
+            object connection = null;
+            EnumChildWindows(mainWindow, (handle, lParam) =>
+            {
+                if (!found && Control.FromHandle(handle) is StatusStrip strip && strip.Parent != null && strip.Parent.GetType().Name == EditorControlType && IsWindowVisible(handle))
+                {
+                    var type = strip.Parent.GetType();
+                    found = true;
+                    isConnected = type.GetProperty("IsConnected")?.GetValue(strip.Parent) is bool value && value;
+                    connection = isConnected ? type.GetProperty("Connection")?.GetValue(strip.Parent) : null;
+                }
+
+                return true;
+            }, IntPtr.Zero);
+            connected = isConnected;
+            info = connection;
+            return found;
+        }
+
         /// <summary>
         /// Colors the strips by the rules, or gives them their own color back when <paramref name="enabled"/> is false or no rule matches.
         /// Returns what the window in front wants (<c>Found</c> false when no query window is shown): the tab and the shell status bar follow it,

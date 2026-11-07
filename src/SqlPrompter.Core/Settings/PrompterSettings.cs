@@ -270,6 +270,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "tabVersionsMax")]
         public int TabVersionsMax { get; set; }
 
+        /// <summary>A restored or reopened tab that used a SQL login is connected again: with the live connection of the same login, or after one Connect dialog per server and login (#322).</summary>
+        [DataMember(Name = "reconnectSqlTabs")]
+        public bool ReconnectSqlTabs { get; set; }
+
         /// <summary>How many closed query tabs can be reopened with Reopen Closed Query Tab (#226).</summary>
         [DataMember(Name = "closedTabsKept")]
         public int ClosedTabsKept { get; set; }
@@ -346,6 +350,7 @@ namespace SqlPrompter.Core.Settings
             ClosedTabsKept = 20;
             ClosedTabsHours = 24;
             RestoreTabs = true;
+            ReconnectSqlTabs = true;
             WarnDeleteWithoutWhere = true;
             WarnUpdateWithoutWhere = true;
             WarnOpenTransaction = true;
