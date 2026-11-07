@@ -21,6 +21,7 @@ namespace SqlPrompter.Ssms
         private readonly SnippetBodyEditor preview = new SnippetBodyEditor { Margin = new Thickness(0), Padding = new Thickness(4), BorderThickness = new Thickness(1) };
         private readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 6, 0, 0) };
         private HistoryView view = HistoryView.All;
+        private MenuItem versionsMenu;
 
         public HistoryWindow()
         {
@@ -56,6 +57,9 @@ namespace SqlPrompter.Ssms
             menu.Items.Add(Entry("Favourite / Unfavourite", ToggleFavourite));
             menu.Items.Add(new Separator());
             menu.Items.Add(Entry("Delete", Delete));
+            versionsMenu = new MenuItem { Header = "Versions" };
+            menu.Items.Insert(1, versionsMenu);
+            menu.Opened += (s, e) => FillVersions();
             list.ContextMenu = menu;
             list.PreviewMouseRightButtonDown += (sender, args) =>
             {
@@ -105,7 +109,8 @@ namespace SqlPrompter.Ssms
             var heading = new DockPanel { LastChildFill = true };
             var views = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
             DockPanel.SetDock(views, Dock.Right);
-            views.Children.Add(ViewButton("\uE72C", "All runs", HistoryView.All, true));
+            views.Children.Add(ViewButton("\uE72C", "Everything: tabs and runs", HistoryView.All, true));
+            views.Children.Add(ViewButton("\uE768", "Executed queries (runs)", HistoryView.Runs, false));
             views.Children.Add(ViewButton("\uE718", "Pinned runs", HistoryView.Pinned, false));
             views.Children.Add(ViewButton("\uE734", "Favourites", HistoryView.Favourites, false));
             views.Children.Add(ViewButton("\uE838", "Open tabs", HistoryView.Open, false));
@@ -170,6 +175,27 @@ namespace SqlPrompter.Ssms
 
         /// <summary>The run is to become a snippet instead of being opened in a tab.</summary>
         public bool MakeSnippet { get; private set; }
+
+        /// <summary>The older versions of the selected tab, newest first; choosing one opens it in a new tab (#302).</summary>
+        private void FillVersions()
+        {
+            versionsMenu.Items.Clear();
+            var entry = (list.SelectedItem as Row)?.Entry;
+            var versions = entry != null && entry.Kind == HistoryKind.Tab ? entry.Versions.Reverse().ToList() : new List<TabVersion>();
+            versionsMenu.IsEnabled = versions.Count > 0;
+            foreach (var version in versions.Take(100))
+            {
+                var picked = version;
+                var item = new MenuItem { Header = picked.AtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "  (" + picked.Text.Length + " characters)" };
+                item.Click += (sender, args) =>
+                {
+                    Chosen = new HistoryEntry(entry.Id, picked.Text, entry.Server, entry.Database, null, picked.AtUtc, entry.ClosedAtUtc, entry.Tab) { Kind = HistoryKind.Tab };
+                    Close();
+                };
+                item.MouseEnter += (sender, args) => preview.PlainText = picked.Text;
+                versionsMenu.Items.Add(item);
+            }
+        }
 
         private void ToggleFavourite()
         {
@@ -275,7 +301,7 @@ namespace SqlPrompter.Ssms
                 list.Items.Add(new Row(entry));
             }
 
-            status.Text = found.Count + " of " + everything.Count + " runs" + (found.Count > MaxShown ? " (the newest " + MaxShown + " are shown)" : string.Empty);
+            status.Text = found.Count + " of " + everything.Count + " entries" + (found.Count > MaxShown ? " (the newest " + MaxShown + " are shown)" : string.Empty);
             if (list.Items.Count > 0)
             {
                 list.SelectedIndex = 0;
@@ -315,7 +341,7 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            if (MessageBox.Show(this, "Delete this run from the history?", "SQL Prompter", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (MessageBox.Show(this, "Delete this entry from the history?", "SQL Prompter", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             {
                 return;
             }
@@ -335,8 +361,10 @@ namespace SqlPrompter.Ssms
 
             public string TabName => Entry.Tab.Length > 0 ? Entry.Tab : "(no tab name)";
 
-            /// <summary>The time of the run, to the minute.</summary>
-            public string RunText => Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+            /// <summary>The time of the run (of the last change of a tab), to the minute.</summary>
+            public string RunText => Entry.Kind == HistoryKind.Tab
+                ? "tab, changed " + Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm") + (Entry.ClosedAtUtc.HasValue ? ", closed " + Entry.ClosedAtUtc.Value.ToLocalTime().ToString("HH:mm") : ", open") + ", " + Entry.Versions.Count + " versions"
+                : Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
             public string Server => Entry.Server;
 
@@ -348,7 +376,7 @@ namespace SqlPrompter.Ssms
 
             /// <summary>The full texts of the row, including whether the tab is still open or when it was closed.</summary>
             public string Tooltip =>
-                TabName + "\nRun: " + Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "\n" +
+                TabName + (Entry.Kind == HistoryKind.Tab ? "\nLast change: " : "\nRun: ") + Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "\n" +
                 (Entry.ClosedAtUtc.HasValue ? "Tab closed: " + Entry.ClosedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") : "Tab is still open") +
                 "\nServer: " + Entry.Server + "\nDatabase: " + Entry.Database + (Entry.Pinned ? "\nPinned" : string.Empty) + (Entry.Favourite ? "\nFavourite" : string.Empty);
         }

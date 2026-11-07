@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using SqlPrompter.Core.History;
@@ -44,21 +45,43 @@ namespace SqlPrompter.Tests
             Assert.Equal(new[] { "SELECT pinned and closed" }, Texts(Store(), string.Empty, HistoryView.Pinned));
 
         [Fact]
-        public void OpenShowsRunsOfTabsThatAreNotClosed() =>
-            Assert.Equal(new[] { "SELECT open" }, Texts(Store(), string.Empty, HistoryView.Open));
+        public void RunsShowsTheExecutedQueriesAndNoTabs()
+        {
+            var store = Store();
+            var all = store.Entries.Concat(TabEntries()).ToList();
+
+            Assert.Equal(new[] { "SELECT pinned and closed", "SELECT closed", "SELECT open" }, HistoryStore.Filter(all, string.Empty, HistoryView.Runs).Select(e => e.Text).ToArray());
+            Assert.Equal(5, HistoryStore.Filter(all, string.Empty, HistoryView.All).Count);
+        }
+
+        private IReadOnlyList<HistoryEntry> TabEntries()
+        {
+            var tabs = new TabHistoryStore(Path.Combine(folder, "tabs.jsonl")) { MinVersionInterval = TimeSpan.Zero };
+            tabs.Track("a.sql", "A", "s", "d", "SELECT tab open", Now);
+            tabs.Track("a.sql", "A", "s", "d", "SELECT tab open", Now.AddSeconds(5));
+            tabs.Track("b.sql", "B", "s", "d", "SELECT tab closed", Now.AddMinutes(1));
+            tabs.Track("b.sql", "B", "s", "d", "SELECT tab closed", Now.AddMinutes(1).AddSeconds(5));
+            tabs.Close("b.sql", Now.AddMinutes(9));
+            return tabs.Entries();
+        }
 
         [Fact]
-        public void ClosedShowsRunsOfClosedTabs() =>
-            Assert.Equal(new[] { "SELECT pinned and closed", "SELECT closed" }, Texts(Store(), string.Empty, HistoryView.Closed));
+        public void OpenAndClosedShowTabsNotRuns()
+        {
+            var all = Store().Entries.Concat(TabEntries()).ToList();
+
+            Assert.Equal(new[] { "SELECT tab open" }, HistoryStore.Filter(all, string.Empty, HistoryView.Open).Select(e => e.Text).ToArray());
+            Assert.Equal(new[] { "SELECT tab closed" }, HistoryStore.Filter(all, string.Empty, HistoryView.Closed).Select(e => e.Text).ToArray());
+        }
 
         [Fact]
         public void TheTextFilterCombinesWithTheView()
         {
-            var store = Store();
+            var all = Store().Entries.Concat(TabEntries()).ToList();
 
-            Assert.Equal(new[] { "SELECT closed" }, Texts(store, "closed", HistoryView.Closed).Where(t => !t.Contains("pinned")).ToArray());
-            Assert.Empty(Texts(store, "open", HistoryView.Closed));
-            Assert.Equal(new[] { "SELECT open" }, Texts(store, "open", HistoryView.Open));
+            Assert.Equal(new[] { "SELECT tab closed" }, HistoryStore.Filter(all, "closed", HistoryView.Closed).Select(e => e.Text).ToArray());
+            Assert.Empty(HistoryStore.Filter(all, "open", HistoryView.Closed));
+            Assert.Equal(new[] { "SELECT tab open" }, HistoryStore.Filter(all, "open", HistoryView.Open).Select(e => e.Text).ToArray());
         }
 
         [Fact]

@@ -14,16 +14,26 @@ namespace SqlPrompter.Core.History
     public enum HistoryView
     {
         All,
+
+        /// <summary>Only the executed queries (the tab entries are left out).</summary>
+        Runs,
         Pinned,
 
         /// <summary>The runs marked as favourites (#285); they keep their place in the list, unlike pinned runs.</summary>
         Favourites,
 
-        /// <summary>The tab of the run is still open.</summary>
+        /// <summary>The tabs that are open now (tab entries, #302).</summary>
         Open,
 
-        /// <summary>The tab of the run was closed.</summary>
+        /// <summary>The tabs that were closed (tab entries, #302).</summary>
         Closed,
+    }
+
+    /// <summary>What a row of the history is: an executed query or a query tab with the versions of its text.</summary>
+    public enum HistoryKind
+    {
+        Run,
+        Tab,
     }
 
     public sealed class HistoryEntry
@@ -41,6 +51,11 @@ namespace SqlPrompter.Core.History
         }
 
         public string Id { get; }
+
+        public HistoryKind Kind { get; set; }
+
+        /// <summary>The versions of the text of a tab entry, oldest first (empty for a run).</summary>
+        public IReadOnlyList<TabVersion> Versions { get; internal set; } = new TabVersion[0];
 
         public string Text { get; }
 
@@ -280,15 +295,16 @@ namespace SqlPrompter.Core.History
                 .ToList();
         }
 
-        /// <summary>Whether the run belongs to the view: all, pinned, open (its tab is not closed) or closed (the tab was closed).</summary>
+        /// <summary>Whether the entry belongs to the view: all, runs, pinned, favourites, open tabs or closed tabs.</summary>
         public static bool InView(HistoryEntry entry, HistoryView view)
         {
             switch (view)
             {
                 case HistoryView.Pinned: return entry.Pinned;
                 case HistoryView.Favourites: return entry.Favourite;
-                case HistoryView.Open: return !entry.ClosedAtUtc.HasValue;
-                case HistoryView.Closed: return entry.ClosedAtUtc.HasValue;
+                case HistoryView.Runs: return entry.Kind == HistoryKind.Run;
+                case HistoryView.Open: return entry.Kind == HistoryKind.Tab && !entry.ClosedAtUtc.HasValue;
+                case HistoryView.Closed: return entry.Kind == HistoryKind.Tab && entry.ClosedAtUtc.HasValue;
                 default: return true;
             }
         }

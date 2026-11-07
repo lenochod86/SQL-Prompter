@@ -55,6 +55,12 @@ namespace SqlPrompter.Ssms
             Current = this;
         }
 
+        /// <summary>SSMS is shutting down or a shutdown has begun: the closing of the windows is not the user's doing.</summary>
+        public bool IsShuttingDown => shuttingDown || shutdown.Pending;
+
+        /// <summary>The name the user gave the tab of the document, or null.</summary>
+        public string NameOf(string document) => document != null && names.TryGetValue(document, out var name) ? name : null;
+
         /// <summary>The tabs that can be reopened, the one closed last first.</summary>
         public IReadOnlyList<SavedTab> ClosedTabsList
         {
@@ -191,6 +197,7 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             Save(true);
+            TabHistoryService.Check(true);
         }
 
         private const int WmClose = 0x0010;
@@ -251,6 +258,7 @@ namespace SqlPrompter.Ssms
 
                 Log.Write("Shutdown begins (" + reason + "): the open tabs are written now.");
                 Save(true);
+                TabHistoryService.Check(true);
                 shutdown.Begin();
                 if (shutdownTimer == null)
                 {
@@ -274,7 +282,41 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        /// <summary>A window is closing by the user: write the list at once, without that window (an empty list is a valid session).</summary>
+        private DispatcherTimer closeWatch;
+        private DateTime closeWatchUntil;
+        private bool closedSeen;
+        private static readonly HashSet<string> ShownDocuments = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// True when the document had a window and has none any more. SSMS keeps the document of a closed query window (an unsaved one) in the list
+        /// of documents and in the running document table for a long time, with no windows (verified: <c>Windows.Count</c> is 0), so the list alone
+        /// does not tell which tabs are open. A new document has no window for a moment before it gets one, hence the "had a window" condition.
+        /// </summary>
+        internal static bool IsClosedWindow(Document document)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (document.Windows.Count > 0)
+                {
+                    ShownDocuments.Add(document.FullName);
+                    return false;
+                }
+
+                return ShownDocuments.Contains(document.FullName);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// The running document table says a lock on a document is going away; that is also so while the window stays open and while the user has
+        /// not yet answered "save changes?". The open windows are therefore looked at every 300 ms for a few seconds until one turns out to be closed
+        /// (no window left); then the list is written at once, without that window (an empty list is a valid session), and the history closes the tab.
+        /// The text of a closing document is never read here: that kept the document alive.
+        /// </summary>
         private void OnClosing(uint docCookie)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -283,17 +325,26 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            string moniker = null;
-            try
+            closeWatchUntil = DateTime.UtcNow.AddSeconds(15);
+            closedSeen = false;
+            if (closeWatch == null)
             {
-                rdt.GetDocumentInfo(docCookie, out _, out _, out _, out moniker, out _, out _, out _);
-            }
-            catch (Exception ex)
-            {
-                Log.Error("The closing document could not be identified", ex);
+                closeWatch = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(300) };
+                closeWatch.Tick += (s, e) =>
+                {
+                    if (shuttingDown || shutdown.Pending || closedSeen || DateTime.UtcNow > closeWatchUntil)
+                    {
+                        closeWatch.Stop();
+                        return;
+                    }
+
+                    Save(true);
+                    TabHistoryService.Check(false);
+                };
             }
 
-            Save(true, moniker);
+            closeWatch.Stop();
+            closeWatch.Start();
         }
         /// <summary>The events of the running document table.</summary>
         private sealed class TableEvents : IVsRunningDocTableEvents
@@ -315,10 +366,7 @@ namespace SqlPrompter.Ssms
             public int OnBeforeLastDocumentUnlock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
-                if (dwReadLocksRemaining == 0 && dwEditLocksRemaining == 0)
-                {
-                    owner.OnClosing(docCookie);
-                }
+                owner.OnClosing(docCookie);
 
                 return VSConstants.S_OK;
             }
@@ -477,7 +525,7 @@ namespace SqlPrompter.Ssms
                 var openKeys = new List<KeyValuePair<string, SavedTab>>();
                 foreach (Document document in dte.Documents)
                 {
-                    if (!IsQuery(document) || (closing != null && string.Equals(document.FullName, closing, StringComparison.OrdinalIgnoreCase)))
+                    if (!IsQuery(document) || (closing != null && string.Equals(document.FullName, closing, StringComparison.OrdinalIgnoreCase)) || IsClosedWindow(document))
                     {
                         continue;
                     }
@@ -527,6 +575,7 @@ namespace SqlPrompter.Ssms
                 var newlyClosed = closedTabs.Update(openKeys);
                 if (newlyClosed > 0)
                 {
+                    closedSeen = true;
                     Log.Write("Tabs: " + newlyClosed + " closed; " + closedTabs.Count + " can be reopened.");
                 }
 
