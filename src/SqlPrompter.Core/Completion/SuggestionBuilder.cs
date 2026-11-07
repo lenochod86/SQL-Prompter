@@ -92,6 +92,23 @@ namespace SqlPrompter.Core.Completion
         /// <summary>Name of the database object whose definition belongs to the item.</summary>
         public string DefinitionName { get; private set; }
 
+        /// <summary>For a column item: the schema of the table or view it belongs to (null when it is not a database object), so that its description can be read (#206).</summary>
+        public string ColumnOwnerSchema { get; private set; }
+
+        /// <summary>For a column item: the name of the table or view it belongs to.</summary>
+        public string ColumnOwnerName { get; private set; }
+
+        internal Suggestion WithColumnOwner(DbObject owner)
+        {
+            if (owner != null)
+            {
+                ColumnOwnerSchema = owner.Schema;
+                ColumnOwnerName = owner.Name;
+            }
+
+            return this;
+        }
+
         internal Suggestion WithDefinition(string schema, string name)
         {
             DefinitionSchema = schema;
@@ -909,6 +926,7 @@ namespace SqlPrompter.Core.Completion
                 Source = source;
                 Columns = columns;
                 Owner = owner;
+                Object = dbObject;
                 if (dbObject != null && metadata != null)
                 {
                     primary = new HashSet<string>(metadata.GetPrimaryKey(dbObject), StringComparer.OrdinalIgnoreCase);
@@ -923,6 +941,9 @@ namespace SqlPrompter.Core.Completion
             public IReadOnlyList<DbColumn> Columns { get; }
 
             public string Owner { get; }
+
+            /// <summary>The table or view the columns belong to, when it is an object of the database.</summary>
+            public DbObject Object { get; }
 
             private readonly HashSet<string> primary = new HashSet<string>();
             private readonly HashSet<string> foreign = new HashSet<string>();
@@ -964,7 +985,7 @@ namespace SqlPrompter.Core.Completion
                 var qualified = ResolveColumns(context.QualifiedSource, metadata, script, options);
                 foreach (var column in qualified?.Columns ?? Array.Empty<DbColumn>())
                 {
-                    yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, quote), null, qualified.Owner, 0, qualified.KeyOf(column));
+                    yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, quote), null, qualified.Owner, 0, qualified.KeyOf(column)).WithColumnOwner(qualified.Object);
                 }
 
                 yield break;
@@ -1018,7 +1039,7 @@ namespace SqlPrompter.Core.Completion
                     var qualify = !inner || ambiguous.Contains(column.Name) || options.Aliases.QualifyColumnsWithAliases;
                     var insert = qualify ? SqlIdentifier.Quote(reference, quote) + "." + name : name;
                     var mismatch = valueType != TypeClass.Unknown && OperatorSuggestions.Classify(column.TypeName) != valueType;
-                    yield return ColumnSuggestion(column, insert, reference, x.Owner, inner && !mismatch ? 0 : 2, x.KeyOf(column));
+                    yield return ColumnSuggestion(column, insert, reference, x.Owner, inner && !mismatch ? 0 : 2, x.KeyOf(column)).WithColumnOwner(x.Object);
                 }
             }
 

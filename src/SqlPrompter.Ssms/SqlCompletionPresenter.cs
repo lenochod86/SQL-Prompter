@@ -110,6 +110,7 @@ namespace SqlPrompter.Ssms
         private CompletionItem definitionItem;
         private CompletionItem dbDescriptionItem;
         private string dbDescription;
+        private SqlPrompter.Metadata.ObjectDescriptions dbDescriptions;
         private DispatcherTimer definitionTimer;
         private readonly StackPanel rowPanel = new StackPanel();
         private readonly ScrollBar scrollBar;
@@ -578,6 +579,12 @@ namespace SqlPrompter.Ssms
             definitionItem = item;
             definitionTimer?.Stop();
             ShowDefinition(null);
+            if (item != null && item.Properties.TryGetProperty(SqlCompletionSource.ColumnKey, out ColumnRef columnRef))
+            {
+                RequestColumnDescription(item, columnRef);
+                return;
+            }
+
             if (item == null || !item.Properties.TryGetProperty(SqlCompletionSource.DefinitionKey, out DefinitionRef reference))
             {
                 return;
@@ -615,13 +622,53 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             dbDescription = null;
+            dbDescriptions = null;
             dbDescriptionItem = item;
             if (!SettingsService.Current.Behavior.ShowDbDescriptions)
             {
                 return;
             }
 
-            DescriptionPreview.Request(reference, text =>
+            DescriptionPreview.RequestAll(reference, descriptions =>
+            {
+                if (descriptions == null || !ReferenceEquals(definitionItem, item) || !ReferenceEquals(dbDescriptionItem, item))
+                {
+                    return;
+                }
+
+                dbDescriptions = descriptions;
+                var text = SqlPrompter.Core.Completion.DescriptionText.Format(descriptions.ObjectDescription, descriptions.Columns);
+                if (!string.IsNullOrEmpty(text))
+                {
+                    dbDescription = text;
+                    descriptionText.Text += (descriptionText.Text.Length > 0 ? "\n\n" : string.Empty) + text;
+                    descriptionPopup.IsOpen = popup.IsOpen;
+                }
+
+                // The Summary tab gets a Description column.
+                if (definitionSummary != null)
+                {
+                    definitionSummary = definitionSummary.WithDescriptions(descriptions.Columns);
+                    if (showingSummary)
+                    {
+                        FillSummary(summaryGrid, definitionSummary);
+                    }
+                }
+            });
+        }
+
+        /// <summary>The description of a column (MS_Description) is added under the description of the item when it arrives (#206).</summary>
+        private void RequestColumnDescription(CompletionItem item, ColumnRef column)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            dbDescription = null;
+            dbDescriptionItem = item;
+            if (!SettingsService.Current.Behavior.ShowDbDescriptions)
+            {
+                return;
+            }
+
+            DescriptionPreview.RequestColumn(column, text =>
             {
                 if (string.IsNullOrEmpty(text) || !ReferenceEquals(definitionItem, item) || !ReferenceEquals(dbDescriptionItem, item))
                 {
@@ -665,6 +712,11 @@ namespace SqlPrompter.Ssms
             }
 
             definitionSummary = BuildSummary();
+            if (definitionSummary != null && dbDescriptions != null && ReferenceEquals(definitionItem, dbDescriptionItem))
+            {
+                definitionSummary = definitionSummary.WithDescriptions(dbDescriptions.Columns);
+            }
+
             definitionTabs.Visibility = definitionSummary != null ? Visibility.Visible : Visibility.Collapsed;
             definitionHeader.Visibility = Visibility.Visible;
             SelectTab(false);
