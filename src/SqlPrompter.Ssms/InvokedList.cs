@@ -78,6 +78,7 @@ namespace SqlPrompter.Ssms
             view.Caret.PositionChanged += (s, e) => LookAgain();
             view.LostAggregateFocus += (s, e) => Close();
             view.Closed += (s, e) => Close();
+            presenter.OutsideClicked += (s, e) => Close();
             presenter.CommitRequested += (s, e) =>
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
