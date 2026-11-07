@@ -43,15 +43,27 @@ namespace SqlPrompter.Ssms
             Size = new Size(1040, 800);
             MinimumSize = new Size(820, 600);
 
-            var top = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 40, Padding = new Padding(8, 6, 8, 0), WrapContents = false };
-            top.Controls.Add(new Label { Text = "Style", AutoSize = true, Margin = new Padding(0, 7, 6, 0) });
-            top.Controls.Add(styleBox);
-            top.Controls.Add(Button("New", NewStyle));
-            top.Controls.Add(Button("Duplicate", Duplicate));
-            top.Controls.Add(Button("Rename", Rename));
-            top.Controls.Add(Button("Delete", Delete));
-            top.Controls.Add(Button("Set as active", () => { activeName = current.Name; ShowActive(); }));
-            top.Controls.Add(activeLabel);
+            // One row; every control is vertically centered in it, so the label, the combo box and the buttons share one baseline (#304).
+            var top = new TableLayoutPanel { Dock = DockStyle.Top, Height = 44, Padding = new Padding(8, 4, 8, 4), ColumnCount = 0, RowCount = 1, GrowStyle = TableLayoutPanelGrowStyle.AddColumns };
+            top.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            void AddTop(Control control)
+            {
+                control.Anchor = AnchorStyles.Left;
+                control.Margin = new Padding(0, 0, 6, 0);
+                top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                top.Controls.Add(control, top.ColumnStyles.Count - 1, 0);
+            }
+
+            AddTop(new Label { Text = "Style", AutoSize = true });
+            AddTop(styleBox);
+            AddTop(Button("New", NewStyle));
+            AddTop(Button("Duplicate", Duplicate));
+            AddTop(Button("Rename", Rename));
+            AddTop(Button("Delete", Delete));
+            AddTop(Button("Import...", Import));
+            AddTop(Button("Set as active", () => { activeName = current.Name; ShowActive(); }));
+            activeLabel.Margin = new Padding(6, 0, 0, 0);
+            AddTop(activeLabel);
 
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 46, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8, 8, 8, 0) };
             var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 90 };
@@ -254,6 +266,19 @@ namespace SqlPrompter.Ssms
             {
                 current = new NamedFormatStyle(name, current.Style.Clone());
                 styles.Add(current);
+                RefreshStyles();
+                ShowPage(true);
+            }
+        }
+
+        /// <summary>Reads a SQL Prompt style file into a new style of the list (#304); the window's own copy of the list changes, so Cancel drops it.</summary>
+        private void Import()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var imported = StyleImportDialog.Run(this, styles);
+            if (imported != null)
+            {
+                current = imported;
                 RefreshStyles();
                 ShowPage(true);
             }

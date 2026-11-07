@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace SqlPrompter.Core.Formatting
@@ -8,12 +9,16 @@ namespace SqlPrompter.Core.Formatting
     /// <summary>What was taken from a style file and what was not.</summary>
     public sealed class StyleImportResult
     {
-        internal StyleImportResult(FormatStyle style, List<string> applied, List<string> notes)
+        internal StyleImportResult(FormatStyle style, List<string> applied, List<string> notes, string name = null)
         {
             Style = style;
             Applied = applied;
             Notes = notes;
+            Name = name;
         }
+
+        /// <summary>The name the file gives the style (<c>metadata.name</c>); null when it has none.</summary>
+        public string Name { get; }
 
         public FormatStyle Style { get; }
 
@@ -30,13 +35,48 @@ namespace SqlPrompter.Core.Formatting
     /// </summary>
     public static class SqlPromptStyleImporter
     {
-        /// <exception cref="FormatException">The text is not JSON.</exception>
+        private static readonly string[] Groups =
+        {
+            "whitespace", "lists", "parentheses", "casing", "dml", "ddl", "controlFlow", "cte", "variables", "joinStatements", "insertStatements", "caseExpressions", "operators",
+        };
+
+        /// <summary>
+        /// Reads the style from <paramref name="json"/> and adds it to <paramref name="styles"/> as a new named style (#304): the name comes from the file's
+        /// metadata, otherwise from <paramref name="fileName"/> (without extension), with a number added when the name is taken. The existing styles are not touched.
+        /// </summary>
+        /// <exception cref="FormatException">The text is not JSON, or is JSON that is not a style.</exception>
+        public static NamedFormatStyle ImportInto(IList<NamedFormatStyle> styles, string json, string fileName, out StyleImportResult result, FormatStyle baseStyle = null)
+        {
+            result = Import(json, baseStyle);
+            var name = string.IsNullOrWhiteSpace(result.Name) ? System.IO.Path.GetFileNameWithoutExtension(fileName ?? string.Empty) : result.Name.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = "Imported style";
+            }
+
+            var unique = name;
+            for (var i = 2; styles.Any(s => string.Equals(s.Name, unique, StringComparison.OrdinalIgnoreCase)); i++)
+            {
+                unique = name + " " + i;
+            }
+
+            var imported = new NamedFormatStyle(unique, result.Style);
+            styles.Add(imported);
+            return imported;
+        }
+
+        /// <exception cref="FormatException">The text is not JSON, or is JSON that is not a style.</exception>
         public static StyleImportResult Import(string json, FormatStyle baseStyle = null)
         {
             var root = MiniJson.Parse(json) as Dictionary<string, object>;
             if (root == null)
             {
                 throw new FormatException("The style file is not a JSON object.");
+            }
+
+            if (!root.ContainsKey("metadata") && !Groups.Any(root.ContainsKey))
+            {
+                throw new FormatException("The file is not a SQL Prompt style (none of its option groups was found).");
             }
 
             var style = (baseStyle ?? new FormatStyle()).Clone();
@@ -99,7 +139,7 @@ namespace SqlPrompter.Core.Formatting
                 }
             }
 
-            return new StyleImportResult(style, applied, notes);
+            return new StyleImportResult(style, applied, notes, (Find(root, "metadata.name", used) as string));
 
             void SetCase(string path, Action<CaseStyle> set, string name)
             {
