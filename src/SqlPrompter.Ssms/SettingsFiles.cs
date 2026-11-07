@@ -68,43 +68,20 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        /// <summary>Returns true when the settings changed.</summary>
+        /// <summary>Imports a SQL Prompt style as a new named style and makes it the active one (#304). Returns true when the settings changed.</summary>
         public static bool ImportFormatStyle(IWin32Window owner)
         {
-            try
+            var settings = SettingsService.Current.Clone();
+            var imported = StyleImportDialog.Run(owner, settings.FormattingStyles);
+            if (imported == null)
             {
-                using (var dialog = new OpenFileDialog
-                {
-                    Title = "Import a SQL Prompt formatting style (.json)",
-                    Filter = "SQL Prompt styles (*.json)|*.json|All files (*.*)|*.*",
-                })
-                {
-                    if (dialog.ShowDialog(owner) != DialogResult.OK)
-                    {
-                        return false;
-                    }
-
-                    var json = System.IO.File.ReadAllText(dialog.FileName, System.Text.Encoding.UTF8);
-                    var result = SqlPromptStyleImporter.Import(json, SettingsService.Current.Formatting);
-                    var settings = SettingsService.Current.Clone();
-                    settings.SetActiveStyleValues(result.Style);
-                    SettingsService.Update(settings);
-                    var text = "Imported:\n- " + (result.Applied.Count == 0 ? "(nothing)" : string.Join("\n- ", result.Applied));
-                    if (result.Notes.Count > 0)
-                    {
-                        text += "\n\nNot applied (the formatter has no such option):\n- " + string.Join("\n- ", result.Notes);
-                    }
-
-                    Show(owner, text);
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Importing the formatting style failed", ex);
-                Show(owner, "Importing the formatting style failed: " + ex.Message);
                 return false;
             }
+
+            settings.ActiveFormattingStyle = imported.Name;
+            settings.EnsureStyles();
+            SettingsService.Update(settings);
+            return true;
         }
 
         private static void Show(IWin32Window owner, string text) =>
