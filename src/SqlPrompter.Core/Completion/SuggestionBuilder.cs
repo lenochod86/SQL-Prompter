@@ -677,23 +677,30 @@ namespace SqlPrompter.Core.Completion
             {
                 yield return new Suggestion(SuggestionKind.Schema, schema, SqlIdentifier.Quote(schema, quote), schema, null, "schema", 1);
             }
+
+            // The system procedures that are used all the time (#218); a procedure of the database with the same name hides them.
+            foreach (var system in SystemProcedures.All.Where(s => !metadata.Procedures.Any(p => string.Equals(p.Name, s.Name, StringComparison.OrdinalIgnoreCase))))
+            {
+                yield return ProcedureSuggestion(system, system.Name, "system", options, 2);
+            }
         }
 
-        private static Suggestion ProcedureSuggestion(DbProcedure procedure, string nameText, string suffix, SuggestionOptions options)
+        private static Suggestion ProcedureSuggestion(DbProcedure procedure, string nameText, string suffix, SuggestionOptions options, int group = 0)
         {
             var parameters = procedure.Parameters;
             var signature = string.Join(", ", parameters.Select(p => p.Name + " " + p.TypeName + (p.IsOutput ? " OUTPUT" : string.Empty) + (p.HasDefault ? " = " + (p.DefaultText ?? "...") : string.Empty)));
             var declarations = InsertBuilder.OutputDeclarations(parameters, options.Editor);
-            return new Suggestion(
+            var suggestion = new Suggestion(
                 SuggestionKind.Procedure,
                 procedure.Name,
                 InsertBuilder.ProcedureCall(nameText, parameters, options.Editor),
                 procedure.Name,
                 suffix,
-                "procedure " + procedure + (parameters.Count > 0 ? " (" + signature + ")" : string.Empty),
-                0,
+                (procedure.Schema == SystemProcedures.Schema ? "system procedure " + procedure.Name : "procedure " + procedure) + (parameters.Count > 0 ? " (" + signature + ")" : string.Empty),
+                group,
                 beforeLine: declarations.Length > 0 ? declarations : null,
-                isBlock: parameters.Count > 0).WithDefinition(procedure.Schema, procedure.Name);
+                isBlock: parameters.Count > 0);
+            return procedure.Schema == SystemProcedures.Schema ? suggestion : suggestion.WithDefinition(procedure.Schema, procedure.Name);
         }
 
         /// <summary>The alias after a table or view; table-valued functions need their parameters first, so they get none.</summary>

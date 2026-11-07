@@ -50,7 +50,7 @@ namespace SqlPrompter.Tests
             Assert.Equal("fnTax", functions.Single(i => i.Kind == SuggestionKind.ScalarFunction).DefinitionName);
 
             var procedures = SuggestionBuilder.Build(Analyze("EXEC |"), Database());
-            Assert.Equal("AddUser", procedures.Single(i => i.Kind == SuggestionKind.Procedure).DefinitionName);
+            Assert.Equal("AddUser", procedures.Single(i => i.Kind == SuggestionKind.Procedure && i.Suffix != "system").DefinitionName);
         }
 
         [Fact]

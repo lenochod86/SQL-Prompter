@@ -153,6 +153,11 @@ namespace SqlPrompter.Core.Completion
             var procedure = metadata.Procedures.FirstOrDefault(p => string.Equals(p.Name, parts[parts.Count - 1], StringComparison.OrdinalIgnoreCase) &&
                 (schema != null ? string.Equals(p.Schema, schema, StringComparison.OrdinalIgnoreCase) : string.Equals(p.Schema, metadata.DefaultSchema, StringComparison.OrdinalIgnoreCase)))
                 ?? (schema == null ? metadata.Procedures.FirstOrDefault(p => string.Equals(p.Name, parts[parts.Count - 1], StringComparison.OrdinalIgnoreCase) && string.Equals(p.Schema, "dbo", StringComparison.OrdinalIgnoreCase)) : null);
+            if (procedure == null && (schema == null || string.Equals(schema, SystemProcedures.Schema, StringComparison.OrdinalIgnoreCase) || string.Equals(schema, "dbo", StringComparison.OrdinalIgnoreCase)))
+            {
+                procedure = SystemProcedures.Find(parts[parts.Count - 1]);
+            }
+
             if (procedure == null || procedure.Parameters.Count == 0)
             {
                 return null;
