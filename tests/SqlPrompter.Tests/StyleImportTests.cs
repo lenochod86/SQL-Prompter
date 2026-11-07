@@ -43,9 +43,9 @@ namespace SqlPrompter.Tests
 
             Assert.Equal(8, result.Style.TabWidth);
             Assert.Equal(90, result.Style.MaxLineLength);
-            Assert.Contains("parentheses.parenthesisStyle", result.Notes);
-            Assert.Contains("lists.alignAliases", result.Notes);
-            Assert.DoesNotContain("casing.reservedKeywords", result.Notes);
+            Assert.Contains(result.Notes, n => n.StartsWith("parentheses.parenthesisStyle: ", StringComparison.Ordinal));
+            Assert.Contains(result.Notes, n => n.StartsWith("lists.alignAliases: ", StringComparison.Ordinal));
+            Assert.DoesNotContain(result.Notes, n => n.StartsWith("casing.reservedKeywords", StringComparison.Ordinal));
             Assert.DoesNotContain(result.Notes, n => n.StartsWith("metadata", StringComparison.Ordinal));
         }
 

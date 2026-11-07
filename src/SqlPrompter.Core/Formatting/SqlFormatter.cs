@@ -662,7 +662,10 @@ namespace SqlPrompter.Core.Formatting
                 }
                 else if (isList)
                 {
-                    items = SplitCommas(body);
+                    // GROUP BY and ORDER BY can stay on the line of their keyword (#305).
+                    items = (name == "GROUP" || name == "ORDER") && !style.GroupOrderBySeparateLines
+                        ? new List<List<R>> { body }
+                        : SplitCommas(body);
                 }
                 else if (isJoin)
                 {
@@ -766,6 +769,31 @@ namespace SqlPrompter.Core.Formatting
                 var conditions = SplitConditions(body.GetRange(on + 1, body.Count - on - 1), out var separators);
                 var onText = body[on].Text;
                 var last = rendered.Count - 1;
+                if (style.OnOnNewLine)
+                {
+                    // ON on a line of its own, one level under the JOIN; the further conditions follow under its first one (#305).
+                    lines.AddRange(rendered);
+                    var onColumn = column + style.TabWidth;
+                    lines.Add(Indent(onColumn) + onText + " " + Flat(conditions[0], 0, conditions[0].Count));
+                    var follow = NextStop(onColumn + onText.Length);
+                    for (var k = 1; k < conditions.Count; k++)
+                    {
+                        var text = Flat(conditions[k], 0, conditions[k].Count);
+                        if (style.AndOrBeforeConditions)
+                        {
+                            var opColumn = Math.Max(onColumn, follow - separators[k - 1].Length - 1);
+                            lines.Add(Indent(opColumn) + separators[k - 1] + new string(' ', Math.Max(1, follow - opColumn - separators[k - 1].Length)) + text);
+                        }
+                        else
+                        {
+                            lines[lines.Count - 1] += " " + separators[k - 1];
+                            lines.Add(Indent(follow) + text);
+                        }
+                    }
+
+                    return;
+                }
+
                 rendered[last] += " " + onText + " " + Flat(conditions[0], 0, conditions[0].Count);
                 lines.AddRange(rendered);
                 for (var k = 1; k < conditions.Count; k++)

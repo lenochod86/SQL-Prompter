@@ -31,9 +31,14 @@ namespace SqlPrompter.Ssms
                     var json = System.IO.File.ReadAllText(dialog.FileName, System.Text.Encoding.UTF8);
                     var imported = SqlPromptStyleImporter.ImportInto(styles, json, dialog.FileName, out var result);
                     var text = "Imported as the style \"" + imported.Name + "\":\n- " + (result.Applied.Count == 0 ? "(no option of this formatter was set)" : string.Join("\n- ", result.Applied));
+                    if (result.Approximate.Count > 0)
+                    {
+                        text += "\n\nMapped approximately (" + result.Approximate.Count + "):\n- " + string.Join("\n- ", result.Approximate);
+                    }
+
                     if (result.Notes.Count > 0)
                     {
-                        text += "\n\nNot understood by the formatter yet (" + result.Notes.Count + "), left at the default values:\n- " + string.Join("\n- ", result.Notes);
+                        text += "\n\nNot taken over (" + result.Notes.Count + "), left at the default values; adjust by hand if you need them:\n- " + string.Join("\n- ", result.Notes);
                     }
 
                     MessageBox.Show(owner, text, "SQL Prompter", MessageBoxButtons.OK, MessageBoxIcon.Information);
