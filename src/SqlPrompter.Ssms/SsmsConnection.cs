@@ -362,8 +362,14 @@ namespace SqlPrompter.Ssms
                 // The window opened with the data of a live connection (no prompt) or after the Connect dialog of SSMS; see whether it is connected.
                 var main = System.Windows.Application.Current?.MainWindow;
                 object front = null;
-                var known = main != null && WindowStatusColoring.TryGetFront(new System.Windows.Interop.WindowInteropHelper(main).Handle, out connected, out front);
-                if (known && connected)
+                var known = main != null && WaitForConnectedWindow(new System.Windows.Interop.WindowInteropHelper(main).Handle, out connected, out front);
+                if (!known)
+                {
+                    // The new window has not shown its editor yet (it was seen after a reopening with the key): SSMS is connecting it, which is not a failure.
+                    Log.Write("A restored tab was opened as " + tab.Login + " to " + tab.Server + "; the state of the new window could not be read yet, it is taken as connected.");
+                    connected = true;
+                }
+                else if (connected)
                 {
                     FromInfo(front);
                     DeclinedSqlLogins.TryRemove(sqlKey, out _);
@@ -393,6 +399,36 @@ namespace SqlPrompter.Ssms
 
             view.TextBuffer.Insert(0, text);
             return view != null;
+        }
+
+        /// <summary>
+        /// Waits (the message loop keeps running) for up to three seconds until the window in front is connected; returns false when no query window
+        /// has been shown at all (its editor does not exist yet), true when one is, connected or not.
+        /// </summary>
+        private static bool WaitForConnectedWindow(IntPtr mainWindow, out bool connected, out object info)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(3);
+            var found = false;
+            connected = false;
+            info = null;
+            while (true)
+            {
+                found = WindowStatusColoring.TryGetFront(mainWindow, out connected, out info);
+                if ((found && connected) || DateTime.UtcNow >= deadline)
+                {
+                    return found;
+                }
+
+                var frame = new System.Windows.Threading.DispatcherFrame();
+                var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(100) };
+                timer.Tick += (s, e) =>
+                {
+                    timer.Stop();
+                    frame.Continue = false;
+                };
+                timer.Start();
+                System.Windows.Threading.Dispatcher.PushFrame(frame);
+            }
         }
 
         private const string ReconnectComment = "-- SQL Prompter: this tab was connected";
