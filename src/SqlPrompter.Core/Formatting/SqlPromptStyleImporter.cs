@@ -9,13 +9,17 @@ namespace SqlPrompter.Core.Formatting
     /// <summary>What was taken from a style file and what was not.</summary>
     public sealed class StyleImportResult
     {
-        internal StyleImportResult(FormatStyle style, List<string> applied, List<string> notes, string name = null)
+        internal StyleImportResult(FormatStyle style, List<string> applied, List<string> notes, string name = null, List<string> approximate = null)
         {
             Style = style;
             Applied = applied;
             Notes = notes;
             Name = name;
+            Approximate = approximate ?? new List<string>();
         }
+
+        /// <summary>Options that were mapped to the nearest option of this formatter, so the result may differ a little from SQL Prompt (#305).</summary>
+        public IReadOnlyList<string> Approximate { get; }
 
         /// <summary>The name the file gives the style (<c>metadata.name</c>); null when it has none.</summary>
         public string Name { get; }
@@ -25,7 +29,7 @@ namespace SqlPrompter.Core.Formatting
         /// <summary>The options that were set, as <c>option = value</c>.</summary>
         public IReadOnlyList<string> Applied { get; }
 
-        /// <summary>Options of the file that this formatter does not have or cannot map.</summary>
+        /// <summary>Options of the file that this formatter does not take over, each with the reason or the decision (<c>path: reason</c>).</summary>
         public IReadOnlyList<string> Notes { get; }
     }
 
@@ -89,6 +93,7 @@ namespace SqlPrompter.Core.Formatting
 
             var style = (baseStyle ?? new FormatStyle()).Clone();
             var applied = new List<string>();
+            var approximate = new List<string>();
             var notes = new List<string>();
             var used = new HashSet<string>(StringComparer.Ordinal);
 
@@ -135,19 +140,40 @@ namespace SqlPrompter.Core.Formatting
             var andOr = Text("operators.andOr.alignment");
             if (andOr != null)
             {
+                // SQL Prompt has several alignments of AND / OR; this formatter has one, with AND and OR at the start of the line.
                 style.AndOrBeforeConditions = true;
-                applied.Add("andOrBeforeConditions = true (AND and OR start the lines)");
+                approximate.Add("operators.andOr.alignment = " + andOr + " -> andOrBeforeConditions = true (AND and OR start the lines; the variants of the alignment are not told apart)");
+            }
+
+            var tabStops = Flag("lists.alignItemsToTabStops");
+            if (tabStops != null)
+            {
+                approximate.Add("lists.alignItemsToTabStops = " + tabStops.Value + " -> the formatter always aligns the items of a list to tab stops");
+            }
+
+            var groupOrder = Text("dml.listItems.placeGroupByAndOrderByOnNewLine");
+            if (groupOrder != null)
+            {
+                style.GroupOrderBySeparateLines = !string.Equals(groupOrder, "never", StringComparison.OrdinalIgnoreCase);
+                applied.Add("groupOrderBySeparateLines = " + style.GroupOrderBySeparateLines);
+            }
+
+            var onNewLine = Flag("joinStatements.on.placeOnNewLine");
+            if (onNewLine != null)
+            {
+                style.OnOnNewLine = onNewLine.Value;
+                applied.Add("onOnNewLine = " + onNewLine.Value);
             }
 
             foreach (var path in Leaves(root, string.Empty))
             {
                 if (!used.Contains(path) && !path.StartsWith("metadata.", StringComparison.Ordinal))
                 {
-                    notes.Add(path);
+                    notes.Add(path + ": " + ReasonFor(path));
                 }
             }
 
-            return new StyleImportResult(style, applied, notes, (Find(root, "metadata.name", used) as string));
+            return new StyleImportResult(style, applied, notes, (Find(root, "metadata.name", used) as string), approximate);
 
             void SetCase(string path, Action<CaseStyle> set, string name)
             {
@@ -188,6 +214,69 @@ namespace SqlPrompter.Core.Formatting
                 set(value);
                 applied.Add(name + " = " + value);
             }
+        }
+
+        /// <summary>
+        /// The decision for an option that is not taken over (#305): "leave out" has a reason that stays, "planned" options are the next ones to implement in the
+        /// formatter (the list is kept in the issue).
+        /// </summary>
+        private static string ReasonFor(string path)
+        {
+            switch (path)
+            {
+                case "casing.useObjectDefinitionCase":
+                    return "left out: the case of names from the database definition needs the database, the formatter works on the text only";
+                case "whitespace.newLines.preserveExistingEmptyLinesAfterBatchSeparator":
+                    return "left out: the formatter always keeps one blank line after a batch separator";
+                case "lists.alignComments":
+                    return "left out: comments are kept where they are written";
+                case "lists.addSpaceBeforeComma":
+                    return "left out: the formatter has one fixed spacing around the commas of a list";
+                case "ddl.placeFirstProcedureParameterOnNewLine":
+                case "ddl.alignDataTypesAndConstraints":
+                case "ddl.placeConstraintColumnsOnNewLines":
+                case "ddl.parenthesisStyle":
+                case "ddl.indentParenthesesContents":
+                    return "planned: the layout of DDL statements";
+                case "parentheses.parenthesisStyle":
+                case "parentheses.indentParenthesesContents":
+                case "parentheses.collapseParenthesesShorterThan":
+                    return "planned: the layout of parentheses";
+                default:
+                    break;
+            }
+
+            if (path.StartsWith("cte.", StringComparison.Ordinal))
+            {
+                return "planned: the layout of CTEs";
+            }
+
+            if (path.StartsWith("insertStatements.", StringComparison.Ordinal))
+            {
+                return "planned: the layout of INSERT columns and values";
+            }
+
+            if (path.StartsWith("caseExpressions.", StringComparison.Ordinal))
+            {
+                return "planned: the layout of CASE expressions";
+            }
+
+            if (path.StartsWith("operators.", StringComparison.Ordinal))
+            {
+                return "planned: the alignment of operators (comparison, BETWEEN, IN)";
+            }
+
+            if (path.StartsWith("controlFlow.", StringComparison.Ordinal))
+            {
+                return "planned: the layout of control flow";
+            }
+
+            if (path.StartsWith("joinStatements.", StringComparison.Ordinal) || path.StartsWith("variables.", StringComparison.Ordinal) || path.StartsWith("lists.", StringComparison.Ordinal))
+            {
+                return "planned";
+            }
+
+            return "not supported yet";
         }
 
         private static object Find(Dictionary<string, object> root, string path, HashSet<string> used)

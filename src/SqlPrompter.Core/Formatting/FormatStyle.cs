@@ -98,6 +98,14 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "caseKeywordsWhileTyping")]
         public bool CaseKeywordsWhileTyping { get; set; }
 
+        /// <summary>The items of GROUP BY and ORDER BY each get a line (when there are several); off keeps them on the line of the keyword (#305).</summary>
+        [DataMember(Name = "groupOrderBySeparateLines")]
+        public bool GroupOrderBySeparateLines { get; set; }
+
+        /// <summary><c>ON</c> of a JOIN starts a line of its own, indented under the JOIN, instead of following the joined table (#305).</summary>
+        [DataMember(Name = "onOnNewLine")]
+        public bool OnOnNewLine { get; set; }
+
         /// <summary>The contents of BEGIN … END are indented.</summary>
         [DataMember(Name = "indentBlocks")]
         public bool IndentBlocks { get; set; }
@@ -129,6 +137,8 @@ namespace SqlPrompter.Core.Formatting
             NewLineAfterDistinctAndTop = false;
             AndOrBeforeConditions = true;
             ConditionsOnSeparateLines = true;
+            GroupOrderBySeparateLines = true;
+            OnOnNewLine = false;
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;
