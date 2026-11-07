@@ -12,12 +12,22 @@ namespace SqlPrompter.Core.Navigation
     /// <summary>The text of the tooltip that appears when the mouse rests on a name (#220).</summary>
     public sealed class HoverText
     {
-        public HoverText(int start, int length, string text)
+        public HoverText(int start, int length, string text, string descriptionSchema = null, string descriptionObject = null, string descriptionColumn = null)
         {
             Start = start;
             Length = length;
             Text = text;
+            DescriptionSchema = descriptionSchema;
+            DescriptionObject = descriptionObject;
+            DescriptionColumn = descriptionColumn;
         }
+
+        /// <summary>The database object (and column) whose description from the database can be added to the tooltip (#206); null when it is not an object of the database.</summary>
+        public string DescriptionSchema { get; }
+
+        public string DescriptionObject { get; }
+
+        public string DescriptionColumn { get; }
 
         /// <summary>The name under the mouse, as a span of the batch.</summary>
         public int Start { get; }
@@ -80,12 +90,17 @@ namespace SqlPrompter.Core.Navigation
 
             var names = parts.Select(p => p.IdentifierValue).ToList();
             var sources = ContextAnalyzer.SourcesAt(batch, parts[0].Start);
-            var text = Describe(names, sources, metadata);
-            return text == null ? null : new HoverText(token.Start, (token.End - token.Start), text);
+            var script = ScriptModel.Build(batch, parts[0].Start);
+            var text = Describe(names, sources, metadata, script, out var descriptionSchema, out var descriptionObject, out var descriptionColumn);
+            return text == null ? null : new HoverText(token.Start, (token.End - token.Start), text, descriptionSchema, descriptionObject, descriptionColumn);
         }
 
-        private static string Describe(IReadOnlyList<string> names, IReadOnlyList<TableSource> sources, IDatabaseMetadata metadata)
+        private static string Describe(IReadOnlyList<string> names, IReadOnlyList<TableSource> sources, IDatabaseMetadata metadata, ScriptModel script,
+            out string dSchema, out string dObject, out string dColumn)
         {
+            dSchema = null;
+            dObject = null;
+            dColumn = null;
             var last = names[names.Count - 1];
             if (names.Count >= 2)
             {
@@ -97,7 +112,21 @@ namespace SqlPrompter.Core.Navigation
                 var column = columns?.FirstOrDefault(c => string.Equals(c.Name, last, StringComparison.OrdinalIgnoreCase));
                 if (column != null)
                 {
+                    dSchema = owner.Schema;
+                    dObject = owner.Name;
+                    dColumn = column.Name;
                     return "Column " + qualifier + "." + column.Name + ": " + column.TypeName + (column.IsNullable ? " NULL" : " NOT NULL") + Flags(column) + Key(metadata, owner, column.Name) + "\nof " + owner.Schema + "." + owner.Name;
+                }
+
+                // A column of a CTE, a derived table, a temporary table or a table variable of the script.
+                if (source != null && owner == null)
+                {
+                    var scripted = script.Resolve(source, metadata);
+                    var scriptedColumn = scripted?.Columns.FirstOrDefault(c => string.Equals(c.Name, last, StringComparison.OrdinalIgnoreCase));
+                    if (scriptedColumn != null)
+                    {
+                        return "Column " + qualifier + "." + scriptedColumn.Name + (scriptedColumn.TypeName.Length > 0 ? ": " + scriptedColumn.TypeName : string.Empty) + "\nof " + ScriptSourceName(source, script);
+                    }
                 }
             }
             else
@@ -106,9 +135,15 @@ namespace SqlPrompter.Core.Navigation
                 if (alias != null)
                 {
                     var target = Readiness.Resolve(alias, metadata);
-                    return target != null
-                        ? "Alias " + last + " for " + Kind(target) + " " + target.Schema + "." + target.Name
-                        : "Alias " + last + (alias.Kind == TableSourceKind.Object ? string.Empty : " for a subquery or a CTE");
+                    if (target != null)
+                    {
+                        dSchema = target.Schema;
+                        dObject = target.Name;
+                        return "Alias " + last + " for " + Kind(target) + " " + target.Schema + "." + target.Name;
+                    }
+
+                    var isScripted = alias.Kind != TableSourceKind.Object || script.Tables.Any(t => string.Equals(t.Name, alias.ObjectName, StringComparison.OrdinalIgnoreCase));
+                    return isScripted ? "Alias " + last + " for " + ScriptSourceName(alias, script) + ScriptColumnList(alias, script, metadata) : "Alias " + last;
                 }
 
                 // A column without a qualifier, when exactly one source has it.
@@ -118,7 +153,21 @@ namespace SqlPrompter.Core.Navigation
                 if (matches.Count == 1 && metadata.FindObject(null, last) == null)
                 {
                     var x = matches[0];
+                    dSchema = x.Owner.Schema;
+                    dObject = x.Owner.Name;
+                    dColumn = x.Column.Name;
                     return "Column " + x.Column.Name + ": " + x.Column.TypeName + (x.Column.IsNullable ? " NULL" : " NOT NULL") + Flags(x.Column) + Key(metadata, x.Owner, x.Column.Name) + "\nof " + x.Owner.Schema + "." + x.Owner.Name;
+                }
+            }
+
+            // The name of a CTE, a temporary table or a table variable of the script, used as a source.
+            if (names.Count == 1)
+            {
+                var scriptSource = sources.FirstOrDefault(s => s.Alias == null && string.Equals(s.ReferenceName, last, StringComparison.OrdinalIgnoreCase));
+                var scriptTable = script.Tables.FirstOrDefault(t => string.Equals(t.Name, last, StringComparison.OrdinalIgnoreCase));
+                if (scriptTable != null)
+                {
+                    return char.ToUpperInvariant(scriptTable.Description[0]) + scriptTable.Description.Substring(1) + (scriptSource != null ? ScriptColumnList(scriptSource, script, metadata) : string.Empty);
                 }
             }
 
@@ -128,6 +177,8 @@ namespace SqlPrompter.Core.Navigation
             var dbObject = metadata.FindObject(schema, objectName);
             if (dbObject != null)
             {
+                dSchema = dbObject.Schema;
+                dObject = dbObject.Name;
                 var target = Readiness.FollowSynonym(dbObject, metadata);
                 var head = Kind(dbObject) + " " + dbObject.Schema + "." + dbObject.Name;
                 if (dbObject.Kind == DbObjectKind.Synonym && target != null && !ReferenceEquals(target, dbObject))
@@ -155,10 +206,36 @@ namespace SqlPrompter.Core.Navigation
                 (schema == null || string.Equals(p.Schema, schema, StringComparison.OrdinalIgnoreCase)));
             if (procedure != null)
             {
+                dSchema = procedure.Schema;
+                dObject = procedure.Name;
                 return "Procedure " + procedure.Schema + "." + procedure.Name + "\n(" + string.Join(", ", procedure.Parameters.Select(Parameter)) + ")";
             }
 
             return null;
+        }
+
+        /// <summary>What a source of the script is: a subquery, a CTE, a temporary table or a table variable.</summary>
+        private static string ScriptSourceName(TableSource source, ScriptModel script)
+        {
+            if (source.Kind == TableSourceKind.Derived)
+            {
+                return "a subquery";
+            }
+
+            var table = script.Tables.FirstOrDefault(t => string.Equals(t.Name, source.ObjectName, StringComparison.OrdinalIgnoreCase));
+            return table != null ? table.Description : source.Kind == TableSourceKind.TempTable ? "a temporary table" : "a table variable";
+        }
+
+        /// <summary>The column names of a script source on a new line, at most twelve.</summary>
+        private static string ScriptColumnList(TableSource source, ScriptModel script, IDatabaseMetadata metadata)
+        {
+            var columns = script.Resolve(source, metadata)?.Columns;
+            if (columns == null || columns.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            return "\ncolumns: " + string.Join(", ", columns.Take(12).Select(c => c.Name)) + (columns.Count > 12 ? ", ... (" + columns.Count + ")" : string.Empty);
         }
 
         private static string Parameter(DbParameter p) => p.Name + " " + p.TypeName + (p.IsOutput ? " OUTPUT" : string.Empty) + (p.HasDefault ? " = " + (p.DefaultText ?? "default") : string.Empty);
