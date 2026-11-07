@@ -62,6 +62,9 @@ namespace SqlPrompter.Ssms
         internal const string ModuleKey = "SqlPrompter.Module";
         internal const string UsageKeyKey = "SqlPrompter.UsageKey";
         internal const string DefinitionKey = "SqlPrompter.Definition";
+
+        /// <summary>The table or view of a column item and the column, for its description from the database (#206).</summary>
+        internal const string ColumnKey = "SqlPrompter.ColumnOwner";
         internal const string BeforeLineKey = "SqlPrompter.BeforeLine";
         internal const string DetailKey = "SqlPrompter.Detail";
         internal const string KeyKey = "SqlPrompter.Key";
@@ -430,6 +433,11 @@ namespace SqlPrompter.Ssms
             if (suggestion.DefinitionName != null && prepared.Metadata is DatabaseSnapshot)
             {
                 item.Properties.AddProperty(DefinitionKey, new DefinitionRef(prepared.Metadata.DatabaseName, suggestion.DefinitionSchema, suggestion.DefinitionName));
+            }
+
+            if (suggestion.ColumnOwnerName != null && prepared.Metadata is DatabaseSnapshot)
+            {
+                item.Properties.AddProperty(ColumnKey, new ColumnRef(new DefinitionRef(prepared.Metadata.DatabaseName, suggestion.ColumnOwnerSchema, suggestion.ColumnOwnerName), suggestion.DisplayText));
             }
 
             if (suggestion.BeforeLine != null)
