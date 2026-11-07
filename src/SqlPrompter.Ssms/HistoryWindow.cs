@@ -166,6 +166,7 @@ namespace SqlPrompter.Ssms
             root.Children.Add(bottom);
             Content = root;
 
+            EnvironmentCache.Reset();
             Fill();
             Loaded += (s, e) => filter.Focus();
         }
@@ -275,9 +276,10 @@ namespace SqlPrompter.Ssms
 
         private const string RowTemplate =
             "<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'>" +
-            "<Grid Margin='4,3,4,3' ToolTip='{Binding Tooltip}'>" +
-            "<Grid.ColumnDefinitions><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MaxWidth='260'/></Grid.ColumnDefinitions>" +
-            "<StackPanel Grid.Column='0'>" +
+            "<Grid Margin='0,0,4,0' ToolTip='{Binding Tooltip}'>" +
+            "<Grid.ColumnDefinitions><ColumnDefinition Width='Auto'/><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MaxWidth='260'/></Grid.ColumnDefinitions>" +
+            "<Border Grid.Column='0' Width='4' Margin='0,0,6,0' Background='{Binding StripBrush}' ToolTip='{Binding EnvironmentName}'/>" +
+            "<StackPanel Grid.Column='1' Margin='0,3,0,3'>" +
             "<StackPanel Orientation='Horizontal'>" +
             "<TextBlock Text='&#xE718;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E5484D' FontSize='12' Margin='0,3,6,0' Visibility='{Binding PinVisibility}'/>" +
             "<TextBlock Text='&#xE735;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E8A800' FontSize='12' Margin='0,3,6,0' ToolTip='Favourite' Visibility='{Binding FavouriteVisibility}'/>" +
@@ -285,7 +287,7 @@ namespace SqlPrompter.Ssms
             "</StackPanel>" +
             "<TextBlock Text='{Binding RunText}' FontSize='11' Opacity='0.65'/>" +
             "</StackPanel>" +
-            "<StackPanel Grid.Column='1' Margin='12,0,0,0' HorizontalAlignment='Right'>" +
+            "<StackPanel Grid.Column='2' Margin='12,3,0,3' HorizontalAlignment='Right'>" +
             "<TextBlock Text='{Binding Server}' FontSize='14' HorizontalAlignment='Right' TextTrimming='CharacterEllipsis'/>" +
             "<TextBlock Text='{Binding Database}' FontSize='11' Opacity='0.65' HorizontalAlignment='Right' TextTrimming='CharacterEllipsis'/>" +
             "</StackPanel>" +
@@ -350,6 +352,31 @@ namespace SqlPrompter.Ssms
             Fill();
         }
 
+        /// <summary>The environment of a server and database by the rules read when the window opened (a changed rule shows after reopening the history).</summary>
+        private static class EnvironmentCache
+        {
+            private static readonly Dictionary<string, SqlPrompter.Core.Settings.ColorEnvironment> Found = new Dictionary<string, SqlPrompter.Core.Settings.ColorEnvironment>();
+            private static SqlPrompter.Core.Settings.ColorSettings rules;
+
+            public static void Reset()
+            {
+                Found.Clear();
+                rules = SettingsService.Current.Coloring;
+            }
+
+            public static SqlPrompter.Core.Settings.ColorEnvironment Find(string server, string database)
+            {
+                var key = server + "|" + database;
+                if (!Found.TryGetValue(key, out var environment))
+                {
+                    environment = SqlPrompter.Core.Coloring.EnvironmentMatcher.Find(rules ?? SettingsService.Current.Coloring, server, database);
+                    Found[key] = environment;
+                }
+
+                return environment;
+            }
+        }
+
         private sealed class Row
         {
             public Row(HistoryEntry entry)
@@ -367,6 +394,28 @@ namespace SqlPrompter.Ssms
                 : Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
             public string Server => Entry.Server;
+
+            /// <summary>The environment of the coloring rules that matches the server and database of the entry, by the current rules (#321); null for none or when the coloring is off.</summary>
+            private SqlPrompter.Core.Settings.ColorEnvironment Environment => EnvironmentCache.Find(Entry.Server, Entry.Database);
+
+            /// <summary>The thin strip at the left edge of the row in the color of the environment; transparent (the same width) when there is none.</summary>
+            public System.Windows.Media.Brush StripBrush
+            {
+                get
+                {
+                    var environment = Environment;
+                    if (environment != null && SqlPrompter.Core.Coloring.EnvironmentMatcher.TryParseColor(environment.Color, out var red, out var green, out var blue))
+                    {
+                        var brush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(red, green, blue));
+                        brush.Freeze();
+                        return brush;
+                    }
+
+                    return System.Windows.Media.Brushes.Transparent;
+                }
+            }
+
+            public string EnvironmentName => Environment?.Name;
 
             public string Database => Entry.Database;
 
