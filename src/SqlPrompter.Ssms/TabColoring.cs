@@ -39,25 +39,26 @@ namespace SqlPrompter.Ssms
             try
             {
                 var window = Application.Current?.MainWindow;
+                if (window == null)
+                {
+                    return;
+                }
+
+                var coloring = SettingsService.Current.Coloring;
+
+                // The status bar inside each query window is colored by the connection of that window, whichever tab is in front.
+                WindowStatusColoring.Update(new System.Windows.Interop.WindowInteropHelper(window).Handle, coloring, coloring.Enabled && coloring.ColorWindowStatusBar);
+
+                // The tab and the shell status bar follow the active window.
                 var view = ActiveEditor.GetView();
-                if (window == null || view == null || !view.TextBuffer.ContentType.IsOfType("SQL"))
-                {
-                    return;
-                }
-
-                var connection = SsmsConnection.GetActive();
-                if (connection == null)
-                {
-                    return;
-                }
-
-                var document = FindActiveDocumentView(window);
+                var connection = view != null && view.TextBuffer.ContentType.IsOfType("SQL") ? SsmsConnection.GetActive() : null;
+                var document = connection == null ? null : FindActiveDocumentView(window);
                 if (document == null)
                 {
                     return;
                 }
 
-                var environment = EnvironmentMatcher.Find(SettingsService.Current.Coloring, connection.Server, connection.Database);
+                var environment = EnvironmentMatcher.Find(coloring, connection.Server, connection.Database);
                 Brush wanted = null;
                 if (environment != null && EnvironmentMatcher.TryParseColor(environment.Color, out var red, out var green, out var blue))
                 {
@@ -65,15 +66,14 @@ namespace SqlPrompter.Ssms
                     wanted.Freeze();
                 }
 
-                Apply(document, wanted);
-                ApplyStatusBar(window, wanted);
+                Apply(document, coloring.ColorTab ? wanted : null);
+                ApplyStatusBar(window, coloring.ColorShellStatusBar ? wanted : null);
             }
             catch (Exception ex)
             {
                 Log.Error("Coloring the tab failed", ex);
             }
         }
-
         private static void Apply(object document, Brush wanted)
         {
             var type = document.GetType();
@@ -116,8 +116,8 @@ namespace SqlPrompter.Ssms
             Log.Write("Tab color set to " + ((SolidColorBrush)wanted).Color + ".");
         }
 
-        // The shell's own status bar (the bar at the bottom of the main window). SSMS's per-window bar with the connection state is a
-        // separate control that this does not touch.
+        // The shell's own status bar (the bar at the bottom of the main window; off by default since #314). The per-window bar with the connection
+        // state is a separate control, see WindowStatusColoring.
         private static WeakReference statusBar;
         private static Brush statusBarOriginal;
         private static bool statusBarColored;

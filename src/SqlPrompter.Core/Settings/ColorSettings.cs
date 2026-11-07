@@ -47,6 +47,18 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "enabled")]
         public bool Enabled { get; set; }
 
+        /// <summary>Color the tab (accent, tint and the frame of the editor pane) of a query window.</summary>
+        [DataMember(Name = "colorTab")]
+        public bool ColorTab { get; set; }
+
+        /// <summary>Color the status strip inside each query window (the one with Connected, the server, login and database); each window by its own connection.</summary>
+        [DataMember(Name = "colorWindowStatusBar")]
+        public bool ColorWindowStatusBar { get; set; }
+
+        /// <summary>Color the status bar of the SSMS main window (at the bottom) by the connection of the active window.</summary>
+        [DataMember(Name = "colorShellStatusBar")]
+        public bool ColorShellStatusBar { get; set; }
+
         [DataMember(Name = "environments")]
         public List<ColorEnvironment> Environments { get; set; }
 
@@ -57,6 +69,9 @@ namespace SqlPrompter.Core.Settings
         public ColorSettings Clone() => new ColorSettings
         {
             Enabled = Enabled,
+            ColorTab = ColorTab,
+            ColorWindowStatusBar = ColorWindowStatusBar,
+            ColorShellStatusBar = ColorShellStatusBar,
             Environments = Environments.Select(e => new ColorEnvironment { Name = e.Name, Color = e.Color }).ToList(),
             Rules = Rules.Select(r => new ColorRule { Server = r.Server, Database = r.Database, Environment = r.Environment, AskBeforeChanges = r.AskBeforeChanges }).ToList(),
         };
@@ -74,6 +89,9 @@ namespace SqlPrompter.Core.Settings
         private void SetDefaults()
         {
             Enabled = true;
+            ColorTab = true;
+            ColorWindowStatusBar = true;
+            ColorShellStatusBar = false;
             Environments = new List<ColorEnvironment>();
             Rules = new List<ColorRule>();
         }

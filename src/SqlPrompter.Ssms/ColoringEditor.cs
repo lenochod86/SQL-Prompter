@@ -16,7 +16,10 @@ namespace SqlPrompter.Ssms
     internal sealed class ColoringEditor : UserControl
     {
         private const string NewEnvironmentItem = "New environment...";
-        private readonly CheckBox enabled = new CheckBox { Text = "Color query windows (tab, frame and status bar) by their server and database", AutoSize = true };
+        private readonly CheckBox enabled = new CheckBox { Text = "Color query windows by their server and database", AutoSize = true };
+        private readonly CheckBox colorTab = new CheckBox { Text = "Tab and frame", AutoSize = true, Margin = new Padding(20, 0, 12, 0) };
+        private readonly CheckBox colorWindowBar = new CheckBox { Text = "Status bar of each query window (Connected, server, login, database)", AutoSize = true, Margin = new Padding(0, 0, 12, 0) };
+        private readonly CheckBox colorShellBar = new CheckBox { Text = "Status bar of the SSMS window (at the bottom)", AutoSize = true, Margin = new Padding(0) };
         private readonly DataGridView rules = NewGrid();
         private readonly Label problems = new Label { AutoSize = false, ForeColor = Color.Firebrick, Dock = DockStyle.Fill };
         private readonly DataGridViewComboBoxColumn environmentColumn = new DataGridViewComboBoxColumn { HeaderText = "Environment", Name = "Environment", FlatStyle = FlatStyle.Flat, FillWeight = 30 };
@@ -35,7 +38,12 @@ namespace SqlPrompter.Ssms
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
 
-            layout.Controls.Add(enabled, 0, 0);
+            var top = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var parts = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Margin = new Padding(0, 2, 0, 4) };
+            parts.Controls.AddRange(new Control[] { new Label { Text = "Colored parts:", AutoSize = true, Margin = new Padding(0, 3, 0, 0) }, colorTab, colorWindowBar, colorShellBar });
+            top.Controls.Add(enabled);
+            top.Controls.Add(parts);
+            layout.Controls.Add(top, 0, 0);
             layout.Controls.Add(Heading("Rules: server and database with * and ? wildcards (an empty database means every database). The environment gives the color; " +
                 "pick one or choose \"New environment...\", and click the color of a row to change the color of that environment. The most specific rule wins, " +
                 "whatever the order: a rule with a database, then one without wildcards, then the longer pattern."), 0, 1);
@@ -85,6 +93,9 @@ namespace SqlPrompter.Ssms
         {
             loading = true;
             enabled.Checked = settings.Enabled;
+            colorTab.Checked = settings.ColorTab;
+            colorWindowBar.Checked = settings.ColorWindowStatusBar;
+            colorShellBar.Checked = settings.ColorShellStatusBar;
             environments.Clear();
             environments.AddRange(settings.Environments.Select(e => new ColorEnvironment { Name = e.Name, Color = e.Color }));
             RefreshChoices(settings.Rules.Select(r => r.Environment));
@@ -103,7 +114,7 @@ namespace SqlPrompter.Ssms
 
         public ColorSettings ToSettings()
         {
-            var settings = new ColorSettings { Enabled = enabled.Checked };
+            var settings = new ColorSettings { Enabled = enabled.Checked, ColorTab = colorTab.Checked, ColorWindowStatusBar = colorWindowBar.Checked, ColorShellStatusBar = colorShellBar.Checked };
             foreach (var environment in environments)
             {
                 settings.Environments.Add(new ColorEnvironment

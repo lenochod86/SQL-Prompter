@@ -129,5 +129,23 @@ namespace SqlPrompter.Tests
                 writer.Write(xml);
             }
         }
+
+        [Fact]
+        public void TheColoredPartsDefaultToTabAndWindowStatusBarAndSurviveCloneAndJson()
+        {
+            var defaults = new ColorSettings();
+            Assert.True(defaults.ColorTab);
+            Assert.True(defaults.ColorWindowStatusBar);
+            Assert.False(defaults.ColorShellStatusBar);
+
+            var changed = new ColorSettings { ColorTab = false, ColorWindowStatusBar = false, ColorShellStatusBar = true }.Clone();
+            Assert.False(changed.ColorTab);
+            Assert.False(changed.ColorWindowStatusBar);
+            Assert.True(changed.ColorShellStatusBar);
+
+            var old = SettingsJson.Deserialize("{ \"coloring\": { \"enabled\": true } }");
+            Assert.True(old.Coloring.ColorWindowStatusBar);
+            Assert.False(old.Coloring.ColorShellStatusBar);
+        }
     }
 }
