@@ -258,6 +258,18 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "historyDays")]
         public int HistoryDays { get; set; }
 
+        /// <summary>The history follows the query tabs (which are open, which were closed) and keeps versions of their text (#302); needs <see cref="KeepHistory"/>.</summary>
+        [DataMember(Name = "trackTabs")]
+        public bool TrackTabs { get; set; }
+
+        /// <summary>How often the open tabs are checked for a change of their text, in seconds (a version is stored at most this often per tab).</summary>
+        [DataMember(Name = "tabCheckSeconds")]
+        public int TabCheckSeconds { get; set; }
+
+        /// <summary>How many versions of the text are kept per tab (older ones are thinned out).</summary>
+        [DataMember(Name = "tabVersionsMax")]
+        public int TabVersionsMax { get; set; }
+
         /// <summary>How many closed query tabs can be reopened with Reopen Closed Query Tab (#226).</summary>
         [DataMember(Name = "closedTabsKept")]
         public int ClosedTabsKept { get; set; }
@@ -328,6 +340,9 @@ namespace SqlPrompter.Core.Settings
             ShowHover = true;
             KeepHistory = true;
             HistoryDays = 0;
+            TrackTabs = true;
+            TabCheckSeconds = 5;
+            TabVersionsMax = 50;
             ClosedTabsKept = 20;
             ClosedTabsHours = 24;
             RestoreTabs = true;

@@ -266,6 +266,12 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.KeepHistory, v => work.Behavior.KeepHistory = v);
             history.Number("Keep history for", "History older than this is removed when SSMS starts. 0 keeps it forever.", 0, 36500,
                 () => work.Behavior.HistoryDays, v => work.Behavior.HistoryDays = v, "days", () => work.Behavior.KeepHistory);
+            history.Check("Track query tabs and their versions", "The history knows which query tabs are open and which were closed, and keeps versions of their text (also of tabs that were never run), in %APPDATA%\\SqlPrompter\\tabhistory.jsonl. Needs Keep query history.",
+                () => work.Behavior.TrackTabs, v => work.Behavior.TrackTabs = v);
+            history.Number("Check tabs every", "How often the open tabs are checked for a change of their text; a new version is stored once the text stayed the same for one check.", 1, 300,
+                () => work.Behavior.TabCheckSeconds, v => work.Behavior.TabCheckSeconds = v, "seconds", () => work.Behavior.KeepHistory && work.Behavior.TrackTabs);
+            history.Number("Versions kept per tab", "The newest versions are kept; older ones are thinned out to one per hour and then one per day.", 2, 500,
+                () => work.Behavior.TabVersionsMax, v => work.Behavior.TabVersionsMax = v, "versions", () => work.Behavior.KeepHistory && work.Behavior.TrackTabs);
             history.Number("Closed tabs to remember", "How many closed query tabs Reopen Closed Query Tab (and the quick actions) can bring back. The list lives until SSMS ends.", 1, 200,
                 () => work.Behavior.ClosedTabsKept, v => work.Behavior.ClosedTabsKept = v, "tabs");
             history.Number("Remember a closed tab for", "A closed query tab can be reopened for this many hours. 0 keeps it until SSMS ends.", 0, 8760,

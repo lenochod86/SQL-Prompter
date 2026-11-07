@@ -39,6 +39,7 @@ namespace SqlPrompter.Ssms
                         }
 
                         HistoryService.Record(text, dte.ActiveDocument?.FullName);
+                        TabHistoryService.Check(true);
                     }
                     catch (Exception ex)
                     {
@@ -51,6 +52,7 @@ namespace SqlPrompter.Ssms
                     try
                     {
                         ThreadHelper.ThrowIfNotOnUIThread();
+                        TabHistoryService.Closing(document?.FullName);
                         HistoryService.DocumentClosed(document?.FullName);
                     }
                     catch (Exception ex)

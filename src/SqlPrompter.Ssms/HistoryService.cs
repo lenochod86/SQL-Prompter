@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using EnvDTE;
 using Microsoft.VisualStudio.Shell;
@@ -26,7 +27,8 @@ namespace SqlPrompter.Ssms
         // The runs of every open window, by document name, for the closing time.
         private static readonly Dictionary<string, List<string>> RunsByDocument = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
-        public static IReadOnlyList<HistoryEntry> Entries => Store.Entries;
+        /// <summary>The executed queries and the query tabs with their versions (#302).</summary>
+        public static IReadOnlyList<HistoryEntry> Entries => Store.Entries.Concat(TabHistoryService.Entries).ToList();
 
         public static void Start()
         {
@@ -127,7 +129,12 @@ namespace SqlPrompter.Ssms
             });
         }
 
-        public static void Delete(IEnumerable<string> ids) => Store.Delete(ids);
+        public static void Delete(IEnumerable<string> ids)
+        {
+            var list = ids.ToList();
+            Store.Delete(list);
+            TabHistoryService.Delete(list);
+        }
 
         public static void SetPinned(IEnumerable<string> ids, bool pinned) => Store.SetPinned(ids, pinned);
 

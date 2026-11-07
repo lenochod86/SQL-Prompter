@@ -139,6 +139,7 @@ namespace SqlPrompter.Ssms
                         executionHooks = ExecutionHooks.Start(dte);
                     }
 
+                    TabHistoryService.Start(dte);
                     tabSession = TabSessionService.Start(dte);
                     SsmsCompatibility.TellOnce(this, report);
                 }
