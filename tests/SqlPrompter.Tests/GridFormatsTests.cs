@@ -12,8 +12,8 @@ namespace SqlPrompter.Tests
         [Fact]
         public void TheInListQuotesStringsAndKeepsNumbersBare()
         {
-            Assert.Equal("1, 2, 3", GridFormats.AsInList(Grid, newLine: "\n"));
-            Assert.Equal("'Anna', N'Bohuš'", GridFormats.AsInList("Name\nAnna\nBohuš\nAnna\n", newLine: "\n"));
+            Assert.Equal("IN (1, 2, 3)", GridFormats.AsInList(Grid, newLine: "\n"));
+            Assert.Equal("IN ('Anna', N'Bohuš')", GridFormats.AsInList("Name\nAnna\nBohuš\nAnna\n", newLine: "\n"));
         }
 
         [Fact]
@@ -21,7 +21,7 @@ namespace SqlPrompter.Tests
         {
             var text = "Note\nit's\nNULL\n";
 
-            Assert.Equal("'it''s', NULL", GridFormats.AsInList(text, newLine: "\n"));
+            Assert.Equal("IN ('it''s', NULL)", GridFormats.AsInList(text, newLine: "\n"));
         }
 
         [Fact]
@@ -29,8 +29,8 @@ namespace SqlPrompter.Tests
         {
             var text = "Name\nAnna\nAnna\nBo\n";
 
-            Assert.Equal("'Anna', 'Bo'", GridFormats.AsInList(text, newLine: "\n"));
-            Assert.Equal("'Anna', 'Anna', 'Bo'", GridFormats.AsInList(text, distinct: false, newLine: "\n"));
+            Assert.Equal("IN ('Anna', 'Bo')", GridFormats.AsInList(text, newLine: "\n"));
+            Assert.Equal("IN ('Anna', 'Anna', 'Bo')", GridFormats.AsInList(text, distinct: false, newLine: "\n"));
         }
 
         [Fact]
@@ -40,10 +40,13 @@ namespace SqlPrompter.Tests
 
             var lines = GridFormats.AsInList(text, lineWidth: 40, newLine: "\n").Split('\n');
 
-            Assert.True(lines.Length > 1);
-            Assert.All(lines, l => Assert.True(l.Length <= 40));
-            Assert.EndsWith(",", lines[0]);
-            Assert.Equal(Enumerable.Range(1000, 30).Select(n => n.ToString()), string.Join(" ", lines).Replace(",", string.Empty).Split(' '));
+            Assert.True(lines.Length > 3);
+            Assert.Equal("IN (", lines[0]);
+            Assert.Equal(")", lines[lines.Length - 1]);
+            var inner = lines.Skip(1).Take(lines.Length - 2).ToList();
+            Assert.All(inner, l => Assert.True(l.Length <= 40 && l.StartsWith("    ")));
+            Assert.EndsWith(",", inner[0]);
+            Assert.Equal(Enumerable.Range(1000, 30).Select(n => n.ToString()), string.Join(" ", inner).Replace(",", string.Empty).Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries));
         }
 
         [Fact]
@@ -51,7 +54,7 @@ namespace SqlPrompter.Tests
         {
             var text = "Id\tName\n1\tAnna\n2\tNULL\n";
 
-            Assert.Equal("(1, 'Anna'),\n(2, NULL)", GridFormats.AsValues(text, "\n"));
+            Assert.Equal("VALUES\n(1, 'Anna'),\n(2, NULL)", GridFormats.AsValues(text, "\n"));
         }
 
         [Fact]
@@ -99,7 +102,7 @@ namespace SqlPrompter.Tests
         [Fact]
         public void ADateColumnIsQuoted()
         {
-            Assert.Equal("'2025-01-02 10:00:00', 'x'", GridFormats.AsInList("D\n2025-01-02 10:00:00\nx\n", newLine: "\n"));
+            Assert.Equal("IN ('2025-01-02 10:00:00', 'x')", GridFormats.AsInList("D\n2025-01-02 10:00:00\nx\n", newLine: "\n"));
         }
     }
 }
