@@ -128,6 +128,27 @@ namespace SqlPrompter.Core.Model
         public override string ToString() => Schema + "." + Name;
     }
 
+    /// <summary>A named constraint of a user table (#213), for the names after DROP CONSTRAINT, CHECK CONSTRAINT and NOCHECK CONSTRAINT.</summary>
+    public sealed class DbConstraint
+    {
+        public DbConstraint(string schema, string table, string name, string typeText)
+        {
+            Schema = schema;
+            Table = table;
+            Name = name;
+            TypeText = typeText ?? string.Empty;
+        }
+
+        public string Schema { get; }
+
+        public string Table { get; }
+
+        public string Name { get; }
+
+        /// <summary>For example primary key, foreign key, unique, check, default.</summary>
+        public string TypeText { get; }
+    }
+
     /// <summary>An index of a user table or view (#200), for the names after ALTER INDEX and DROP INDEX.</summary>
     public sealed class DbIndex
     {
@@ -240,6 +261,9 @@ namespace SqlPrompter.Core.Model
 
         /// <summary>Indexes of user tables and views; empty if unknown.</summary>
         IReadOnlyList<DbIndex> Indexes { get; }
+
+        /// <summary>Named constraints of user tables (primary key, unique, foreign key, check, default); empty if unknown.</summary>
+        IReadOnlyList<DbConstraint> Constraints { get; }
 
         /// <summary>The parameters of a user function in the order of the declaration; empty if it has none or they are not known.</summary>
         IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function);

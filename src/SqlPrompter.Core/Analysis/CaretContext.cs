@@ -194,6 +194,17 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>With <see cref="ContextKind.InsertColumns"/>: the column list of an index (key columns or INCLUDE) of CREATE INDEX, where every column of the table fits.</summary>
         public bool IndexColumns { get; internal set; }
 
+        /// <summary>With <see cref="ContextKind.InsertColumns"/> in <c>REFERENCES t (</c>: the key columns of the referenced table, the primary key first (#213).</summary>
+        public bool KeyColumnsOfReference { get; internal set; }
+
+        /// <summary>With <see cref="ContextKind.Name"/> after CONSTRAINT: the table (and column) the constraint name is made from, e.g. PK_t, DF_t_col (#213).</summary>
+        public string ConstraintTable { get; internal set; }
+
+        public string ConstraintColumn { get; internal set; }
+
+        /// <summary>With <see cref="ContextKind.Name"/> after DROP / CHECK / NOCHECK CONSTRAINT: the name parts of the table whose constraints are offered (#213).</summary>
+        public IReadOnlyList<string> ExistingConstraintsOf { get; internal set; }
+
         /// <summary>With <see cref="ContextKind.ObjectName"/> after ALTER / CREATE OR ALTER / DROP PROCEDURE, FUNCTION, VIEW or TRIGGER: only modules of this kind are offered.</summary>
         public ModuleKind Module { get; internal set; }
 
@@ -336,6 +347,10 @@ namespace SqlPrompter.Core.Analysis
             ProcedureName = ProcedureName,
             FirstInsertColumn = FirstInsertColumn,
             IndexColumns = IndexColumns,
+            KeyColumnsOfReference = KeyColumnsOfReference,
+            ConstraintTable = ConstraintTable,
+            ConstraintColumn = ConstraintColumn,
+            ExistingConstraintsOf = ExistingConstraintsOf,
             Module = Module,
             ModuleAction = ModuleAction,
             ModuleHeaderStart = ModuleHeaderStart,

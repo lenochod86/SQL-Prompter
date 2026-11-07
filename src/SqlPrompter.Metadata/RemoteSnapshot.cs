@@ -71,6 +71,8 @@ namespace SqlPrompter.Metadata
 
         public IReadOnlyList<DbIndex> Indexes => Array.Empty<DbIndex>();
 
+        public IReadOnlyList<DbConstraint> Constraints => Array.Empty<DbConstraint>();
+
         public IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function) => Array.Empty<DbParameter>();
 
         public IReadOnlyList<string> GetPrimaryKey(DbObject dbObject) => Array.Empty<string>();

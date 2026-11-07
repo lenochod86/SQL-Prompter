@@ -30,6 +30,17 @@ namespace SqlPrompter.Core.Analysis
 
         /// <summary>The data types come with the usual lengths (nvarchar(100), decimal(18,2) ...).</summary>
         public bool Sizes { get; }
+
+        /// <summary>The columns of Table are the key columns of a REFERENCES (the primary key comes first).</summary>
+        public bool KeyColumnsOfReference { get; internal set; }
+
+        /// <summary>For a constraint name: the table and the column it is named after.</summary>
+        public string ConstraintTable { get; internal set; }
+
+        public string ConstraintColumn { get; internal set; }
+
+        /// <summary>For the name of an existing constraint (DROP, CHECK, NOCHECK CONSTRAINT): the table.</summary>
+        public IReadOnlyList<string> ExistingConstraintsOf { get; internal set; }
     }
 
     /// <summary>
@@ -48,6 +59,89 @@ namespace SqlPrompter.Core.Analysis
 
         /// <summary>The position of the caret (after the token at <paramref name="anchorIndex"/>) in a table definition or ALTER TABLE; null elsewhere.</summary>
         public static TableDdlPosition At(List<Token> tokens, int statementStart, int anchorIndex)
+        {
+            var position = AtCore(tokens, statementStart, anchorIndex);
+            if (position != null && position.Kind == ContextKind.Name && tokens[anchorIndex].IsWord("CONSTRAINT"))
+            {
+                AddConstraintContext(position, tokens, statementStart, anchorIndex);
+            }
+
+            return position;
+        }
+
+        /// <summary>After CONSTRAINT: the table and column for a new name, or the table for the names of existing constraints.</summary>
+        private static void AddConstraintContext(TableDdlPosition position, List<Token> tokens, int statementStart, int anchorIndex)
+        {
+            var head = tokens[statementStart];
+            var alter = head.IsWord("ALTER");
+            var table = new List<string>();
+            var afterName = SkipName(tokens, statementStart + 2, anchorIndex, table);
+            if (table.Count == 0 || tokens[statementStart + 1].IsWord("TABLE") == false)
+            {
+                return;
+            }
+
+            var previous = tokens[anchorIndex - 1];
+            if (alter && (previous.IsWord("DROP") || previous.IsWord("CHECK") || previous.IsWord("NOCHECK")))
+            {
+                position.ExistingConstraintsOf = table;
+                return;
+            }
+
+            position.ConstraintTable = table[table.Count - 1];
+            if (alter)
+            {
+                // ALTER TABLE t ADD [COLUMN] col type CONSTRAINT |
+                var k = afterName;
+                if (k < anchorIndex && tokens[k].IsWord("ADD"))
+                {
+                    k++;
+                    if (k < anchorIndex && tokens[k].IsWord("COLUMN"))
+                    {
+                        k++;
+                    }
+
+                    if (k < anchorIndex - 1 && tokens[k].IsNamePart && !tokens[k].IsWord("CONSTRAINT"))
+                    {
+                        position.ConstraintColumn = tokens[k].IdentifierValue;
+                    }
+                }
+
+                return;
+            }
+
+            // CREATE TABLE t (... col type CONSTRAINT |: the first word of the current item, unless it is the CONSTRAINT itself.
+            var open = afterName;
+            if (open >= anchorIndex || tokens[open].Kind != TokenKind.OpenParen)
+            {
+                return;
+            }
+
+            var depth = 1;
+            var itemStart = open + 1;
+            for (var i = open + 1; i <= anchorIndex; i++)
+            {
+                if (tokens[i].Kind == TokenKind.OpenParen)
+                {
+                    depth++;
+                }
+                else if (tokens[i].Kind == TokenKind.CloseParen)
+                {
+                    depth--;
+                }
+                else if (depth == 1 && tokens[i].Kind == TokenKind.Comma)
+                {
+                    itemStart = i + 1;
+                }
+            }
+
+            if (itemStart < anchorIndex && tokens[itemStart].IsNamePart && !tokens[itemStart].IsWord("CONSTRAINT"))
+            {
+                position.ConstraintColumn = tokens[itemStart].IdentifierValue;
+            }
+        }
+
+        private static TableDdlPosition AtCore(List<Token> tokens, int statementStart, int anchorIndex)
         {
             if (statementStart < 0 || anchorIndex <= statementStart || anchorIndex >= tokens.Count)
             {
@@ -138,7 +232,17 @@ namespace SqlPrompter.Core.Analysis
 
             if (depth != 1)
             {
-                // Inside the parentheses of a type or a constraint: nothing is decided here.
+                // REFERENCES t (|: the key columns of t. Elsewhere inside parentheses (a type, a CHECK) nothing is decided here.
+                if (depth == 2 && tokens[anchorIndex].Kind == TokenKind.OpenParen)
+                {
+                    var current = tokens.GetRange(itemStart, anchorIndex - itemStart + 1);
+                    var references = current.FindIndex(t => t.IsWord("REFERENCES"));
+                    if (references >= 0)
+                    {
+                        return References(current, references);
+                    }
+                }
+
                 return null;
             }
 
@@ -342,7 +446,8 @@ namespace SqlPrompter.Core.Analysis
             var tail = after.GetRange(i, after.Count - i);
             if (tail[0].Kind == TokenKind.OpenParen && tail.Count == 1)
             {
-                return null;
+                // REFERENCES t (|: the key columns of t, the primary key first.
+                return new TableDdlPosition(ContextKind.InsertColumns, null, null, parts) { KeyColumnsOfReference = true };
             }
 
             var last = tail[tail.Count - 1];
@@ -422,6 +527,11 @@ namespace SqlPrompter.Core.Analysis
 
             if (first.IsWord("NOCHECK") || first.IsWord("CHECK"))
             {
+                if (rest.Count == 2 && rest[1].IsWord("CONSTRAINT"))
+                {
+                    return new TableDdlPosition(ContextKind.Name);
+                }
+
                 return rest.Count == 1 ? new TableDdlPosition(ContextKind.Keyword, Of(new[] { "CONSTRAINT" }, null, true)) : null;
             }
 
