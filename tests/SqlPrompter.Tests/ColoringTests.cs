@@ -170,5 +170,14 @@ namespace SqlPrompter.Tests
             Assert.False(settings.Clone().Behavior.ReconnectSqlTabs);
             Assert.True(SettingsJson.Deserialize("{ \"behavior\": { } }").Behavior.ReconnectSqlTabs);
         }
+
+        [Fact]
+        public void PrefillingRememberPasswordIsOffByDefault()
+        {
+            Assert.False(new PrompterSettings().Behavior.PrefillRememberPassword);
+            var on = new PrompterSettings();
+            on.Behavior.PrefillRememberPassword = true;
+            Assert.True(on.Clone().Behavior.PrefillRememberPassword);
+        }
     }
 }

@@ -358,6 +358,11 @@ namespace SqlPrompter.Ssms
                     // dialog with the server, login and database filled in (verified in SSMS 22, see docs/architecture.md).
                     SetProperty(info, "UserName", tab.Login);
                     SetProperty(info, "Password", live?.Password);
+                    if (live == null && SettingsService.Current.Behavior.PrefillRememberPassword)
+                    {
+                        // Opt-in (#333): the Connect dialog that SSMS opens for a tab without a password has Remember Password already ticked.
+                        SetProperty(info, "PersistPassword", true);
+                    }
                 }
 
                 var options = (NameValueCollection)infoType.GetProperty("AdvancedOptions").GetValue(info);

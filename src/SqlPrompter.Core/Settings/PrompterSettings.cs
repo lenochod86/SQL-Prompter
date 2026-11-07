@@ -274,6 +274,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "reconnectSqlTabs")]
         public bool ReconnectSqlTabs { get; set; }
 
+        /// <summary>The Connect dialog that SSMS opens for a restored tab without a password has Remember Password ticked (#333); off by default, SQL Prompter never forces SSMS to remember a password.</summary>
+        [DataMember(Name = "prefillRememberPassword")]
+        public bool PrefillRememberPassword { get; set; }
+
         /// <summary>How many closed query tabs can be reopened with Reopen Closed Query Tab (#226).</summary>
         [DataMember(Name = "closedTabsKept")]
         public int ClosedTabsKept { get; set; }
@@ -351,6 +355,7 @@ namespace SqlPrompter.Core.Settings
             ClosedTabsHours = 24;
             RestoreTabs = true;
             ReconnectSqlTabs = true;
+            PrefillRememberPassword = false;
             WarnDeleteWithoutWhere = true;
             WarnUpdateWithoutWhere = true;
             WarnOpenTransaction = true;
