@@ -28,12 +28,20 @@
           <CommandName>Copy Grid Selection As</CommandName>
         </Strings>
       </Menu>
+      <!-- A toolbar of its own for the query history, so that the button is not lost among the standard buttons. -->
+      <Menu guid="guidSqlPrompterCmdSet" id="SqlHistoryToolbar" priority="0x0100" type="Toolbar">
+        <CommandFlag>DefaultDocked</CommandFlag>
+        <Strings>
+          <ButtonText>SQL History</ButtonText>
+          <CommandName>SQL History</CommandName>
+        </Strings>
+      </Menu>
     </Menus>
 
     <Groups>
-      <!-- A group on the Standard toolbar (it holds New Query); the query history button sits in it. -->
-      <Group guid="guidSqlPrompterCmdSet" id="ToolbarGroup" priority="0x0900">
-        <Parent guid="guidSHLMainMenu" id="IDM_VS_TOOL_STANDARD" />
+      <!-- The group of the SQL History toolbar. -->
+      <Group guid="guidSqlPrompterCmdSet" id="ToolbarGroup" priority="0x0100">
+        <Parent guid="guidSqlPrompterCmdSet" id="SqlHistoryToolbar" />
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="MetadataGroup" priority="0x0100">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
@@ -137,6 +145,16 @@
         <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
         <Strings>
           <ButtonText>Run Statement At Caret</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidQueryHistoryToolbar" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="ToolbarGroup" />
+        <Icon guid="ImageCatalogGuid" id="History" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <CommandFlag>IconAndText</CommandFlag>
+        <Strings>
+          <ButtonText>SQL History</ButtonText>
+          <ToolTipText>Open the SQL query history</ToolTipText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidQueryHistory" priority="0x0103" type="Button">
@@ -324,11 +342,6 @@
       </Button>
     </Buttons>
   </Commands>
-  <CommandPlacements>
-    <CommandPlacement guid="guidSqlPrompterCmdSet" id="cmdidQueryHistory" priority="0x0100">
-      <Parent guid="guidSqlPrompterCmdSet" id="ToolbarGroup" />
-    </CommandPlacement>
-  </CommandPlacements>
   <Symbols>
     <GuidSymbol name="guidSqlPrompterPackage" value="{a3a4db19-c58e-4eac-8a84-ba61357b9b01}" />
     <GuidSymbol name="guidSqlPrompterCmdSet" value="{15e19ce9-b3c9-47dd-97f9-49fe13869730}">
@@ -347,6 +360,8 @@
       <IDSymbol name="RefactoringGroup" value="0x1016" />
       <IDSymbol name="FormattingGroup" value="0x1017" />
       <IDSymbol name="ToolbarGroup" value="0x1018" />
+      <IDSymbol name="SqlHistoryToolbar" value="0x1004" />
+      <IDSymbol name="cmdidQueryHistoryToolbar" value="0x0131" />
       <IDSymbol name="cmdidFormatDocument" value="0x011A" />
       <IDSymbol name="cmdidFormatSelection" value="0x011B" />
       <IDSymbol name="cmdidAddNPrefix" value="0x011C" />
