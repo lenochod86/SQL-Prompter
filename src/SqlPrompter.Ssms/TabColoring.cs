@@ -46,30 +46,25 @@ namespace SqlPrompter.Ssms
 
                 var coloring = SettingsService.Current.Coloring;
 
-                // The status bar inside each query window is colored by the connection of that window, whichever tab is in front.
-                WindowStatusColoring.Update(new System.Windows.Interop.WindowInteropHelper(window).Handle, coloring, coloring.Enabled && coloring.ColorWindowStatusBar);
-
-                // The tab and the shell status bar follow the active window.
-                var view = ActiveEditor.GetView();
-                var connection = view != null && view.TextBuffer.ContentType.IsOfType("SQL") ? SsmsConnection.GetActive() : null;
-                var document = connection == null ? null : FindActiveDocumentView(window);
+                // The status bar inside each query window is colored by the connection of that window, whichever tab is in front. The window in
+                // front also decides the tab and the shell status bar, from its own connection state: an unconnected window gets no color (#317).
+                var front = WindowStatusColoring.Update(new System.Windows.Interop.WindowInteropHelper(window).Handle, coloring, coloring.Enabled && coloring.ColorWindowStatusBar);
+                var document = front.Found ? FindActiveDocumentView(window) : null;
                 if (document == null)
                 {
                     return;
                 }
 
-                var environment = EnvironmentMatcher.Find(coloring, connection.Server, connection.Database);
                 Brush wanted = null;
-                if (environment != null && EnvironmentMatcher.TryParseColor(environment.Color, out var red, out var green, out var blue))
+                if (coloring.Enabled && front.Color is System.Drawing.Color color)
                 {
-                    wanted = new SolidColorBrush(Color.FromRgb(red, green, blue));
+                    wanted = new SolidColorBrush(System.Windows.Media.Color.FromRgb(color.R, color.G, color.B));
                     wanted.Freeze();
                 }
 
                 Apply(document, coloring.ColorTab ? wanted : null);
                 ApplyStatusBar(window, coloring.ColorShellStatusBar ? wanted : null);
-            }
-            catch (Exception ex)
+            }            catch (Exception ex)
             {
                 Log.Error("Coloring the tab failed", ex);
             }
