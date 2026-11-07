@@ -208,8 +208,8 @@ namespace SqlPrompter.Ssms
             "<Grid.ColumnDefinitions><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MaxWidth='260'/></Grid.ColumnDefinitions>" +
             "<StackPanel Grid.Column='0'>" +
             "<StackPanel Orientation='Horizontal'>" +
+            "<TextBlock Text='&#xE718;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E5484D' FontSize='12' Margin='0,3,6,0' Visibility='{Binding PinVisibility}'/>" +
             "<TextBlock Text='{Binding TabName}' FontSize='14' TextTrimming='CharacterEllipsis'/>" +
-            "<TextBlock Text='&#xE718;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E5484D' FontSize='12' Margin='6,3,0,0' Visibility='{Binding PinVisibility}'/>" +
             "</StackPanel>" +
             "<TextBlock Text='{Binding RunText}' FontSize='11' Opacity='0.65'/>" +
             "</StackPanel>" +
