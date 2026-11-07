@@ -16,6 +16,9 @@ namespace SqlPrompter.Core.History
         All,
         Pinned,
 
+        /// <summary>The runs marked as favourites (#285); they keep their place in the list, unlike pinned runs.</summary>
+        Favourites,
+
         /// <summary>The tab of the run is still open.</summary>
         Open,
 
@@ -57,6 +60,9 @@ namespace SqlPrompter.Core.History
 
         /// <summary>A favourite: it is never removed by the retention and is listed first (#225).</summary>
         public bool Pinned { get; internal set; }
+
+        /// <summary>A favourite (#285): marked with a star and found in the Favourites view, it keeps its normal place in the list; it is kept by the cleanup like a pinned run.</summary>
+        public bool Favourite { get; internal set; }
     }
 
     /// <summary>
@@ -115,6 +121,11 @@ namespace SqlPrompter.Core.History
                             {
                                 known.Pinned = record.Pinned == "1";
                             }
+
+                            if (record.Favourite != null)
+                            {
+                                known.Favourite = record.Favourite == "1";
+                            }
                         }
 
                         continue;
@@ -123,7 +134,7 @@ namespace SqlPrompter.Core.History
                     if (TryParseTime(record.Ran, out var ran) && !byId.ContainsKey(record.Id))
                     {
                         var entry = new HistoryEntry(record.Id, record.Text, record.Server, record.Database, record.Login, ran,
-                            TryParseTime(record.Closed, out var closedAt) ? closedAt : (DateTime?)null, record.Tab) { Pinned = record.Pinned == "1" };
+                            TryParseTime(record.Closed, out var closedAt) ? closedAt : (DateTime?)null, record.Tab) { Pinned = record.Pinned == "1", Favourite = record.Favourite == "1" };
                         byId[record.Id] = entry;
                         loaded.Add(entry);
                     }
@@ -195,6 +206,25 @@ namespace SqlPrompter.Core.History
             }
         }
 
+        /// <summary>Marks or unmarks runs as favourites; a favourite is kept by <see cref="Prune"/> but stays where the normal order puts it.</summary>
+        public void SetFavourite(IEnumerable<string> ids, bool favourite)
+        {
+            lock (sync)
+            {
+                foreach (var id in ids)
+                {
+                    var entry = entries.FirstOrDefault(e => e.Id == id);
+                    if (entry == null || entry.Favourite == favourite)
+                    {
+                        continue;
+                    }
+
+                    entry.Favourite = favourite;
+                    Append(Serialize(new Record { Id = id, Favourite = favourite ? "1" : "0" }));
+                }
+            }
+        }
+
         /// <summary>Removes the runs older than <paramref name="keepDays"/> days (0 or less keeps everything). Returns how many were removed.</summary>
         public int Prune(int keepDays, DateTime nowUtc)
         {
@@ -206,7 +236,7 @@ namespace SqlPrompter.Core.History
             lock (sync)
             {
                 var limit = nowUtc.AddDays(-keepDays);
-                var removed = entries.RemoveAll(e => !e.Pinned && e.RanAtUtc < limit);
+                var removed = entries.RemoveAll(e => !e.Pinned && !e.Favourite && e.RanAtUtc < limit);
                 if (removed > 0)
                 {
                     Rewrite();
@@ -256,6 +286,7 @@ namespace SqlPrompter.Core.History
             switch (view)
             {
                 case HistoryView.Pinned: return entry.Pinned;
+                case HistoryView.Favourites: return entry.Favourite;
                 case HistoryView.Open: return !entry.ClosedAtUtc.HasValue;
                 case HistoryView.Closed: return entry.ClosedAtUtc.HasValue;
                 default: return true;
@@ -305,6 +336,7 @@ namespace SqlPrompter.Core.History
             Closed = e.ClosedAtUtc.HasValue ? FormatTime(e.ClosedAtUtc.Value) : null,
             Tab = e.Tab.Length > 0 ? e.Tab : null,
             Pinned = e.Pinned ? "1" : null,
+            Favourite = e.Favourite ? "1" : null,
         });
 
         private static string FormatTime(DateTime utc) => utc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
@@ -370,6 +402,9 @@ namespace SqlPrompter.Core.History
 
             [DataMember(Name = "pinned", EmitDefaultValue = false)]
             public string Pinned { get; set; }
+
+            [DataMember(Name = "favourite", EmitDefaultValue = false)]
+            public string Favourite { get; set; }
         }
     }
 }

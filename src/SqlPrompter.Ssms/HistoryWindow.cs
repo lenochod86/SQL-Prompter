@@ -41,6 +41,29 @@ namespace SqlPrompter.Ssms
             list.ItemTemplate = (DataTemplate)System.Windows.Markup.XamlReader.Parse(RowTemplate);
             list.ItemContainerStyle = (Style)System.Windows.Markup.XamlReader.Parse(RowStyle);
             ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+
+            // The same actions as the buttons, on the right-click menu of a run (#285).
+            var menu = new ContextMenu();
+            MenuItem Entry(string header, Action click)
+            {
+                var item = new MenuItem { Header = header };
+                item.Click += (sender, args) => click();
+                return item;
+            }
+
+            menu.Items.Add(Entry("Open In New Tab", Choose));
+            menu.Items.Add(Entry("Pin / Unpin", TogglePin));
+            menu.Items.Add(Entry("Favourite / Unfavourite", ToggleFavourite));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(Entry("Delete", Delete));
+            list.ContextMenu = menu;
+            list.PreviewMouseRightButtonDown += (sender, args) =>
+            {
+                if (ItemsControl.ContainerFromElement(list, args.OriginalSource as DependencyObject) is ListViewItem clicked)
+                {
+                    clicked.IsSelected = true;
+                }
+            };
             list.SelectionChanged += (s, e) => ShowPreview();
             list.MouseDoubleClick += (s, e) => Choose();
             list.KeyDown += (s, e) =>
@@ -84,6 +107,7 @@ namespace SqlPrompter.Ssms
             DockPanel.SetDock(views, Dock.Right);
             views.Children.Add(ViewButton("\uE72C", "All runs", HistoryView.All, true));
             views.Children.Add(ViewButton("\uE718", "Pinned runs", HistoryView.Pinned, false));
+            views.Children.Add(ViewButton("\uE734", "Favourites", HistoryView.Favourites, false));
             views.Children.Add(ViewButton("\uE838", "Open tabs", HistoryView.Open, false));
             views.Children.Add(ViewButton("\uE8B7", "Closed tabs", HistoryView.Closed, false));
             heading.Children.Add(views);
@@ -119,6 +143,7 @@ namespace SqlPrompter.Ssms
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             buttons.Children.Add(SnippetUi.Button("Open In New Tab", Choose));
             buttons.Children.Add(SnippetUi.Button("Pin / Unpin", TogglePin));
+            buttons.Children.Add(SnippetUi.Button("Favourite / Unfavourite", ToggleFavourite));
             buttons.Children.Add(SnippetUi.Button("Make A Snippet", () =>
             {
                 if (list.SelectedItem is Row picked)
@@ -145,6 +170,26 @@ namespace SqlPrompter.Ssms
 
         /// <summary>The run is to become a snippet instead of being opened in a tab.</summary>
         public bool MakeSnippet { get; private set; }
+
+        private void ToggleFavourite()
+        {
+            if (!(list.SelectedItem is Row row))
+            {
+                return;
+            }
+
+            HistoryService.SetFavourite(new[] { row.Entry.Id }, !row.Entry.Favourite);
+            var id = row.Entry.Id;
+            Fill();
+            foreach (Row item in list.Items)
+            {
+                if (item.Entry.Id == id)
+                {
+                    list.SelectedItem = item;
+                    break;
+                }
+            }
+        }
 
         private void TogglePin()
         {
@@ -209,6 +254,7 @@ namespace SqlPrompter.Ssms
             "<StackPanel Grid.Column='0'>" +
             "<StackPanel Orientation='Horizontal'>" +
             "<TextBlock Text='&#xE718;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E5484D' FontSize='12' Margin='0,3,6,0' Visibility='{Binding PinVisibility}'/>" +
+            "<TextBlock Text='&#xE735;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E8A800' FontSize='12' Margin='0,3,6,0' ToolTip='Favourite' Visibility='{Binding FavouriteVisibility}'/>" +
             "<TextBlock Text='{Binding TabName}' FontSize='14' TextTrimming='CharacterEllipsis'/>" +
             "</StackPanel>" +
             "<TextBlock Text='{Binding RunText}' FontSize='11' Opacity='0.65'/>" +
@@ -298,11 +344,13 @@ namespace SqlPrompter.Ssms
 
             public Visibility PinVisibility => Entry.Pinned ? Visibility.Visible : Visibility.Collapsed;
 
+            public Visibility FavouriteVisibility => Entry.Favourite ? Visibility.Visible : Visibility.Collapsed;
+
             /// <summary>The full texts of the row, including whether the tab is still open or when it was closed.</summary>
             public string Tooltip =>
                 TabName + "\nRun: " + Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "\n" +
                 (Entry.ClosedAtUtc.HasValue ? "Tab closed: " + Entry.ClosedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") : "Tab is still open") +
-                "\nServer: " + Entry.Server + "\nDatabase: " + Entry.Database + (Entry.Pinned ? "\nPinned" : string.Empty);
+                "\nServer: " + Entry.Server + "\nDatabase: " + Entry.Database + (Entry.Pinned ? "\nPinned" : string.Empty) + (Entry.Favourite ? "\nFavourite" : string.Empty);
         }
     }
 }
