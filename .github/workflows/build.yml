@@ -52,8 +52,7 @@ jobs:
         shell: pwsh
         run: ./.github/scripts/Check-Versions.ps1 -Base origin/${{ github.base_ref }}
 
-  # The Windows build runs on the self-hosted runner of the development PC (label `vsix`, no billed minutes; E:\actions-runner, started by the
-  # user): only for a pull request with the label `build-vsix`, and on demand. When the PC is off the job waits in the queue; to use GitHub's
+  # The Windows build runs on the self-hosted runner of the development PC (label `vsix`, no billed minutes; the Windows service in E:\actions-runner): only for a pull request with the label `build-vsix`, and on demand. When the PC is off the job waits in the queue; to use GitHub's
   # Windows runner instead (billed twice) change `runs-on` to `windows-latest`.
   vsix:
     if: >-
