@@ -24,6 +24,9 @@ namespace SqlPrompter.Core.Analysis
         Function,
         View,
         Trigger,
+
+        /// <summary>The name of an index after ALTER INDEX or DROP INDEX (#200).</summary>
+        Index,
     }
 
     public enum ModuleAction

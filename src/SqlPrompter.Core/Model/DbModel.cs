@@ -128,6 +128,30 @@ namespace SqlPrompter.Core.Model
         public override string ToString() => Schema + "." + Name;
     }
 
+    /// <summary>An index of a user table or view (#200), for the names after ALTER INDEX and DROP INDEX.</summary>
+    public sealed class DbIndex
+    {
+        public DbIndex(string schema, string table, string name, string typeText)
+        {
+            Schema = schema;
+            Table = table;
+            Name = name;
+            TypeText = typeText ?? string.Empty;
+        }
+
+        /// <summary>The schema of the table or view the index is on.</summary>
+        public string Schema { get; }
+
+        public string Table { get; }
+
+        public string Name { get; }
+
+        /// <summary>For example clustered, nonclustered unique.</summary>
+        public string TypeText { get; }
+
+        public override string ToString() => Schema + "." + Table + "." + Name;
+    }
+
     /// <summary>A trigger: a DML trigger on a table or view (<see cref="ParentName"/>), or a database DDL trigger (no parent).</summary>
     public sealed class DbTrigger
     {
@@ -213,6 +237,9 @@ namespace SqlPrompter.Core.Model
 
         /// <summary>User triggers (DML and database DDL); empty if unknown.</summary>
         IReadOnlyList<DbTrigger> Triggers { get; }
+
+        /// <summary>Indexes of user tables and views; empty if unknown.</summary>
+        IReadOnlyList<DbIndex> Indexes { get; }
 
         /// <summary>The parameters of a user function in the order of the declaration; empty if it has none or they are not known.</summary>
         IReadOnlyList<DbParameter> GetFunctionParameters(DbObject function);

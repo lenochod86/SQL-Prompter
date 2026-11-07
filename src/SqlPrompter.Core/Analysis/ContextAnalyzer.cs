@@ -825,6 +825,9 @@ namespace SqlPrompter.Core.Analysis
                 case "TRIGGER":
                     kind = ModuleKind.Trigger;
                     break;
+                case "INDEX":
+                    kind = ModuleKind.Index;
+                    break;
                 default:
                     return false;
             }
@@ -841,6 +844,12 @@ namespace SqlPrompter.Core.Analysis
             else if (head == "DROP" && anchorIndex == statementStart + 1)
             {
                 action = ModuleAction.Drop;
+            }
+
+            // CREATE OR ALTER does not exist for indexes.
+            if (kind == ModuleKind.Index && action == ModuleAction.CreateOrAlter)
+            {
+                action = ModuleAction.None;
             }
 
             return action != ModuleAction.None;

@@ -110,7 +110,15 @@ FROM sys.triggers AS t
 LEFT JOIN sys.objects AS p ON p.object_id = t.parent_id AND t.parent_class = 1
 LEFT JOIN sys.schemas AS ps ON ps.schema_id = p.schema_id
 WHERE t.is_ms_shipped = 0
-ORDER BY t.name;";
+ORDER BY t.name;
+
+-- Indexes of user tables and views (names after ALTER INDEX and DROP INDEX).
+SELECT s.name, o.name, i.name, i.type_desc, i.is_unique
+FROM sys.indexes AS i
+JOIN sys.objects AS o ON o.object_id = i.object_id
+JOIN sys.schemas AS s ON s.schema_id = o.schema_id
+WHERE i.index_id > 0 AND i.name IS NOT NULL AND o.is_ms_shipped = 0 AND o.type IN ('U', 'V')
+ORDER BY i.name;";
 
         private const string VersionQuery = @"
 SELECT CONCAT(COUNT(*), '|', CONVERT(varchar(30), MAX(modify_date), 126), '|', (SELECT COUNT(*) FROM sys.schemas))
@@ -231,10 +239,18 @@ FROM sys.objects;";
                         triggers.Add(new DbTrigger(reader.IsDBNull(0) ? null : reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2) + "." + reader.GetString(3)));
                     }
 
+                    var indexes = new List<DbIndex>();
+                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        var typeText = (reader.GetBoolean(4) ? "unique " : string.Empty) + reader.GetString(3).Replace('_', ' ').ToLowerInvariant();
+                        indexes.Add(new DbIndex(reader.GetString(0), reader.GetString(1), reader.GetString(2), typeText));
+                    }
+
                     reader.Close();
                     var version = await QueryVersionAsync(connection, cancellationToken).ConfigureAwait(false);
                     return new DatabaseSnapshot(database, defaultSchema, schemas, objects, version, columns, databases, linkedServers, foreignKeys,
-                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures, functionParameters, triggers);
+                        primaryKeys.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), procedures, functionParameters, triggers, indexes);
                 }
             }
         }

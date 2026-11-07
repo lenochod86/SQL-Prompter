@@ -43,6 +43,9 @@ namespace SqlPrompter.Core.Completion
 
         /// <summary>A stored procedure; choosing it inserts its parameters.</summary>
         Procedure,
+
+        /// <summary>An index name after ALTER INDEX or DROP INDEX.</summary>
+        Index,
     }
 
     public enum KeyKind
@@ -435,6 +438,21 @@ namespace SqlPrompter.Core.Completion
                         .Select(o => (o.Schema, o.Name, o.Kind == DbObjectKind.ScalarFunction ? SuggestionKind.ScalarFunction : SuggestionKind.TableFunction,
                             (o.Kind == DbObjectKind.ScalarFunction ? "scalar function " : "table function ") + o, (string)o.Schema)));
                     break;
+                case ModuleKind.Index:
+                    foreach (var index in metadata.Indexes)
+                    {
+                        // ON table is part of the insert: ALTER INDEX ix ON dbo.T REBUILD, DROP INDEX ix ON dbo.T.
+                        var table = SqlIdentifier.Quote(index.Schema, quote) + "." + SqlIdentifier.Quote(index.Table, quote);
+                        yield return new Suggestion(SuggestionKind.Index, index.Name, SqlIdentifier.Quote(index.Name, quote) + " ON " + table, index.Name, index.Schema + "." + index.Table,
+                            index.TypeText + " index on " + index.Schema + "." + index.Table, 0);
+                    }
+
+                    if (context.ModuleAction == ModuleAction.Alter)
+                    {
+                        yield return new Suggestion(SuggestionKind.Keyword, "ALL", "ALL", "ALL", null, "every index of the table: ALTER INDEX ALL ON table", 0);
+                    }
+
+                    yield break;
                 case ModuleKind.Trigger:
                     modules.AddRange(metadata.Triggers.Select(t => (t.Schema, t.Name, SuggestionKind.Procedure,
                         t.ParentName == null ? "database trigger " + t.Name : "trigger " + t + " on " + t.ParentName, t.ParentName ?? "database")));
