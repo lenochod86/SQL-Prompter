@@ -16,6 +16,9 @@ namespace SqlPrompter.Ssms
     {
         private const int DwmUseImmersiveDarkMode = 20;
 
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+        private static extern int SetWindowTheme(IntPtr window, string subAppName, string subIdList);
+
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 
@@ -41,7 +44,7 @@ namespace SqlPrompter.Ssms
             {
                 Back = back,
                 Fore = fore,
-                Border = border,
+                Border = Blend(back, fore, 0.35),
                 Input = Blend(back, fore, 0.07),
                 Button = Blend(back, fore, 0.14),
                 Muted = Blend(fore, back, 0.45),
@@ -119,8 +122,37 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>The native scroll bars and drop-down arrows of a control follow a dark theme (Windows 10 1809 and later; ignored elsewhere).</summary>
+        private static void NativeTheme(Control control, Palette p)
+        {
+            void Set()
+            {
+                try
+                {
+                    SetWindowTheme(control.Handle, p.Dark ? (control is TextBox || control is ComboBox ? "DarkMode_CFD" : "DarkMode_Explorer") : "Explorer", null);
+                }
+                catch (Exception)
+                {
+                }
+            }
+
+            if (control.IsHandleCreated)
+            {
+                Set();
+            }
+            else
+            {
+                control.HandleCreated += (s, e) => Set();
+            }
+        }
+
         private static void One(Control control, Palette p)
         {
+            if (!(control is Button) && !(control is Label) && !(control is CheckBox))
+            {
+                NativeTheme(control, p);
+            }
+
             switch (control)
             {
                 case FormatPreview preview:

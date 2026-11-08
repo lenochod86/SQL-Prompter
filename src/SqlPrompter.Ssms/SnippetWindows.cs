@@ -23,6 +23,12 @@ namespace SqlPrompter.Ssms
         {
             window.SetResourceReference(Window.BackgroundProperty, VsBrushes.WindowKey);
             window.SetResourceReference(Window.ForegroundProperty, VsBrushes.WindowTextKey);
+
+            // The scroll bars of the lists and boxes in the window follow the theme of the shell too.
+            if (window.TryFindResource(VsResourceKeys.ScrollBarStyleKey) is Style scrollBars)
+            {
+                window.Resources[typeof(System.Windows.Controls.Primitives.ScrollBar)] = scrollBars;
+            }
         }
 
         public static TextBox Box(bool multiline, double height = double.NaN)
