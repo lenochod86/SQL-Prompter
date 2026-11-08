@@ -395,7 +395,7 @@ namespace SqlPrompter.Ssms
             var context = ContextAnalyzer.Analyze(batch, triggerLocation.Position - batchStart);
             var insertion = trigger.Reason == CompletionTriggerReason.Insertion;
             if (context.Kind == ContextKind.None ||
-                (insertion && trigger.Character == ' ' && context.Kind != ContextKind.ObjectName && !AfterComma(batch, triggerLocation.Position - batchStart, context)) ||
+                (insertion && trigger.Character == ' ' && context.Kind != ContextKind.ObjectName && !AfterComma(batch, triggerLocation.Position - batchStart, context) && !KeywordSpaceTrigger.ShouldOpen(batch, triggerLocation.Position - batchStart, context)) ||
                 (insertion && trigger.Character == ',' && !AfterComma(batch, triggerLocation.Position - batchStart, context)) ||
                 (insertion && trigger.Character == '(' && context.Kind != ContextKind.InsertColumns) ||
                 (insertion && trigger.Character == '.' && context.Qualifier.Count == 0 && context.Kind != ContextKind.Name))
