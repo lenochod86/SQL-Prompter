@@ -20,6 +20,7 @@ namespace SqlPrompter.Ssms
 
         public SnippetBodyEditor()
         {
+            Loaded += (s, e) => ApplyEditorBackground();
             AcceptsReturn = true;
             AcceptsTab = true;
             IsUndoEnabled = false;
@@ -43,6 +44,14 @@ namespace SqlPrompter.Ssms
             Unloaded += (s, e) => Microsoft.VisualStudio.PlatformUI.VSColorTheme.ThemeChanged -= OnThemeChanged;
         }
 
+        /// <summary>The background of the preview is the background of the SSMS editor, so the colors of the words stand on what they stand on there.</summary>
+        private void ApplyEditorBackground()
+        {
+            var color = EditorColors.Background();
+            Background = new SolidColorBrush(color);
+            Foreground = new SolidColorBrush(EditorColors.ByKind()[0]);
+        }
+
         private void OnThemeChanged(Microsoft.VisualStudio.PlatformUI.ThemeChangedEventArgs args)
         {
             // The resources of the window (the background and the text color) follow the theme a moment later; the text is colored after that.
@@ -51,6 +60,7 @@ namespace SqlPrompter.Ssms
             {
                 if (IsLoaded)
                 {
+                    ApplyEditorBackground();
                     Recolor(-1);
                 }
             }), System.Windows.Threading.DispatcherPriority.Background);
@@ -151,21 +161,10 @@ namespace SqlPrompter.Ssms
         }
 
 #pragma warning disable VSTHRD010 // the editor is a WPF control: it is only used on the UI thread
+        /// <summary>The colors of the SQL editor of SSMS by kind of <see cref="SnippetHighlighter"/>.</summary>
         private Brush[] Palette()
         {
-            var themed = Microsoft.VisualStudio.PlatformUI.VSColorTheme.GetThemedColor(Microsoft.VisualStudio.PlatformUI.EnvironmentColors.ToolWindowBackgroundColorKey);
-            var dark = (themed.R * 299 + themed.G * 587 + themed.B * 114) / 1000 < 128;
-            var text = Microsoft.VisualStudio.PlatformUI.VSColorTheme.GetThemedColor(Microsoft.VisualStudio.PlatformUI.EnvironmentColors.ToolWindowTextColorKey);
-            var plain = Color.FromRgb(text.R, text.G, text.B);
-            return new Brush[]
-            {
-                new SolidColorBrush(plain),
-                new SolidColorBrush(dark ? Color.FromRgb(0x56, 0x9C, 0xD6) : Color.FromRgb(0x00, 0x00, 0xFF)),
-                new SolidColorBrush(dark ? Color.FromRgb(0xD6, 0x9D, 0x85) : Color.FromRgb(0xA3, 0x15, 0x15)),
-                new SolidColorBrush(dark ? Color.FromRgb(0x57, 0xA6, 0x4A) : Color.FromRgb(0x00, 0x80, 0x00)),
-                new SolidColorBrush(dark ? Color.FromRgb(0x9C, 0xDC, 0xFE) : Color.FromRgb(0x1F, 0x37, 0x7F)),
-                new SolidColorBrush(dark ? Color.FromRgb(0xC5, 0x86, 0xC0) : Color.FromRgb(0xAF, 0x00, 0xDB)),
-            };
+            return EditorColors.ByKind().Select(c => (Brush)new SolidColorBrush(c)).ToArray();
         }
 #pragma warning restore VSTHRD010
     }

@@ -163,7 +163,8 @@ namespace SqlPrompter.Ssms
             switch (control)
             {
                 case FormatPreview preview:
-                    preview.BackColor = p.Input;
+                    var editor = EditorColors.Background();
+                    preview.BackColor = Color.FromArgb(editor.R, editor.G, editor.B);
                     preview.ForeColor = p.Fore;
                     return;
                 case Button button:
