@@ -92,6 +92,29 @@ namespace SqlPrompter.Ssms
         public System.Func<SqlPrompter.Core.Analysis.TableSource, System.Collections.Generic.IReadOnlyList<SqlPrompter.Core.Model.DbColumn>> LinkedColumns()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            return LinkedColumns(out _);
+        }
+
+        /// <summary>As above, with a function that tells where the load of the columns of a four-part table stands (for the "Loading..." item, #358).</summary>
+        public System.Func<SqlPrompter.Core.Analysis.TableSource, SqlPrompter.Metadata.LinkedLoadStatus> LinkedColumnStatus()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var settings = SsmsConnection.GetActive();
+            if (settings == null || !settings.CanConnect)
+            {
+                return null;
+            }
+
+            var linked = Caches.GetLinkedServers(settings);
+            return source => source.NameParts.Count == 4
+                ? linked.StatusOfColumns(source.NameParts[0], source.NameParts[1], source.NameParts[2], source.NameParts[3])
+                : SqlPrompter.Metadata.LinkedLoadStatus.Done;
+        }
+
+        private System.Func<SqlPrompter.Core.Analysis.TableSource, System.Collections.Generic.IReadOnlyList<SqlPrompter.Core.Model.DbColumn>> LinkedColumns(out System.Func<SqlPrompter.Core.Analysis.TableSource, SqlPrompter.Metadata.LinkedLoadStatus> status)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            status = null;
             var settings = SsmsConnection.GetActive();
             if (settings == null || !settings.CanConnect)
             {

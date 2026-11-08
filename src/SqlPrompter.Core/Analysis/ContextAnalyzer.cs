@@ -92,7 +92,7 @@ namespace SqlPrompter.Core.Analysis
                 return CaretContext.None;
             }
 
-            var tokens = all.Where(t => t.Kind != TokenKind.Comment).ToList();
+            var tokens = WithMissingOn(all.Where(t => t.Kind != TokenKind.Comment).ToList());
             var word = tokens.FirstOrDefault(t => t.Start < caret && caret <= t.End);
             if (word != null && word.Kind == TokenKind.Number)
             {
@@ -671,6 +671,89 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return caret < token.End || (caret == token.End && (token.IsUnterminated || token.IsLineComment));
+        }
+
+        /// <summary>
+        /// A join whose <c>ON</c> is missing (<c>JOIN t AS x a.Id = |</c>, the keyword was deleted or not typed yet, #358): a name that cannot be an alias,
+        /// because it has a dot, stands right after the source of the join and is followed by a comparison. Such a condition is analyzed as if
+        /// <c>ON</c> stood before it (a token of no width, so every position in the text stays the same).
+        /// </summary>
+        private static List<Token> WithMissingOn(List<Token> tokens)
+        {
+            List<Token> result = null;
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                if (!tokens[i].IsWord("JOIN"))
+                {
+                    continue;
+                }
+
+                // The source: name [. [.] name]...
+                var p = i + 1;
+                while (true)
+                {
+                    if (p >= tokens.Count || !tokens[p].IsNamePart)
+                    {
+                        p = -1;
+                        break;
+                    }
+
+                    p++;
+                    if (p < tokens.Count && tokens[p].Kind == TokenKind.Dot)
+                    {
+                        p++;
+                        while (p < tokens.Count && tokens[p].Kind == TokenKind.Dot)
+                        {
+                            p++;
+                        }
+
+                        continue;
+                    }
+
+                    break;
+                }
+
+                if (p < 0)
+                {
+                    continue;
+                }
+
+                // The alias: AS name, or a name that is not the start of a qualified name.
+                var q = p;
+                if (p < tokens.Count && tokens[p].IsWord("AS"))
+                {
+                    q = p + 2;
+                }
+                else if (p < tokens.Count && tokens[p].IsIdentifier && !(p + 1 < tokens.Count && tokens[p + 1].Kind == TokenKind.Dot))
+                {
+                    q = p + 1;
+                }
+
+                // The condition: a qualified name, then a comparison or nothing yet (the caret is in the name).
+                if (q + 1 >= tokens.Count || !tokens[q].IsIdentifier || tokens[q + 1].Kind != TokenKind.Dot)
+                {
+                    continue;
+                }
+
+                var e = q;
+                while (e + 1 < tokens.Count && tokens[e + 1].Kind == TokenKind.Dot && e + 2 < tokens.Count && tokens[e + 2].IsNamePart)
+                {
+                    e += 2;
+                }
+
+                var comparison = e + 1 < tokens.Count && tokens[e + 1].Kind == TokenKind.Operator && ComparisonOperators.Contains(tokens[e + 1].Text);
+                var typing = e + 1 >= tokens.Count || tokens[e + 1].Kind == TokenKind.Dot;
+                if (!comparison && !typing)
+                {
+                    continue;
+                }
+
+                result = result ?? new List<Token>(tokens);
+                var at = result.IndexOf(tokens[q]);
+                result.Insert(at, new Token(TokenKind.Word, tokens[q].Start, tokens[q].Start, "ON", false));
+            }
+
+            return result ?? tokens;
         }
 
         private static int CountBefore(List<Token> tokens, int caret)

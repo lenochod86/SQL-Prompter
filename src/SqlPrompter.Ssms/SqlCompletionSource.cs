@@ -245,23 +245,51 @@ namespace SqlPrompter.Ssms
         {
             script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
             RequestScriptColumns(prepared, script);
-            options = SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor);
+            // The columns of a table of a linked server load lazily: the list is built without them and says so (#358).
+            LinkedLoadStatus columnsStatus = null;
+            string columnsWhat = null;
+            Func<TableSource, IReadOnlyList<DbColumn>> remoteColumns = prepared.RemoteColumns;
+            if (remoteColumns != null && prepared.ColumnStatus != null)
+            {
+                var inner = remoteColumns;
+                remoteColumns = source =>
+                {
+                    var columns = inner(source);
+                    if (columns == null && source.NameParts.Count == 4)
+                    {
+                        var status = prepared.ColumnStatus(source);
+                        if (!status.IsDone && (columnsStatus == null || status.IsLoading))
+                        {
+                            columnsStatus = status;
+                            columnsWhat = "columns of " + string.Join(".", source.NameParts);
+                        }
+                    }
+
+                    return columns;
+                };
+            }
+
+            options = SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(remoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor);
             var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, options).Select(s => ToItem(s, prepared)).ToList();
-            waitingForLinked = prepared.LinkedStatus != null && prepared.LinkedStatus.IsLoading;
+            waitingForLinked = (prepared.LinkedStatus != null && prepared.LinkedStatus.IsLoading) || (columnsStatus != null && columnsStatus.IsLoading);
             if (prepared.LinkedStatus != null && !prepared.LinkedStatus.IsDone)
             {
-                items.Insert(0, LoadingItem(prepared));
+                items.Insert(0, LoadingItem(prepared.LinkedWhat, prepared.LinkedStatus, prepared.Context.TypedPrefix));
+            }
+            else if (columnsStatus != null)
+            {
+                items.Insert(0, LoadingItem(columnsWhat, columnsStatus, prepared.Context.TypedPrefix));
             }
 
             return items.ToImmutableArray();
         }
 
         /// <summary>The first item while a part of a linked server loads, or when the load failed (#357); it cannot be chosen.</summary>
-        private CompletionItem LoadingItem(Prepared prepared)
+        private CompletionItem LoadingItem(string what, LinkedLoadStatus status, string typedPrefix)
         {
-            var failed = prepared.LinkedStatus.Error != null;
-            var text = failed ? "Could not load the " + prepared.LinkedWhat + ": " + prepared.LinkedStatus.Error : "Loading the " + prepared.LinkedWhat + "...";
-            var typed = prepared.Context.TypedPrefix ?? string.Empty;
+            var failed = status.Error != null;
+            var text = failed ? "Could not load the " + what + ": " + status.Error : "Loading the " + what + "...";
+            var typed = typedPrefix ?? string.Empty;
             var item = new CompletionItem(text, this, Icon(failed ? KnownMonikers.StatusWarning : KnownMonikers.Refresh, failed ? "Failed" : "Loading"), Filters, string.Empty, string.Empty, "\u0001", typed, ImmutableArray<ImageElement>.Empty);
             item.Properties.AddProperty(LoadingKey, true);
             item.Properties.AddProperty(DescriptionKey, failed ? "The linked server could not be read. The list asks again after a minute." : "The list updates itself when the linked server has answered; typing is never blocked.");
@@ -400,6 +428,7 @@ namespace SqlPrompter.Ssms
 
             prepared = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart))
             {
+                ColumnStatus = service.LinkedColumnStatus(),
                 LinkedStatus = linkedStatus,
                 LinkedWhat = linkedWhat,
             };
@@ -605,6 +634,9 @@ namespace SqlPrompter.Ssms
 
             /// <summary>The state of the lazy load behind a linked server name, or null when the position has nothing to do with a linked server.</summary>
             public LinkedLoadStatus LinkedStatus { get; set; }
+
+            /// <summary>Where the load of the columns of a four-part table stands; null when there is no connection.</summary>
+            public Func<TableSource, LinkedLoadStatus> ColumnStatus { get; set; }
 
             /// <summary>What the load is about, for the text of the item: "databases of Srv", "objects of Srv.Db".</summary>
             public string LinkedWhat { get; set; }
