@@ -281,7 +281,7 @@ namespace SqlPrompter.Ssms
             "<Border Grid.Column='0' Width='4' Margin='0,0,6,0' Background='{Binding StripBrush}' ToolTip='{Binding EnvironmentName}'/>" +
             "<StackPanel Grid.Column='1' Margin='0,3,0,3'>" +
             "<StackPanel Orientation='Horizontal'>" +
-            "<TextBlock Text='&#xE718;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E5484D' FontSize='12' Margin='0,3,6,0' Visibility='{Binding PinVisibility}'/>" +
+            "<TextBlock Text='&#xE841;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E5484D' FontSize='12' Margin='0,3,6,0' Visibility='{Binding PinVisibility}'/>" +
             "<TextBlock Text='&#xE735;' FontFamily='Segoe Fluent Icons, Segoe MDL2 Assets' Foreground='#E8A800' FontSize='12' Margin='0,3,6,0' ToolTip='Favourite' Visibility='{Binding FavouriteVisibility}'/>" +
             "<TextBlock Text='{Binding TabName}' FontSize='14' TextTrimming='CharacterEllipsis'/>" +
             "</StackPanel>" +
