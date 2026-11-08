@@ -250,6 +250,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "keepHistory")]
         public bool KeepHistory { get; set; }
 
+        /// <summary>The query history opens as a tab in the editor area (true) or as a separate window (false, #385).</summary>
+        [DataMember(Name = "historyAsTab")]
+        public bool HistoryAsTab { get; set; }
+
         /// <summary>History older than this many days is removed when SSMS starts; 0 keeps it forever.</summary>
         [DataMember(Name = "historyDays")]
         public int HistoryDays { get; set; }
@@ -342,6 +346,7 @@ namespace SqlPrompter.Core.Settings
             ShowDbDescriptions = true;
             ShowHover = true;
             KeepHistory = true;
+            HistoryAsTab = true;
             HistoryDays = 0;
             TrackTabs = true;
             TabCheckSeconds = 5;

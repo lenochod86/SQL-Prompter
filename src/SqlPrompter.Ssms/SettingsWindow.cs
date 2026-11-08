@@ -265,6 +265,9 @@ namespace SqlPrompter.Ssms
             var history = Add("History and tabs", "Everything stays on this computer and is never sent anywhere.");
             history.Check("Keep query history", "Every executed query is written to %APPDATA%\\SqlPrompter\\history.jsonl. Open it with SQL Prompter > Query History.",
                 () => work.Behavior.KeepHistory, v => work.Behavior.KeepHistory = v);
+            history.Choice("Open the query history in", "A tab in the editor area stays open next to the queries (you can dock or float it); a separate window is closed when you open something. Takes effect the next time the history is opened.",
+                new[] { O(true, "a tab"), O(false, "a separate window") },
+                () => work.Behavior.HistoryAsTab, v => work.Behavior.HistoryAsTab = v);
             history.Number("Keep history for", "History older than this is removed when SSMS starts. 0 keeps it forever.", 0, 36500,
                 () => work.Behavior.HistoryDays, v => work.Behavior.HistoryDays = v, "days", () => work.Behavior.KeepHistory);
             history.Check("Track query tabs and their versions", "The history knows which query tabs are open and which were closed, and keeps versions of their text (also of tabs that were never run), in %APPDATA%\\SqlPrompter\\tabhistory.jsonl. Needs Keep query history.",

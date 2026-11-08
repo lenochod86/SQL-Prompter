@@ -16,6 +16,7 @@ namespace SqlPrompter.Ssms
     [ProvideMenuResource("Menus.ctmenu", 42)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
+    [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
     public sealed class SqlPrompterPackage : AsyncPackage
     {
         public const string PackageGuidString = "a3a4db19-c58e-4eac-8a84-ba61357b9b01";
@@ -236,28 +237,84 @@ namespace SqlPrompter.Ssms
             ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
+                if (SettingsService.Current.Behavior.HistoryAsTab && ShowHistoryTab())
+                {
+                    return;
+                }
+
                 var window = new HistoryWindow();
                 ActiveEditor.SetOwner(window);
                 window.ShowDialog();
-                var chosen = window.Chosen;
+                if (window.Chosen != null)
+                {
+                    OpenHistoryEntry(window.Chosen, window.MakeSnippet);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening the query history failed", ex);
+                ShowMessage("Opening the query history failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// The history as a tab of the editor area (#385): the one tool window of the package is created or activated, with the entries as they are now.
+        /// False when SSMS could not show it, then the window opens instead.
+        /// </summary>
+        private bool ShowHistoryTab()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var pane = FindToolWindow(typeof(HistoryToolWindowPane), 0, true) as HistoryToolWindowPane;
+                var frame = pane?.Frame as Microsoft.VisualStudio.Shell.Interop.IVsWindowFrame;
+                if (frame == null)
+                {
+                    return false;
+                }
+
+                if (frame.IsVisible() == VSConstants.S_OK)
+                {
+                    pane.Reload();
+                }
+
+                Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(frame.Show());
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Showing the history as a tab failed", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// What choosing an entry of the history does (the window and the tab call it): a run becomes a snippet, or the entry is opened in its tab, its file or a
+        /// new tab, and continues its tab record (#375, #372, #327, #331).
+        /// </summary>
+        internal static void OpenHistoryEntry(SqlPrompter.Core.History.HistoryEntry chosen, bool makeSnippet)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
                 var before = (GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveDocument?.FullName;
-                if (chosen != null && window.MakeSnippet)
+                if (makeSnippet)
                 {
                     var draft = SqlPrompter.Core.Snippets.Snippet.Create(string.Empty, string.Empty, SqlPrompter.Core.Snippets.SnippetText.BodyFromSelection(chosen.Text));
                     var manager = new SnippetManagerWindow(new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder), draft);
                     ActiveEditor.SetOwner(manager);
                     manager.ShowDialog();
                 }
-                else if (chosen != null && TouchEntry(chosen) && GoToTabOfEntry(chosen))
+                else if (TouchEntry(chosen) && GoToTabOfEntry(chosen))
                 {
                     // The entry is of a tab that is open: that tab is in front (#375), no second tab and no second record.
                 }
-                else if (chosen != null && OpenFileOfEntry(chosen))
+                else if (OpenFileOfEntry(chosen))
                 {
                     // The file of the tab was opened (#372).
                     BindOpenedWindow(chosen, before);
                 }
-                else if (chosen != null && !string.IsNullOrEmpty(chosen.Server) && !string.IsNullOrEmpty(chosen.Login) &&
+                else if (!string.IsNullOrEmpty(chosen.Server) && !string.IsNullOrEmpty(chosen.Login) &&
                     !string.Equals(chosen.Server, SsmsConnection.GetActiveOfWindow()?.Server, StringComparison.OrdinalIgnoreCase))
                 {
                     // Another server than the active window, with a SQL login: opened like a restored tab (live or remembered password, SSMS's Connect dialog otherwise).
@@ -270,11 +327,11 @@ namespace SqlPrompter.Ssms
                         BindOpenedWindow(chosen, before);
                     }
                 }
-                else if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login) && !OpenWithoutActiveConnection(chosen))
+                else if (!SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login) && !OpenWithoutActiveConnection(chosen))
                 {
                     ShowMessage("The query could not be opened in a new tab (see the log).");
                 }
-                else if (chosen != null)
+                else
                 {
                     BindOpenedWindow(chosen, before);
                 }
@@ -285,7 +342,6 @@ namespace SqlPrompter.Ssms
                 ShowMessage("Opening the query history failed: " + ex.Message);
             }
         }
-
         /// <summary>An entry that is opened from the history comes first in the list afterwards (below the pinned ones, #378). Always true.</summary>
         private static bool TouchEntry(SqlPrompter.Core.History.HistoryEntry chosen)
         {
@@ -336,7 +392,7 @@ namespace SqlPrompter.Ssms
         /// chooses, the file is the default) when the file changed since; a file that is gone is announced in the status bar and the text opens as before.
         /// An older version of a tab always opens as text. False when the entry is to be opened as text in a new tab.
         /// </summary>
-        private bool OpenFileOfEntry(SqlPrompter.Core.History.HistoryEntry chosen)
+        private static bool OpenFileOfEntry(SqlPrompter.Core.History.HistoryEntry chosen)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             if (string.IsNullOrEmpty(chosen.File) || chosen.FromOlderVersion)
@@ -447,11 +503,11 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private void ShowMessage(string text)
+        private static void ShowMessage(string text)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             VsShellUtilities.ShowMessageBox(
-                this, text, "SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_INFO,
+                ServiceProvider.GlobalProvider, text, "SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_INFO,
                 Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_OK,
                 Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
         }
