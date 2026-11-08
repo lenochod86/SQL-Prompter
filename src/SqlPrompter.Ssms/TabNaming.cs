@@ -53,6 +53,7 @@ namespace SqlPrompter.Ssms
             ResizeMode = ResizeMode.NoResize;
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
             SnippetUi.Theme(this);
             box.Text = initial ?? string.Empty;
             var panel = new StackPanel { Margin = new Thickness(12) };

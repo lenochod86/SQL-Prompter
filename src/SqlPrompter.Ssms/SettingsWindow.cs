@@ -63,6 +63,7 @@ namespace SqlPrompter.Ssms
             Controls.Add(buttons);
             ReloadPages();
             groups.SelectedIndex = 0;
+            WinFormsTheme.Apply(this);
         }
 
         private void ShowGroup(int index)

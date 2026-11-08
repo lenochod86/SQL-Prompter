@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Microsoft.VisualStudio.Shell;
 using SqlPrompter.Core.Coloring;
 using SqlPrompter.Core.Settings;
 
@@ -372,6 +373,8 @@ namespace SqlPrompter.Ssms
             CancelButton = cancel;
             AcceptButton = ok;
             ShowColor();
+            ThreadHelper.ThrowIfNotOnUIThread();
+            WinFormsTheme.Apply(this);
         }
 
         public string EnvironmentName => name.Text.Trim();

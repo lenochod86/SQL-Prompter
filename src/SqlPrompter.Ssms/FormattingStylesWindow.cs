@@ -103,6 +103,7 @@ namespace SqlPrompter.Ssms
             Controls.Add(top);
             RefreshStyles();
             tree.SelectedNode = tree.Nodes[0];
+            WinFormsTheme.Apply(this);
         }
 
         public static void Open()
@@ -286,6 +287,7 @@ namespace SqlPrompter.Ssms
 
         private void Rename()
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             var oldName = current.Name;
             var name = TextPrompt.Ask(this, "Rename style", "New name", oldName, n => !string.Equals(n, oldName, StringComparison.OrdinalIgnoreCase) && Taken(n));
             if (name != null)
@@ -380,6 +382,8 @@ namespace SqlPrompter.Ssms
                 form.AcceptButton = ok;
                 form.CancelButton = cancel;
                 box.SelectAll();
+                ThreadHelper.ThrowIfNotOnUIThread();
+                WinFormsTheme.Apply(form);
                 return form.ShowDialog(owner) == DialogResult.OK ? box.Text.Trim() : null;
             }
         }

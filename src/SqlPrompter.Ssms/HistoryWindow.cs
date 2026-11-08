@@ -30,6 +30,7 @@ namespace SqlPrompter.Ssms
             Height = 680;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ShowInTaskbar = false;
+            Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
             SnippetUi.Theme(this);
             SnippetUi.Theme(list);
             SnippetUi.Theme(preview);
