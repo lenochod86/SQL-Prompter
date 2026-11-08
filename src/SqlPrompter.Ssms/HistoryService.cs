@@ -152,6 +152,25 @@ namespace SqlPrompter.Ssms
             TabHistoryService.Delete(list);
         }
 
+        /// <summary>The entry was opened from the history window: it moves to the top of the list, below the pinned ones (#378).</summary>
+        public static void Touch(string id)
+        {
+            var list = new[] { id };
+            var now = DateTime.UtcNow;
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    Store.Touch(list, now);
+                    TabHistoryService.Touch(list, now);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Recording the opening of a history entry failed", ex);
+                }
+            });
+        }
+
         public static void SetPinned(IEnumerable<string> ids, bool pinned)
         {
             var list = ids.ToList();

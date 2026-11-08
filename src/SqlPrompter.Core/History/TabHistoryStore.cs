@@ -58,6 +58,9 @@ namespace SqlPrompter.Core.History
         /// <summary>When the tab was closed; null while it is open.</summary>
         public DateTime? ClosedAtUtc { get; internal set; }
 
+        /// <summary>When the tab was last opened from the history window; null when never (#378).</summary>
+        public DateTime? LastUsedUtc { get; internal set; }
+
         /// <summary>Pinned (#285): never removed by the retention.</summary>
         public bool Pinned { get; internal set; }
 
@@ -84,6 +87,7 @@ namespace SqlPrompter.Core.History
             Versions = Versions.ToList().AsReadOnly(),
             Pinned = Pinned,
             Favourite = Favourite,
+            OpenedAtUtc = LastUsedUtc,
         };
     }
 
@@ -241,6 +245,13 @@ namespace SqlPrompter.Core.History
                             }
 
                             break;
+                        case "touch":
+                            if (tab != null && TryParseTime(record.At, out at))
+                            {
+                                tab.LastUsedUtc = at;
+                            }
+
+                            break;
                         case "open":
                             if (tab != null)
                             {
@@ -386,6 +397,19 @@ namespace SqlPrompter.Core.History
             }
         }
 
+        /// <summary>The tabs were opened from the history now: they go to the top of the list (below the pinned ones).</summary>
+        public void Touch(IEnumerable<string> ids, DateTime nowUtc)
+        {
+            lock (sync)
+            {
+                foreach (var tab in tabs.Where(t => ids.Contains(t.Id)))
+                {
+                    tab.LastUsedUtc = nowUtc;
+                    Append(new Record { Kind = "touch", Id = tab.Id, At = FormatTime(nowUtc) });
+                }
+            }
+        }
+
         /// <summary>Marks or unmarks tabs as favourites; a favourite is kept by <see cref="Prune"/>.</summary>
         public void SetFavourite(IEnumerable<string> ids, bool favourite)
         {
@@ -422,7 +446,7 @@ namespace SqlPrompter.Core.History
             lock (sync)
             {
                 var limit = nowUtc.AddDays(-keepDays);
-                var removed = tabs.RemoveAll(t => t.ClosedAtUtc.HasValue && !t.Pinned && !t.Favourite && t.LastChangeUtc < limit);
+                var removed = tabs.RemoveAll(t => t.ClosedAtUtc.HasValue && !t.Pinned && !t.Favourite && t.LastChangeUtc < limit && !(t.LastUsedUtc.HasValue && t.LastUsedUtc.Value >= limit));
                 if (removed > 0)
                 {
                     Rewrite();
@@ -553,6 +577,11 @@ namespace SqlPrompter.Core.History
                     if (tab.Favourite)
                     {
                         lines.Add(Serialize(new Record { Kind = "fav", Id = tab.Id, Text = "1" }));
+                    }
+
+                    if (tab.LastUsedUtc.HasValue)
+                    {
+                        lines.Add(Serialize(new Record { Kind = "touch", Id = tab.Id, At = FormatTime(tab.LastUsedUtc.Value) }));
                     }
                 }
 
