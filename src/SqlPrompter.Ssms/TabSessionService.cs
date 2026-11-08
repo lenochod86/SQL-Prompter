@@ -782,6 +782,11 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var opened = OpenTabCore(tab, out var connected);
+            if (opened && tab.Pinned && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
+            {
+                TabCaption.Pin(dte.ActiveDocument.FullName);
+            }
+
             if (opened && !string.IsNullOrEmpty(tab.Name) && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
             {
                 names[dte.ActiveDocument.FullName] = tab.Name;
@@ -974,6 +979,7 @@ namespace SqlPrompter.Ssms
                 Encrypt = connection?.Encrypt ?? wanted?.Encrypt,
                 TrustServerCertificate = connection?.TrustServerCertificate ?? wanted?.TrustServerCertificate,
                 Active = active,
+                Pinned = TabCaption.IsPinned(name),
                 Name = names.TryGetValue(name, out var tabName) ? tabName : null,
             };
         }

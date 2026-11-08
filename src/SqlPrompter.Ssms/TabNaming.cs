@@ -11,6 +11,54 @@ namespace SqlPrompter.Ssms
     /// <summary>Sets the caption of a query window (#226): the document is backed by a temp file (SQLQuery1.sql), so the caption is a property of the window frame.</summary>
     internal static class TabCaption
     {
+        /// <summary>
+        /// The frame property that says the tab is pinned (found by comparing the properties of a pinned and a loose tab in SSMS 22: <c>-5021</c> is a
+        /// Boolean that is true for a pinned tab; there is no name for it in the SDK).
+        /// </summary>
+        private const int IsPinnedProperty = -5021;
+
+        /// <summary>Whether the window of the document is a pinned tab (#pinned restore).</summary>
+        public static bool IsPinned(string documentPath)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                return VsShellUtilities.IsDocumentOpen(ServiceProvider.GlobalProvider, documentPath, Guid.Empty, out _, out _, out var frame) && frame != null &&
+                    frame.GetProperty(IsPinnedProperty, out var value) == VSConstants.S_OK && value is bool pinned && pinned;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reading whether the tab is pinned failed", ex);
+                return false;
+            }
+        }
+
+        /// <summary>Pins the tab of the document (it stays where it is and is not replaced). Returns false when SSMS did not do it.</summary>
+        public static bool Pin(string documentPath)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (!VsShellUtilities.IsDocumentOpen(ServiceProvider.GlobalProvider, documentPath, Guid.Empty, out _, out _, out var frame) || frame == null)
+                {
+                    return false;
+                }
+
+                if (frame.SetProperty(IsPinnedProperty, true) != VSConstants.S_OK)
+                {
+                    Log.Write("Pinning the tab: SetProperty did not work, the command Window.PinTab is used.");
+                    (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("Window.PinTab");
+                }
+
+                return IsPinned(documentPath);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Pinning the tab failed", ex);
+                return false;
+            }
+        }
+
         /// <summary>Gives the window of the document the caption <paramref name="name"/>; an empty name gives the caption back to SSMS. Returns false when the frame was not found.</summary>
         public static bool Apply(string documentPath, string name)
         {
