@@ -247,6 +247,15 @@ namespace SqlPrompter.Ssms
                     ActiveEditor.SetOwner(manager);
                     manager.ShowDialog();
                 }
+                else if (chosen != null && !string.IsNullOrEmpty(chosen.Server) && !string.IsNullOrEmpty(chosen.Login) &&
+                    !string.Equals(chosen.Server, SsmsConnection.GetActiveOfWindow()?.Server, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Another server than the active window, with a SQL login: opened like a restored tab (live or remembered password, SSMS's Connect dialog otherwise).
+                    if (!OpenWithoutActiveConnection(chosen))
+                    {
+                        ShowMessage("The query could not be opened in a new tab (see the log).");
+                    }
+                }
                 else if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login) && !OpenWithoutActiveConnection(chosen))
                 {
                     ShowMessage("The query could not be opened in a new tab (see the log).");
