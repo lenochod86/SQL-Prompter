@@ -22,6 +22,8 @@ namespace SqlPrompter.Ssms
         private readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 6, 0, 0) };
         private HistoryView view = HistoryView.All;
         private MenuItem versionsMenu;
+        private Button openButton;
+        private MenuItem openItem;
 
         public HistoryWindow()
         {
@@ -53,7 +55,8 @@ namespace SqlPrompter.Ssms
                 return item;
             }
 
-            menu.Items.Add(Entry("Open In New Tab", Choose));
+            openItem = Entry("Open In New Tab", Choose);
+            menu.Items.Add(openItem);
             menu.Items.Add(Entry("Pin / Unpin", TogglePin));
             menu.Items.Add(Entry("Favourite / Unfavourite", ToggleFavourite));
             menu.Items.Add(new Separator());
@@ -69,7 +72,22 @@ namespace SqlPrompter.Ssms
                     clicked.IsSelected = true;
                 }
             };
-            list.SelectionChanged += (s, e) => ShowPreview();
+            list.SelectionChanged += (s, e) =>
+            {
+                ShowPreview();
+                // An entry of a tab that is open goes to that tab (#375).
+                var open = (list.SelectedItem as Row)?.Entry;
+                var goTo = open != null && open.Kind == HistoryKind.Tab && !open.ClosedAtUtc.HasValue && !string.IsNullOrEmpty(open.Key);
+                if (openButton != null)
+                {
+                    openButton.Content = goTo ? "Go To Tab" : "Open In New Tab";
+                }
+
+                if (openItem != null)
+                {
+                    openItem.Header = goTo ? "Go To Tab" : "Open In New Tab";
+                }
+            };
             list.MouseDoubleClick += (s, e) => Choose();
             list.KeyDown += (s, e) =>
             {
@@ -149,7 +167,8 @@ namespace SqlPrompter.Ssms
 
             var bottom = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
-            buttons.Children.Add(SnippetUi.Button("Open In New Tab", Choose));
+            openButton = SnippetUi.Button("Open In New Tab", Choose);
+            buttons.Children.Add(openButton);
             buttons.Children.Add(SnippetUi.Button("Pin / Unpin", TogglePin));
             buttons.Children.Add(SnippetUi.Button("Favourite / Unfavourite", ToggleFavourite));
             buttons.Children.Add(SnippetUi.Button("Make A Snippet", () =>

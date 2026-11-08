@@ -79,6 +79,7 @@ namespace SqlPrompter.Core.History
         /// <summary>The tab as a row of the history window: the latest text, the time of the last change and its versions.</summary>
         public HistoryEntry ToEntry() => new HistoryEntry(Id, LatestText, Server, Database, Login, LastChangeUtc, ClosedAtUtc, Name, File)
         {
+            Key = Key,
             Kind = HistoryKind.Tab,
             Versions = Versions.ToList().AsReadOnly(),
             Pinned = Pinned,
@@ -428,6 +429,53 @@ namespace SqlPrompter.Core.History
                 }
 
                 return removed;
+            }
+        }
+
+        /// <summary>
+        /// A window that was opened from the history entry of this tab continues the record (#375): its key becomes the name of the new document, it is
+        /// open again, its versions go on, and no second record is made for it. Returns the name of the tab (the caption it should show), or null when
+        /// there is no such record.
+        /// </summary>
+        public string Rebind(string id, string newKey, DateTime nowUtc)
+        {
+            lock (sync)
+            {
+                var tab = tabs.FirstOrDefault(t => t.Id == id);
+                if (tab == null || string.IsNullOrEmpty(newKey))
+                {
+                    return null;
+                }
+
+                // Another open record with the same document is a leftover of the same work; the record the user chose wins.
+                var other = FindOpen(newKey);
+                if (other != null && other != tab)
+                {
+                    other.ClosedAtUtc = nowUtc;
+                    other.Key = string.Empty;
+                    Append(new Record { Kind = "close", Id = other.Id, At = FormatTime(nowUtc) });
+                }
+
+                tab.Adoptable = false;
+                tab.ClosedAtUtc = null;
+                tab.Key = newKey;
+                tab.PendingText = null;
+                Append(new Record { Kind = "open", Id = tab.Id, Key = tab.Key });
+                return tab.Name;
+            }
+        }
+
+        /// <summary>
+        /// The id of the tab record a run of the history belongs to (the run only knows the name of its window): the latest record with that name that has the
+        /// text among its versions, on the same server and database. Null when there is none.
+        /// </summary>
+        public string FindForRun(string tabName, string text, string server, string database)
+        {
+            lock (sync)
+            {
+                var found = tabs.LastOrDefault(t => !string.IsNullOrEmpty(tabName) && string.Equals(t.Name, tabName, StringComparison.OrdinalIgnoreCase) &&
+                    t.Server == (server ?? string.Empty) && t.Database == (database ?? string.Empty) && t.Versions.Any(v => v.Text == text));
+                return found?.Id;
             }
         }
 

@@ -240,6 +240,7 @@ namespace SqlPrompter.Ssms
                 ActiveEditor.SetOwner(window);
                 window.ShowDialog();
                 var chosen = window.Chosen;
+                var before = (GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveDocument?.FullName;
                 if (chosen != null && window.MakeSnippet)
                 {
                     var draft = SqlPrompter.Core.Snippets.Snippet.Create(string.Empty, string.Empty, SqlPrompter.Core.Snippets.SnippetText.BodyFromSelection(chosen.Text));
@@ -247,9 +248,14 @@ namespace SqlPrompter.Ssms
                     ActiveEditor.SetOwner(manager);
                     manager.ShowDialog();
                 }
+                else if (chosen != null && GoToTabOfEntry(chosen))
+                {
+                    // The entry is of a tab that is open: that tab is in front (#375), no second tab and no second record.
+                }
                 else if (chosen != null && OpenFileOfEntry(chosen))
                 {
                     // The file of the tab was opened (#372).
+                    BindOpenedWindow(chosen, before);
                 }
                 else if (chosen != null && !string.IsNullOrEmpty(chosen.Server) && !string.IsNullOrEmpty(chosen.Login) &&
                     !string.Equals(chosen.Server, SsmsConnection.GetActiveOfWindow()?.Server, StringComparison.OrdinalIgnoreCase))
@@ -259,16 +265,62 @@ namespace SqlPrompter.Ssms
                     {
                         ShowMessage("The query could not be opened in a new tab (see the log).");
                     }
+                    else
+                    {
+                        BindOpenedWindow(chosen, before);
+                    }
                 }
                 else if (chosen != null && !SsmsConnection.OpenNewWindow(chosen.Database, chosen.Text, chosen.Server, chosen.Login) && !OpenWithoutActiveConnection(chosen))
                 {
                     ShowMessage("The query could not be opened in a new tab (see the log).");
+                }
+                else if (chosen != null)
+                {
+                    BindOpenedWindow(chosen, before);
                 }
             }
             catch (Exception ex)
             {
                 Log.Error("Opening the query history failed", ex);
                 ShowMessage("Opening the query history failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// An entry of a tab that is open right now (the Open tabs view) goes to that tab (#375) instead of opening a copy. False when the tab is not open (any more),
+        /// then the entry is opened as before. An older version of a tab is always opened as text.
+        /// </summary>
+        private static bool GoToTabOfEntry(SqlPrompter.Core.History.HistoryEntry chosen)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            return chosen.Kind == SqlPrompter.Core.History.HistoryKind.Tab && !chosen.FromOlderVersion && !chosen.ClosedAtUtc.HasValue && !string.IsNullOrEmpty(chosen.Key) &&
+                TabSessionService.Current != null && TabSessionService.Current.ActivateDocument(chosen.Key);
+        }
+
+        /// <summary>
+        /// The window that was opened from the entry continues the tab record of the entry (#375): the history keeps one entry, and the window gets the name of the
+        /// record as its caption. Nothing is bound when no new window came to the front (the user cancelled).
+        /// </summary>
+        private static void BindOpenedWindow(SqlPrompter.Core.History.HistoryEntry chosen, string documentBefore)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var document = (GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveDocument?.FullName;
+                if (string.IsNullOrEmpty(document) || (string.Equals(document, documentBefore, StringComparison.OrdinalIgnoreCase) && !string.Equals(document, chosen.File, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return;
+                }
+
+                var name = TabHistoryService.Bind(chosen, document);
+                if (name != null)
+                {
+                    TabSessionService.Current?.AdoptName(document, name);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Continuing the tab of a history entry failed", ex);
             }
         }
 

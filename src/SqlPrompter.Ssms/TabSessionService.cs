@@ -61,6 +61,42 @@ namespace SqlPrompter.Ssms
         /// <summary>SSMS is shutting down or a shutdown has begun: the closing of the windows is not the user's doing.</summary>
         public bool IsShuttingDown => shuttingDown || shutdown.Pending;
 
+        /// <summary>The window of the document gets the name of its history record as the caption and as its name (#375): the history keeps one title for the work.</summary>
+        public void AdoptName(string document, string name)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (string.IsNullOrEmpty(document) || string.IsNullOrWhiteSpace(name) || string.Equals(name, System.IO.Path.GetFileName(document), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            names[document] = name;
+            TabCaption.Apply(document, name);
+        }
+
+        /// <summary>Brings the open window of the document to the front; false when there is none (it was closed meanwhile).</summary>
+        public bool ActivateDocument(string document)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                foreach (Document known in dte.Documents.Cast<Document>().ToList())
+                {
+                    if (string.Equals(known.FullName, document, StringComparison.OrdinalIgnoreCase) && known.Windows.Count > 0 && !IsClosedWindow(known))
+                    {
+                        known.Activate();
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Activating the tab of a history entry failed", ex);
+            }
+
+            return false;
+        }
+
         /// <summary>The name the user gave the tab of the document, or null.</summary>
         public string NameOf(string document) => document != null && names.TryGetValue(document, out var name) ? name : null;
 
