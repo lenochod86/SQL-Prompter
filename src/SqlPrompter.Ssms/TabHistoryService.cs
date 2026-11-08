@@ -36,6 +36,30 @@ namespace SqlPrompter.Ssms
         /// <summary>The tabs as rows of the history window.</summary>
         public static IReadOnlyList<HistoryEntry> Entries => ready ? Store.Entries() : new HistoryEntry[0];
 
+        /// <summary>
+        /// The window <paramref name="document"/> was opened from a history entry (#375): the tab record of the entry (for a run, the one its window had) continues
+        /// in it, so the history keeps one entry for the work. Returns the name of the tab (null when there is no record to continue); call on the UI thread.
+        /// </summary>
+        public static string Bind(HistoryEntry entry, string document)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (!ready || entry == null || string.IsNullOrEmpty(document))
+            {
+                return null;
+            }
+
+            var id = entry.Kind == HistoryKind.Tab ? entry.Id : Store.FindForRun(entry.Tab, entry.Text, entry.Server, entry.Database);
+            if (id == null)
+            {
+                return null;
+            }
+
+            var name = Store.Tabs.FirstOrDefault(t => t.Id == id)?.Name;
+            var now = DateTime.UtcNow;
+            Enqueue(() => Store.Rebind(id, document, now));
+            return name;
+        }
+
         public static void Delete(IEnumerable<string> ids) => Store.Delete(ids);
 
         public static void SetPinned(IEnumerable<string> ids, bool pinned) => Store.SetPinned(ids, pinned);
