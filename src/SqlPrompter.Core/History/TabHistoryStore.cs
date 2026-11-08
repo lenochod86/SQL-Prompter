@@ -45,6 +45,9 @@ namespace SqlPrompter.Core.History
 
         public string Server { get; internal set; }
 
+        /// <summary>The SQL login of the tab (null for Windows authentication or when unknown); never a password.</summary>
+        public string Login { get; internal set; }
+
         public string Database { get; internal set; }
 
         public DateTime OpenedAtUtc { get; }
@@ -71,7 +74,7 @@ namespace SqlPrompter.Core.History
         internal bool Adoptable { get; set; }
 
         /// <summary>The tab as a row of the history window: the latest text, the time of the last change and its versions.</summary>
-        public HistoryEntry ToEntry() => new HistoryEntry(Id, LatestText, Server, Database, null, LastChangeUtc, ClosedAtUtc, Name)
+        public HistoryEntry ToEntry() => new HistoryEntry(Id, LatestText, Server, Database, Login, LastChangeUtc, ClosedAtUtc, Name)
         {
             Kind = HistoryKind.Tab,
             Versions = Versions.ToList().AsReadOnly(),
@@ -188,7 +191,7 @@ namespace SqlPrompter.Core.History
                         case "tab":
                             if (tab == null && TryParseTime(record.At, out at))
                             {
-                                tab = new TabRecord(record.Id, record.Key, record.Name, record.Server, record.Database, at);
+                                tab = new TabRecord(record.Id, record.Key, record.Name, record.Server, record.Database, at) { Login = record.Login };
                                 byId[record.Id] = tab;
                                 loaded.Add(tab);
                             }
@@ -205,6 +208,7 @@ namespace SqlPrompter.Core.History
                             if (tab != null)
                             {
                                 tab.Server = record.Server ?? tab.Server;
+                                tab.Login = record.Login ?? tab.Login;
                                 tab.Database = record.Database ?? tab.Database;
                                 tab.Name = record.Name ?? tab.Name;
                             }
@@ -266,7 +270,7 @@ namespace SqlPrompter.Core.History
         /// it was restored from); a change of text is stored as a version once it has stayed unchanged for one check and the minimum interval has
         /// passed. An empty tab is not stored. Returns true when something was written.
         /// </summary>
-        public bool Track(string key, string name, string server, string database, string text, DateTime nowUtc)
+        public bool Track(string key, string name, string server, string database, string text, DateTime nowUtc, string login = null)
         {
             lock (sync)
             {
@@ -290,14 +294,14 @@ namespace SqlPrompter.Core.History
                         return true;
                     }
 
-                    tab = new TabRecord(Guid.NewGuid().ToString("N"), key, name, server, database, nowUtc);
+                    tab = new TabRecord(Guid.NewGuid().ToString("N"), key, name, server, database, nowUtc) { Login = login };
                     tabs.Add(tab);
-                    Append(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Database = tab.Database, At = FormatTime(nowUtc) });
+                    Append(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Login = tab.Login, Database = tab.Database, At = FormatTime(nowUtc) });
                     tab.PendingText = text;
                     return true;
                 }
 
-                var written = UpdateConnection(tab, name, server, database);
+                var written = UpdateConnection(tab, name, server, database, login);
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     return written;
@@ -425,20 +429,21 @@ namespace SqlPrompter.Core.History
         private TabRecord FindOpen(string key) =>
             tabs.LastOrDefault(t => !t.ClosedAtUtc.HasValue && string.Equals(t.Key, key ?? string.Empty, StringComparison.OrdinalIgnoreCase));
 
-        private bool UpdateConnection(TabRecord tab, string name, string server, string database)
+        private bool UpdateConnection(TabRecord tab, string name, string server, string database, string login)
         {
             server = server ?? string.Empty;
             database = database ?? string.Empty;
             name = name ?? string.Empty;
-            if (tab.Server == server && tab.Database == database && tab.Name == name)
+            if (tab.Server == server && tab.Database == database && tab.Name == name && (login == null || tab.Login == login))
             {
                 return false;
             }
 
             tab.Server = server;
+            tab.Login = login ?? tab.Login;
             tab.Database = database;
             tab.Name = name;
-            Append(new Record { Kind = "meta", Id = tab.Id, Server = server, Database = database, Name = name });
+            Append(new Record { Kind = "meta", Id = tab.Id, Server = server, Login = tab.Login, Database = database, Name = name });
             return true;
         }
 
@@ -478,7 +483,7 @@ namespace SqlPrompter.Core.History
                 var lines = new List<string>();
                 foreach (var tab in tabs)
                 {
-                    lines.Add(Serialize(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Database = tab.Database, At = FormatTime(tab.OpenedAtUtc) }));
+                    lines.Add(Serialize(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Login = tab.Login, Database = tab.Database, At = FormatTime(tab.OpenedAtUtc) }));
                     lines.AddRange(tab.Versions.Select(v => Serialize(new Record { Kind = "ver", Id = tab.Id, At = FormatTime(v.AtUtc), Text = v.Text })));
                     if (tab.ClosedAtUtc.HasValue)
                     {
@@ -560,6 +565,9 @@ namespace SqlPrompter.Core.History
 
             [DataMember(Name = "server", EmitDefaultValue = false)]
             public string Server { get; set; }
+
+            [DataMember(Name = "login", EmitDefaultValue = false)]
+            public string Login { get; set; }
 
             [DataMember(Name = "database", EmitDefaultValue = false)]
             public string Database { get; set; }

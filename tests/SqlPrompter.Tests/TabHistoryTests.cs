@@ -203,6 +203,19 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void TheSqlLoginOfATabIsKeptAndGivenToTheEntry()
+        {
+            var store = NewStore();
+            store.Track("a.sql", "a", "srv2", "db", "SELECT 1", T0, "claude");
+            store.Close("a.sql", T0.AddMinutes(1));
+
+            Assert.Equal("claude", store.Entries().Single().Login);
+            var again = NewStore();
+            again.Load();
+            Assert.Equal("claude", again.Entries().Single().Login);
+        }
+
+        [Fact]
         public void ChangingTheConnectionUpdatesTheTab()
         {
             var store = NewStore();
