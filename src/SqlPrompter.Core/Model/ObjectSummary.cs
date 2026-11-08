@@ -84,9 +84,46 @@ namespace SqlPrompter.Core.Model
                 return null;
             }
 
-            return new ObjectSummary(
-                new[] { "Column Name", "Data Type", "Nullability" },
-                columns.Select(c => new[] { c.Name, c.TypeName, c.IsNullable ? "null" : "not null" }).ToList());
+            var rows = columns.Select(c => new[] { c.Name, c.TypeName, c.IsNullable ? "null" : "not null" }).ToList();
+            if (dbObject.Kind == DbObjectKind.Table)
+            {
+                AddKeysAndIndexes(rows, metadata, dbObject);
+            }
+
+            return new ObjectSummary(new[] { "Column Name", "Data Type", "Nullability" }, rows);
+        }
+
+        /// <summary>Below the columns of a table: its primary key, the foreign keys in both directions and its indexes (#351), as rows of the same grid.</summary>
+        private static void AddKeysAndIndexes(List<string[]> rows, IDatabaseMetadata metadata, DbObject table)
+        {
+            var extra = new List<string[]>();
+            var primaryKey = metadata.GetPrimaryKey(table);
+            if (primaryKey != null && primaryKey.Count > 0)
+            {
+                extra.Add(new[] { "Primary key", string.Join(", ", primaryKey), string.Empty });
+            }
+
+            string Name(int id) { var o = metadata.Objects.FirstOrDefault(x => x.Id == id); return o == null ? "?" : o.Schema + "." + o.Name; }
+            foreach (var key in (metadata.ForeignKeys ?? new DbForeignKey[0]).Where(k => k.ChildObjectId == table.Id))
+            {
+                extra.Add(new[] { "Foreign key", string.Join(", ", key.Columns.Select(c => c.Column)) + " → " + Name(key.ReferencedObjectId) + " (" + string.Join(", ", key.Columns.Select(c => c.ReferencedColumn)) + ")", key.Name });
+            }
+
+            foreach (var key in (metadata.ForeignKeys ?? new DbForeignKey[0]).Where(k => k.ReferencedObjectId == table.Id && k.ChildObjectId != table.Id))
+            {
+                extra.Add(new[] { "Referenced by", Name(key.ChildObjectId) + " (" + string.Join(", ", key.Columns.Select(c => c.Column)) + ")", key.Name });
+            }
+
+            foreach (var index in (metadata.Indexes ?? new DbIndex[0]).Where(i => string.Equals(i.Table, table.Name, StringComparison.OrdinalIgnoreCase) && string.Equals(i.Schema, table.Schema, StringComparison.OrdinalIgnoreCase)))
+            {
+                extra.Add(new[] { "Index", index.Name, index.TypeText });
+            }
+
+            if (extra.Count > 0)
+            {
+                rows.Add(new[] { string.Empty, string.Empty, string.Empty });
+                rows.AddRange(extra);
+            }
         }
 
         private static ObjectSummary OfParameters(IReadOnlyList<DbParameter> parameters)

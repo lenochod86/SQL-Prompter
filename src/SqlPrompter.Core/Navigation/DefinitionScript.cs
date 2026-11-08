@@ -26,6 +26,19 @@ namespace SqlPrompter.Core.Navigation
 
         /// <summary>"IDENTITY(1,1)" for an identity column, otherwise null.</summary>
         public string IdentityText { get; }
+
+        /// <summary>The collation of a character column when it differs from the one of the database; null otherwise.</summary>
+        public string Collation { get; set; }
+
+        /// <summary>The expression of a computed column (as stored, with its parentheses); null for an ordinary column.</summary>
+        public string ComputedText { get; set; }
+
+        public bool IsPersisted { get; set; }
+
+        /// <summary>The name and the expression of the default of the column; null for none.</summary>
+        public string DefaultName { get; set; }
+
+        public string DefaultText { get; set; }
     }
 
     /// <summary>Builds the scripts that F12 opens.</summary>
@@ -186,6 +199,126 @@ namespace SqlPrompter.Core.Navigation
             text.Append("\r\n);\r\n");
             return text.ToString();
         }
+
+        /// <summary>
+        /// The complete script of a table (#351), runnable on an empty database: <c>CREATE TABLE</c> with the columns (identity, computed columns,
+        /// collation where it differs, named defaults), the primary key, unique and check constraints; then the foreign keys as <c>ALTER TABLE</c>, the
+        /// indexes, and the triggers (each batch ends with <c>GO</c>). The tables that point to this one are listed as a comment.
+        /// </summary>
+        public static string ForTable(TableScriptModel table)
+        {
+            const string nl = "\r\n";
+            var lines = new List<string>();
+            foreach (var column in table.Columns)
+            {
+                lines.Add("    " + ColumnText(column));
+            }
+
+            foreach (var key in table.Indexes.Where(i => i.IsPrimaryKey || i.IsUniqueConstraint))
+            {
+                lines.Add("    CONSTRAINT " + Quote(key.Name) + (key.IsPrimaryKey ? " PRIMARY KEY " : " UNIQUE ") + (key.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
+                    + "(" + string.Join(", ", key.KeyColumns) + ")" + WithOptions(key));
+            }
+
+            foreach (var check in table.Checks)
+            {
+                lines.Add("    CONSTRAINT " + Quote(check.Name) + " CHECK " + Parenthesized(check.Definition));
+            }
+
+            var text = new StringBuilder();
+            var target = Quote(table.Schema) + "." + Quote(table.Name);
+            text.Append("CREATE TABLE ").Append(target).Append(nl).Append('(').Append(nl);
+            text.Append(string.Join("," + nl, lines));
+            text.Append(nl).Append(");").Append(nl);
+
+            foreach (var check in table.Checks.Where(c => c.IsDisabled))
+            {
+                text.Append("ALTER TABLE ").Append(target).Append(" NOCHECK CONSTRAINT ").Append(Quote(check.Name)).Append(';').Append(nl);
+            }
+
+            if (table.ForeignKeys.Count > 0)
+            {
+                text.Append(nl);
+            }
+
+            foreach (var fk in table.ForeignKeys)
+            {
+                text.Append("ALTER TABLE ").Append(target).Append(fk.IsNotTrusted ? " WITH NOCHECK" : " WITH CHECK").Append(" ADD CONSTRAINT ").Append(Quote(fk.Name))
+                    .Append(" FOREIGN KEY (").Append(string.Join(", ", fk.Columns.Select(Quote))).Append(") REFERENCES ")
+                    .Append(Quote(fk.ReferencedSchema)).Append('.').Append(Quote(fk.ReferencedTable)).Append(" (").Append(string.Join(", ", fk.ReferencedColumns.Select(Quote))).Append(')')
+                    .Append(Action(" ON DELETE ", fk.DeleteAction)).Append(Action(" ON UPDATE ", fk.UpdateAction))
+                    .Append(fk.IsNotForReplication ? " NOT FOR REPLICATION" : string.Empty).Append(';').Append(nl);
+                if (fk.IsDisabled)
+                {
+                    text.Append("ALTER TABLE ").Append(target).Append(" NOCHECK CONSTRAINT ").Append(Quote(fk.Name)).Append(';').Append(nl);
+                }
+            }
+
+            var indexes = table.Indexes.Where(i => !i.IsPrimaryKey && !i.IsUniqueConstraint).ToList();
+            if (indexes.Count > 0)
+            {
+                text.Append(nl);
+            }
+
+            foreach (var index in indexes)
+            {
+                text.Append("CREATE ").Append(index.IsUnique ? "UNIQUE " : string.Empty).Append(index.IsClustered ? "CLUSTERED" : "NONCLUSTERED").Append(" INDEX ").Append(Quote(index.Name))
+                    .Append(" ON ").Append(target).Append(" (").Append(string.Join(", ", index.KeyColumns)).Append(')');
+                if (index.IncludedColumns.Count > 0)
+                {
+                    text.Append(" INCLUDE (").Append(string.Join(", ", index.IncludedColumns)).Append(')');
+                }
+
+                if (!string.IsNullOrEmpty(index.Filter))
+                {
+                    text.Append(" WHERE ").Append(index.Filter);
+                }
+
+                text.Append(WithOptions(index)).Append(';').Append(nl);
+                if (index.IsDisabled)
+                {
+                    text.Append("ALTER INDEX ").Append(Quote(index.Name)).Append(" ON ").Append(target).Append(" DISABLE;").Append(nl);
+                }
+            }
+
+            foreach (var trigger in table.Triggers)
+            {
+                text.Append(nl).Append("GO").Append(nl).Append(WithoutLeadingBlankLines(trigger.Definition).TrimEnd()).Append(nl).Append("GO").Append(nl);
+            }
+
+            if (table.ReferencedBy.Count > 0)
+            {
+                text.Append(nl).Append("-- Referenced by: ").Append(string.Join(", ", table.ReferencedBy.Select(r => Quote(r.Schema) + "." + Quote(r.Table) + " (" + r.ForeignKey + ")"))).Append(nl);
+            }
+
+            return text.ToString();
+        }
+
+        private static string ColumnText(ScriptTableColumn column)
+        {
+            if (column.ComputedText != null)
+            {
+                return Quote(column.Name) + " AS " + Parenthesized(column.ComputedText) + (column.IsPersisted ? " PERSISTED" : string.Empty) + (column.IsNullable ? string.Empty : " NOT NULL");
+            }
+
+            return Quote(column.Name) + " " + column.TypeText
+                + (column.Collation != null ? " COLLATE " + column.Collation : string.Empty)
+                + (column.IdentityText != null ? " " + column.IdentityText : string.Empty)
+                + (column.IsNullable ? " NULL" : " NOT NULL")
+                + (column.DefaultText != null ? " CONSTRAINT " + Quote(column.DefaultName) + " DEFAULT " + Parenthesized(column.DefaultText) : string.Empty);
+        }
+
+        /// <summary>SQL Server stores an expression with its own parentheses; text without them gets them.</summary>
+        private static string Parenthesized(string expression)
+        {
+            expression = (expression ?? string.Empty).Trim();
+            return expression.StartsWith("(", StringComparison.Ordinal) && expression.EndsWith(")", StringComparison.Ordinal) ? expression : "(" + expression + ")";
+        }
+
+        private static string WithOptions(TableIndexScript index) => index.Options.Count == 0 ? string.Empty : " WITH (" + string.Join(", ", index.Options) + ")";
+
+        private static string Action(string prefix, string action) =>
+            string.IsNullOrEmpty(action) || action == "NO_ACTION" ? string.Empty : prefix + action.Replace('_', ' ');
 
         private static string Quote(string identifier) => "[" + (identifier ?? string.Empty).Replace("]", "]]") + "]";
     }
