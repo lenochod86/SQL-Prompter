@@ -551,3 +551,5 @@ Verified in SSMS 22.11 (VSIX 0.60.0): after `dbo.` the list opens; `ca` filters 
 **Solid red pin in the history (#338).** The pin on a pinned row uses the filled glyph `E841` (PinFill) of Segoe Fluent Icons / Segoe MDL2 Assets in red instead of the outline `E718`. Verified in SSMS 22 (2026-11-08, VSIX 0.137.0): pinned rows show a solid red pin.
 
 **Pin with a needle (#340).** The filled pin `E841` has no needle (it is a different shape from the outline `E718`), so the pin of a pinned history row is drawn as both glyphs on top of each other in the same red: solid with the needle. Verified in SSMS 22 (2026-11-08, VSIX 0.138.0).
+
+**History window layout (#342).** The view buttons (Everything, Runs, Pinned, Favourites, Open and Closed tabs) are in a row on the left under the search box and above the list; the buttons at the bottom have a gap above them. Verified in SSMS 22 (2026-11-08, VSIX 0.139.0).
