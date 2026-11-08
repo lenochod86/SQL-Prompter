@@ -62,11 +62,12 @@ namespace SqlPrompter.Ssms
             var database = connection?.Database;
             var key = document ?? string.Empty;
             var tab = TabName(key);
+            var file = FileOf(key);
             _ = Task.Run(() =>
             {
                 try
                 {
-                    var entry = Store.Add(text, server, database, login, DateTime.UtcNow, tab);
+                    var entry = Store.Add(text, server, database, login, DateTime.UtcNow, tab, file);
                     if (entry == null)
                     {
                         return;
@@ -87,6 +88,19 @@ namespace SqlPrompter.Ssms
                     Log.Error("Recording the query failed", ex);
                 }
             });
+        }
+
+        /// <summary>The file of the query window (a saved .sql document), empty for an unsaved window (#372).</summary>
+        internal static string FileOf(string document)
+        {
+            try
+            {
+                return SqlPrompter.Core.History.HistoryFile.OfDocument(document, !string.IsNullOrEmpty(document) && File.Exists(document), Path.GetTempPath());
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
         }
 
         /// <summary>The name of the query window: the file name of the document (SQLQuery1.sql, or the saved script).</summary>

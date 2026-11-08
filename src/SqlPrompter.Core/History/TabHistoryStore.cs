@@ -43,6 +43,9 @@ namespace SqlPrompter.Core.History
 
         public string Name { get; internal set; }
 
+        /// <summary>The full path of the file of the tab (a saved .sql document), empty for an unsaved tab; it stays after the tab is closed (#372).</summary>
+        public string File { get; internal set; } = string.Empty;
+
         public string Server { get; internal set; }
 
         /// <summary>The SQL login of the tab (null for Windows authentication or when unknown); never a password.</summary>
@@ -74,7 +77,7 @@ namespace SqlPrompter.Core.History
         internal bool Adoptable { get; set; }
 
         /// <summary>The tab as a row of the history window: the latest text, the time of the last change and its versions.</summary>
-        public HistoryEntry ToEntry() => new HistoryEntry(Id, LatestText, Server, Database, Login, LastChangeUtc, ClosedAtUtc, Name)
+        public HistoryEntry ToEntry() => new HistoryEntry(Id, LatestText, Server, Database, Login, LastChangeUtc, ClosedAtUtc, Name, File)
         {
             Kind = HistoryKind.Tab,
             Versions = Versions.ToList().AsReadOnly(),
@@ -191,7 +194,7 @@ namespace SqlPrompter.Core.History
                         case "tab":
                             if (tab == null && TryParseTime(record.At, out at))
                             {
-                                tab = new TabRecord(record.Id, record.Key, record.Name, record.Server, record.Database, at) { Login = record.Login };
+                                tab = new TabRecord(record.Id, record.Key, record.Name, record.Server, record.Database, at) { Login = record.Login, File = record.File ?? string.Empty };
                                 byId[record.Id] = tab;
                                 loaded.Add(tab);
                             }
@@ -211,6 +214,7 @@ namespace SqlPrompter.Core.History
                                 tab.Login = record.Login ?? tab.Login;
                                 tab.Database = record.Database ?? tab.Database;
                                 tab.Name = record.Name ?? tab.Name;
+                                tab.File = record.File ?? tab.File;
                             }
 
                             break;
@@ -270,7 +274,7 @@ namespace SqlPrompter.Core.History
         /// it was restored from); a change of text is stored as a version once it has stayed unchanged for one check and the minimum interval has
         /// passed. An empty tab is not stored. Returns true when something was written.
         /// </summary>
-        public bool Track(string key, string name, string server, string database, string text, DateTime nowUtc, string login = null)
+        public bool Track(string key, string name, string server, string database, string text, DateTime nowUtc, string login = null, string file = null)
         {
             lock (sync)
             {
@@ -289,19 +293,20 @@ namespace SqlPrompter.Core.History
                         tab.ClosedAtUtc = null;
                         tab.Key = key ?? string.Empty;
                         tab.Name = name ?? string.Empty;
+                        tab.File = file ?? string.Empty;
                         Append(new Record { Kind = "open", Id = tab.Id, Key = tab.Key });
-                        Append(new Record { Kind = "meta", Id = tab.Id, Name = tab.Name });
+                        Append(new Record { Kind = "meta", Id = tab.Id, Name = tab.Name, File = tab.File.Length > 0 ? tab.File : null });
                         return true;
                     }
 
-                    tab = new TabRecord(Guid.NewGuid().ToString("N"), key, name, server, database, nowUtc) { Login = login };
+                    tab = new TabRecord(Guid.NewGuid().ToString("N"), key, name, server, database, nowUtc) { Login = login, File = file ?? string.Empty };
                     tabs.Add(tab);
-                    Append(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Login = tab.Login, Database = tab.Database, At = FormatTime(nowUtc) });
+                    Append(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Login = tab.Login, Database = tab.Database, File = tab.File.Length > 0 ? tab.File : null, At = FormatTime(nowUtc) });
                     tab.PendingText = text;
                     return true;
                 }
 
-                var written = UpdateConnection(tab, name, server, database, login);
+                var written = UpdateConnection(tab, name, server, database, login, file);
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     return written;
@@ -429,21 +434,23 @@ namespace SqlPrompter.Core.History
         private TabRecord FindOpen(string key) =>
             tabs.LastOrDefault(t => !t.ClosedAtUtc.HasValue && string.Equals(t.Key, key ?? string.Empty, StringComparison.OrdinalIgnoreCase));
 
-        private bool UpdateConnection(TabRecord tab, string name, string server, string database, string login)
+        private bool UpdateConnection(TabRecord tab, string name, string server, string database, string login, string file)
         {
             server = server ?? string.Empty;
             database = database ?? string.Empty;
             name = name ?? string.Empty;
-            if (tab.Server == server && tab.Database == database && tab.Name == name && (login == null || tab.Login == login))
+            file = file ?? string.Empty;
+            if (tab.Server == server && tab.Database == database && tab.Name == name && tab.File == file && (login == null || tab.Login == login))
             {
                 return false;
             }
 
+            tab.File = file;
             tab.Server = server;
             tab.Login = login ?? tab.Login;
             tab.Database = database;
             tab.Name = name;
-            Append(new Record { Kind = "meta", Id = tab.Id, Server = server, Login = tab.Login, Database = database, Name = name });
+            Append(new Record { Kind = "meta", Id = tab.Id, Server = server, Login = tab.Login, Database = database, Name = name, File = file.Length > 0 ? file : null });
             return true;
         }
 
@@ -483,7 +490,7 @@ namespace SqlPrompter.Core.History
                 var lines = new List<string>();
                 foreach (var tab in tabs)
                 {
-                    lines.Add(Serialize(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Login = tab.Login, Database = tab.Database, At = FormatTime(tab.OpenedAtUtc) }));
+                    lines.Add(Serialize(new Record { Kind = "tab", Id = tab.Id, Key = tab.Key, Name = tab.Name, Server = tab.Server, Login = tab.Login, Database = tab.Database, File = tab.File.Length > 0 ? tab.File : null, At = FormatTime(tab.OpenedAtUtc) }));
                     lines.AddRange(tab.Versions.Select(v => Serialize(new Record { Kind = "ver", Id = tab.Id, At = FormatTime(v.AtUtc), Text = v.Text })));
                     if (tab.ClosedAtUtc.HasValue)
                     {
@@ -571,6 +578,9 @@ namespace SqlPrompter.Core.History
 
             [DataMember(Name = "database", EmitDefaultValue = false)]
             public string Database { get; set; }
+
+            [DataMember(Name = "file", EmitDefaultValue = false)]
+            public string File { get; set; }
 
             [DataMember(Name = "at", EmitDefaultValue = false)]
             public string At { get; set; }

@@ -247,6 +247,10 @@ namespace SqlPrompter.Ssms
                     ActiveEditor.SetOwner(manager);
                     manager.ShowDialog();
                 }
+                else if (chosen != null && OpenFileOfEntry(chosen))
+                {
+                    // The file of the tab was opened (#372).
+                }
                 else if (chosen != null && !string.IsNullOrEmpty(chosen.Server) && !string.IsNullOrEmpty(chosen.Login) &&
                     !string.Equals(chosen.Server, SsmsConnection.GetActiveOfWindow()?.Server, StringComparison.OrdinalIgnoreCase))
                 {
@@ -265,6 +269,71 @@ namespace SqlPrompter.Ssms
             {
                 Log.Error("Opening the query history failed", ex);
                 ShowMessage("Opening the query history failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// An entry of a tab that was a file opens the file again (#372): the file when it still has the text of the entry, the file or the text (the user
+        /// chooses, the file is the default) when the file changed since; a file that is gone is announced in the status bar and the text opens as before.
+        /// An older version of a tab always opens as text. False when the entry is to be opened as text in a new tab.
+        /// </summary>
+        private bool OpenFileOfEntry(SqlPrompter.Core.History.HistoryEntry chosen)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (string.IsNullOrEmpty(chosen.File) || chosen.FromOlderVersion)
+            {
+                return false;
+            }
+
+            string fileText = null;
+            try
+            {
+                fileText = System.IO.File.Exists(chosen.File) ? System.IO.File.ReadAllText(chosen.File) : null;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reading the file of a history entry failed", ex);
+            }
+
+            var action = SqlPrompter.Core.History.HistoryFile.Decide(chosen.File, fileText, chosen.Text);
+            if (action == SqlPrompter.Core.History.HistoryOpenAction.FileMissingOpenText)
+            {
+                SetStatus("SQL Prompter: the file " + chosen.File + " of this entry is gone; its text is opened in a new tab.");
+                return false;
+            }
+
+            if (action == SqlPrompter.Core.History.HistoryOpenAction.OpenFileOrText)
+            {
+                var answer = System.Windows.Forms.MessageBox.Show(
+                    "The file " + chosen.File + " has changed since this entry was recorded.\n\nYes: open the file\nNo: open the text of the history entry in a new tab",
+                    "SQL Prompter", System.Windows.Forms.MessageBoxButtons.YesNoCancel, System.Windows.Forms.MessageBoxIcon.Question, System.Windows.Forms.MessageBoxDefaultButton.Button1);
+                if (answer == System.Windows.Forms.DialogResult.Cancel)
+                {
+                    return true;
+                }
+
+                if (answer == System.Windows.Forms.DialogResult.No)
+                {
+                    return false;
+                }
+            }
+
+            var tab = new SqlPrompter.Core.History.SavedTab { File = chosen.File, Server = chosen.Server, Database = chosen.Database, Login = chosen.Login };
+            if (TabSessionService.Current == null || !TabSessionService.Current.OpenFileTab(tab))
+            {
+                SetStatus("SQL Prompter: the file " + chosen.File + " could not be opened; its text is opened in a new tab.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void SetStatus(string message)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsStatusbar)) is Microsoft.VisualStudio.Shell.Interop.IVsStatusbar statusBar)
+            {
+                statusBar.SetText(message);
             }
         }
 

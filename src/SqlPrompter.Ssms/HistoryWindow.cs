@@ -193,7 +193,7 @@ namespace SqlPrompter.Ssms
                 var item = new MenuItem { Header = picked.AtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "  (" + picked.Text.Length + " characters)" };
                 item.Click += (sender, args) =>
                 {
-                    Chosen = new HistoryEntry(entry.Id, picked.Text, entry.Server, entry.Database, null, picked.AtUtc, entry.ClosedAtUtc, entry.Tab) { Kind = HistoryKind.Tab };
+                    Chosen = new HistoryEntry(entry.Id, picked.Text, entry.Server, entry.Database, entry.Login, picked.AtUtc, entry.ClosedAtUtc, entry.Tab, entry.File) { Kind = HistoryKind.Tab, FromOlderVersion = true };
                     Close();
                 };
                 item.MouseEnter += (sender, args) => preview.PlainText = picked.Text;
@@ -433,6 +433,7 @@ namespace SqlPrompter.Ssms
             public string Tooltip =>
                 TabName + (Entry.Kind == HistoryKind.Tab ? "\nLast change: " : "\nRun: ") + Entry.RanAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "\n" +
                 (Entry.ClosedAtUtc.HasValue ? "Tab closed: " + Entry.ClosedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") : "Tab is still open") +
+                (Entry.File.Length > 0 ? "\nFile: " + Entry.File : string.Empty) +
                 "\nServer: " + Entry.Server + "\nDatabase: " + Entry.Database + (Entry.Pinned ? "\nPinned" : string.Empty) + (Entry.Favourite ? "\nFavourite" : string.Empty);
         }
     }
