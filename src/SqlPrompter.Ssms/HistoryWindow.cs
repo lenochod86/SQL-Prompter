@@ -104,24 +104,26 @@ namespace SqlPrompter.Ssms
             var root = new Grid { Margin = new Thickness(12) };
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var heading = new DockPanel { LastChildFill = true };
-            var views = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            DockPanel.SetDock(views, Dock.Right);
+            // The view buttons sit under the search box and above the list they filter (#342).
+            var views = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 6) };
             views.Children.Add(ViewButton("\uE72C", "Everything: tabs and runs", HistoryView.All, true));
             views.Children.Add(ViewButton("\uE768", "Executed queries (runs)", HistoryView.Runs, false));
             views.Children.Add(ViewButton("\uE718", "Pinned runs", HistoryView.Pinned, false));
             views.Children.Add(ViewButton("\uE734", "Favourites", HistoryView.Favourites, false));
             views.Children.Add(ViewButton("\uE838", "Open tabs", HistoryView.Open, false));
             views.Children.Add(ViewButton("\uE8B7", "Closed tabs", HistoryView.Closed, false));
-            heading.Children.Add(views);
             var hint = SnippetUi.Label("Type words to filter (text, tab, server, database). Enter or a double click opens the query in a new tab; Esc closes.");
             hint.VerticalAlignment = VerticalAlignment.Center;
             heading.Children.Add(hint);
             root.Children.Add(heading);
             Grid.SetRow(filter, 1);
             root.Children.Add(filter);
+            Grid.SetRow(views, 2);
+            root.Children.Add(views);
 
             var middle = new Grid();
             middle.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.4, GridUnitType.Star), MinWidth = 150 });
@@ -141,10 +143,10 @@ namespace SqlPrompter.Ssms
             middle.Children.Add(splitter);
             Grid.SetColumn(preview, 2);
             middle.Children.Add(preview);
-            Grid.SetRow(middle, 2);
+            Grid.SetRow(middle, 3);
             root.Children.Add(middle);
 
-            var bottom = new StackPanel();
+            var bottom = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             buttons.Children.Add(SnippetUi.Button("Open In New Tab", Choose));
             buttons.Children.Add(SnippetUi.Button("Pin / Unpin", TogglePin));
@@ -162,7 +164,7 @@ namespace SqlPrompter.Ssms
             buttons.Children.Add(SnippetUi.Button("Close", Close));
             bottom.Children.Add(buttons);
             bottom.Children.Add(status);
-            Grid.SetRow(bottom, 3);
+            Grid.SetRow(bottom, 4);
             root.Children.Add(bottom);
             Content = root;
 
