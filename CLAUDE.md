@@ -97,6 +97,7 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
 - New commands go into the SQL Prompter menu (`SqlPrompterCommands.vsct`).
 - Cover every new context in `ContextAnalyzer` with a test that marks the caret with `|`. Every bug fix has a test that catches the bug.
 - Follow the style of the surrounding code.
+- **Themes.** SSMS has light and dark themes (and others); the user works in the dark one. Every window, control, color and icon must follow the theme of SSMS (`VSColorTheme` / `EnvironmentColors`, `VsBrushes` for WPF, `WinFormsTheme.Apply` for WinForms windows, `SnippetUi` for WPF windows) and be checked in the **dark and the light** theme where the change is visual. Never hard-code a color that only works on one background; derive it from the theme. A WinForms control that does not look right in one theme is a bug.
 
 ## Build and versions
 
@@ -109,7 +110,7 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
 
 ## Environments
 
-- **Locally on Windows:** the VSIX can be built and installed into SSMS 22. You may install and uninstall the VSIX yourself (VSIXInstaller from the SSMS installation, with SSMS closed) and drive SSMS to verify your work: start it, connect to the test instance, take screenshots and read the log. Ask before changing SSMS configuration beyond that, and before closing an SSMS window that may hold the user's unsaved work. Never touch the user's own servers. A SQL Server test instance runs in Docker on `localhost,1433`; use the `test-database` skill (`.claude/skills/test-database/`) to create test databases and data yourself.
+- **Locally on Windows:** the VSIX can be built and installed into SSMS 22. You may install and uninstall the VSIX yourself (VSIXInstaller from the SSMS installation, with SSMS closed) and drive SSMS to verify your work: start it, connect to the test instance, take screenshots and read the log. Ask before changing SSMS configuration beyond that, and before closing an SSMS window that may hold the user's unsaved work. **Exception: switching the SSMS color theme (Tools > Options > Environment > General) to check a window in the light and the dark theme is allowed without asking; switch it back to the user's theme (dark) when done.** The SSMS you start from the scripts uses the same settings as the user's own: do not start it or install a VSIX while the user's own SSMS is running. Never touch the user's own servers. A SQL Server test instance runs in Docker on `localhost,1433`; use the `test-database` skill (`.claude/skills/test-database/`) to create test databases and data yourself.
 - **In the cloud:** neither SSMS nor the VSIX build is available. Work on Core, Metadata and tests; CI builds the VSIX for pull requests that have the label `build-vsix` (`.github/workflows/build.yml`); branch pushes without a pull request are not built, so open a pull request or run the workflow manually.
 - **From mobile:** the user may not have SSMS at hand. Ask for SSMS results as a screenshot or the log (`%LOCALAPPDATA%\SqlPrompter\sqlprompter.log`).
 
