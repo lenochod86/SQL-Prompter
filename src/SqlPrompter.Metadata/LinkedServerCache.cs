@@ -57,6 +57,9 @@ namespace SqlPrompter.Metadata
         /// <summary>The state of the objects of a database of a linked server.</summary>
         public LinkedLoadStatus StatusOfDatabase(string server, string database) => StatusOf("D|" + server + "|" + database);
 
+        /// <summary>The state of the columns of a table of a linked server.</summary>
+        public LinkedLoadStatus StatusOfColumns(string server, string database, string schema, string table) => StatusOf("C|" + server + "|" + database + "|" + schema + "|" + table);
+
         private LinkedLoadStatus StatusOf(string key)
         {
             if (!entries.TryGetValue(key, out var entry))
