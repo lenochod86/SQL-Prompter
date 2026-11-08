@@ -250,7 +250,15 @@ namespace SqlPrompter.Metadata
 
         /// <summary>Linked servers reachable from this connection; the database of the connection does not matter.</summary>
         public LinkedServerCache GetLinkedServers(ConnectionSettings settings) =>
-            linkedServers.GetOrAdd(settings.WithDatabase(string.Empty).CacheKey, _ => new LinkedServerCache(log));
+            linkedServers.GetOrAdd(settings.WithDatabase(string.Empty).CacheKey, _ =>
+            {
+                var created = new LinkedServerCache(log);
+                created.Loaded += (s, e) => LinkedServerLoaded?.Invoke(this, EventArgs.Empty);
+                return created;
+            });
+
+        /// <summary>Raised (on a background thread) when any lazy load of a linked server has finished (#357).</summary>
+        public event EventHandler LinkedServerLoaded;
 
         public DatabaseMetadataCache Get(ConnectionSettings settings) =>
             caches.GetOrAdd(settings.CacheKey, _ => new DatabaseMetadataCache(log));

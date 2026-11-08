@@ -36,6 +36,9 @@ namespace SqlPrompter.Ssms
         [Import]
         internal MetadataService Metadata { get; set; }
 
+        [Import]
+        internal IAsyncCompletionBroker Broker { get; set; }
+
         /// <summary>The provider the editor created, so that <see cref="InvokedList"/> reaches the source of a view.</summary>
         internal static SqlCompletionSourceProvider Current { get; private set; }
 
@@ -45,7 +48,7 @@ namespace SqlPrompter.Ssms
         }
 
         public IAsyncCompletionSource GetOrCreate(ITextView textView) =>
-            textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionSource(Metadata, textView));
+            textView.Properties.GetOrCreateSingletonProperty(() => new SqlCompletionSource(Metadata, textView, Broker));
     }
 
     /// <summary>
@@ -103,14 +106,79 @@ namespace SqlPrompter.Ssms
             [SuggestionKind.Index] = Icon(KnownMonikers.Key, "Index"),
         };
 
+        /// <summary>Item property: the item only says that something is loading or failed; choosing it inserts nothing.</summary>
+        internal const string LoadingKey = "SqlPrompter.Loading";
+
         private readonly MetadataService service;
         private readonly ITextView textView;
+        private readonly IAsyncCompletionBroker broker;
         private Prepared pending;
 
-        public SqlCompletionSource(MetadataService service, ITextView textView)
+        /// <summary>The last list was built while a part of a linked server was loading: when the load finishes the list is made again (#357).</summary>
+        private volatile bool waitingForLinked;
+
+        public SqlCompletionSource(MetadataService service, ITextView textView, IAsyncCompletionBroker broker = null)
         {
             this.service = service;
             this.textView = textView;
+            this.broker = broker;
+            if (service != null)
+            {
+                service.LinkedServerLoaded += OnLinkedLoaded;
+                textView.Closed += (s, e) => service.LinkedServerLoaded -= OnLinkedLoaded;
+            }
+        }
+
+        private void OnLinkedLoaded(object sender, EventArgs e)
+        {
+            if (!waitingForLinked)
+            {
+                return;
+            }
+
+#pragma warning disable VSSDK007 // fire and forget on purpose: the load finished on a background thread
+            ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                RefreshAfterLoad();
+            }).Task.FileAndForget("SqlPrompter/LinkedRefresh");
+#pragma warning restore VSSDK007
+        }
+
+        /// <summary>
+        /// The load of a linked server has finished: the list that was open shows the new items without being closed by the user. The list of our own
+        /// (<see cref="InvokedList"/>) asks the source again; the editor's session, whose items cannot be replaced from outside, is replaced by our list at the caret.
+        /// </summary>
+        private void RefreshAfterLoad()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (!waitingForLinked || !(textView is Microsoft.VisualStudio.Text.Editor.IWpfTextView view))
+                {
+                    return;
+                }
+
+                var own = InvokedList.Of(view);
+                if (own != null && own.IsOpen)
+                {
+                    waitingForLinked = false;
+                    own.Reload();
+                    return;
+                }
+
+                var session = broker?.GetSession(view);
+                if (session != null && !session.IsDismissed)
+                {
+                    waitingForLinked = false;
+                    session.Dismiss();
+                    InvokedList.Open(view);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Refreshing the list after a linked server load failed", ex);
+            }
         }
 
         public CompletionStartData InitializeCompletion(CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
@@ -178,7 +246,26 @@ namespace SqlPrompter.Ssms
             script = ScriptModel.Build(prepared.Batch, prepared.CaretInBatch);
             RequestScriptColumns(prepared, script);
             options = SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(prepared.RemoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor);
-            return SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, options).Select(s => ToItem(s, prepared)).ToImmutableArray();
+            var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, options).Select(s => ToItem(s, prepared)).ToList();
+            waitingForLinked = prepared.LinkedStatus != null && prepared.LinkedStatus.IsLoading;
+            if (prepared.LinkedStatus != null && !prepared.LinkedStatus.IsDone)
+            {
+                items.Insert(0, LoadingItem(prepared));
+            }
+
+            return items.ToImmutableArray();
+        }
+
+        /// <summary>The first item while a part of a linked server loads, or when the load failed (#357); it cannot be chosen.</summary>
+        private CompletionItem LoadingItem(Prepared prepared)
+        {
+            var failed = prepared.LinkedStatus.Error != null;
+            var text = failed ? "Could not load the " + prepared.LinkedWhat + ": " + prepared.LinkedStatus.Error : "Loading the " + prepared.LinkedWhat + "...";
+            var typed = prepared.Context.TypedPrefix ?? string.Empty;
+            var item = new CompletionItem(text, this, Icon(failed ? KnownMonikers.StatusWarning : KnownMonikers.Refresh, failed ? "Failed" : "Loading"), Filters, string.Empty, string.Empty, "\u0001", typed, ImmutableArray<ImageElement>.Empty);
+            item.Properties.AddProperty(LoadingKey, true);
+            item.Properties.AddProperty(DescriptionKey, failed ? "The linked server could not be read. The list asks again after a minute." : "The list updates itself when the linked server has answered; typing is never blocked.");
+            return item;
         }
 
         /// <summary>
@@ -289,6 +376,8 @@ namespace SqlPrompter.Ssms
             }
 
             var usedDatabase = SqlBatch.FindUsedDatabase(snapshot, triggerLocation.Position);
+            LinkedLoadStatus linkedStatus = null;
+            string linkedWhat = null;
             var metadata = PrepareMetadata(context, usedDatabase, out var cache, out var loader);
             if (ForeignDatabase.TryResolve(context, metadata, out var otherDatabase, out var insideDatabase))
             {
@@ -303,12 +392,17 @@ namespace SqlPrompter.Ssms
             {
                 // Srv.|, Srv.Db.| : names of a linked server, loaded lazily in the background (nothing until then).
                 context = insideLinked;
-                metadata = service.LinkedMetadata(linkedServer, linkedDatabase);
+                metadata = service.LinkedMetadata(linkedServer, linkedDatabase, out linkedStatus);
+                linkedWhat = linkedDatabase == null ? "databases of " + linkedServer : "objects of " + linkedServer + "." + linkedDatabase;
                 cache = null;
                 loader = null;
             }
 
-            prepared = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart));
+            prepared = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart))
+            {
+                LinkedStatus = linkedStatus,
+                LinkedWhat = linkedWhat,
+            };
             return new CompletionStartData(
                 CompletionParticipation.ProvidesItems,
                 new SnapshotSpan(snapshot, batchStart + context.ReplaceStart, context.ReplaceLength));
@@ -509,6 +603,12 @@ namespace SqlPrompter.Ssms
 
             public string Batch { get; }
 
+            /// <summary>The state of the lazy load behind a linked server name, or null when the position has nothing to do with a linked server.</summary>
+            public LinkedLoadStatus LinkedStatus { get; set; }
+
+            /// <summary>What the load is about, for the text of the item: "databases of Srv", "objects of Srv.Db".</summary>
+            public string LinkedWhat { get; set; }
+
             public EditorLayout Editor { get; }
 
             public Func<TableSource, IReadOnlyList<DbColumn>> RemoteColumns { get; }
@@ -596,6 +696,12 @@ namespace SqlPrompter.Ssms
         internal static CommitResult Commit(ITextView view, ITrackingSpan applicable, ITextBuffer buffer, CompletionItem item, char typedChar)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            if (item.Properties.ContainsProperty(SqlCompletionSource.LoadingKey))
+            {
+                // The note that something loads is no suggestion: nothing is inserted (the list stays for Enter and Tab, the typed character goes on).
+                return typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' ? new CommitResult(isHandled: true, CommitBehavior.CancelCommit) : CloseWithoutInserting;
+            }
+
             // A space typed while nothing has been typed yet (the list opened after a comma) only closes the list.
             if (typedChar == ' ' && applicable.GetSpan(buffer.CurrentSnapshot).Length == 0)
             {

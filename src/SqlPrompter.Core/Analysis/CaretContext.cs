@@ -262,6 +262,9 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>The qualifier started with a database name that was removed from it (three-part name); the metadata is that database's.</summary>
         public bool InOtherDatabase { get; internal set; }
 
+        /// <summary>A dotted prefix (a database, a linked server and its database) was taken off the qualifier: a name part is expected, so no snippets and keywords (#357).</summary>
+        public bool AfterDot { get; internal set; }
+
         /// <summary>
         /// A SELECT list without any FROM: columns of all tables are offered and choosing one adds the FROM.
         /// </summary>
@@ -356,6 +359,7 @@ namespace SqlPrompter.Core.Analysis
             ModuleHeaderStart = ModuleHeaderStart,
             ExcludedColumns = ExcludedColumns,
             InOtherDatabase = inOtherDatabase,
+            AfterDot = true,
         };
 
         public override string ToString() => Kind + " [" + string.Join(".", Qualifier) + "] '" + TypedPrefix + "'";
