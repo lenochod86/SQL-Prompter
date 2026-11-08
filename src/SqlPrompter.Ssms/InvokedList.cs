@@ -121,6 +121,14 @@ namespace SqlPrompter.Ssms
 
         internal bool IsOpen => suggestions != null;
 
+        /// <summary>The items are made again at once (after a lazy load has finished), keeping the list, the typed text and the position of the caret (#357).</summary>
+        internal void Reload()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            deleted = true;
+            LookAgain();
+        }
+
         /// <summary>The list of a view, or null when none was ever opened in it.</summary>
         internal static InvokedList Of(ITextView view) => view.Properties.TryGetProperty(typeof(InvokedList), out InvokedList list) ? list : null;
 

@@ -7,6 +7,29 @@ using SqlPrompter.Core.Model;
 
 namespace SqlPrompter.Metadata
 {
+    /// <summary>Where the lazy load of a part of a linked server stands.</summary>
+    public sealed class LinkedLoadStatus
+    {
+        public static readonly LinkedLoadStatus Done = new LinkedLoadStatus(false, null);
+
+        public static readonly LinkedLoadStatus Loading = new LinkedLoadStatus(true, null);
+
+        private LinkedLoadStatus(bool isLoading, string error)
+        {
+            IsLoading = isLoading;
+            Error = error;
+        }
+
+        public static LinkedLoadStatus Failed(string error) => new LinkedLoadStatus(false, error);
+
+        public bool IsLoading { get; }
+
+        /// <summary>Why the load failed, or null.</summary>
+        public string Error { get; }
+
+        public bool IsDone => !IsLoading && Error == null;
+    }
+
     /// <summary>
     /// What is known about the linked servers reachable from one connection. Nothing is loaded up front: the databases of a server
     /// are requested when its name is typed, the objects of a database when the database is chosen, the columns of a table when
@@ -23,6 +46,34 @@ namespace SqlPrompter.Metadata
         {
             this.log = log ?? (_ => { });
             this.clock = clock ?? (() => DateTime.UtcNow);
+        }
+
+        /// <summary>Raised (on a background thread) when a load has finished, successfully or not: an open list asks again then (#357).</summary>
+        public event EventHandler Loaded;
+
+        /// <summary>The state of the databases of a linked server.</summary>
+        public LinkedLoadStatus StatusOfServer(string server) => StatusOf("S|" + server);
+
+        /// <summary>The state of the objects of a database of a linked server.</summary>
+        public LinkedLoadStatus StatusOfDatabase(string server, string database) => StatusOf("D|" + server + "|" + database);
+
+        private LinkedLoadStatus StatusOf(string key)
+        {
+            if (!entries.TryGetValue(key, out var entry))
+            {
+                return LinkedLoadStatus.Loading;
+            }
+
+            lock (entry)
+            {
+                if (entry.Result != null)
+                {
+                    return LinkedLoadStatus.Done;
+                }
+
+                var loading = entry.Loading != null && !entry.Loading.IsCompleted;
+                return !loading && entry.Error != null ? LinkedLoadStatus.Failed(entry.Error) : LinkedLoadStatus.Loading;
+            }
         }
 
         /// <summary>After a failure the next attempt for the same thing waits this long.</summary>
@@ -72,20 +123,26 @@ namespace SqlPrompter.Metadata
                                 lock (entry)
                                 {
                                     entry.Result = result;
+                                    entry.Error = null;
                                 }
 
                                 log("Linked server: loaded " + what + ".");
                             }
+
+                            Loaded?.Invoke(this, EventArgs.Empty);
                         }
                         catch (Exception ex)
                         {
                             lock (entry)
                             {
                                 entry.LastFailure = clock();
+                                entry.Error = ex is OperationCanceledException ? "timed out" : ex.Message;
                             }
 
                             log("Linked server: loading " + what + " failed: " + ex.Message);
                         }
+
+                        Loaded?.Invoke(this, EventArgs.Empty);
                     });
                 }
 
@@ -98,6 +155,7 @@ namespace SqlPrompter.Metadata
             public object Result;
             public Task Loading;
             public DateTime LastFailure = DateTime.MinValue;
+            public string Error;
         }
     }
 }

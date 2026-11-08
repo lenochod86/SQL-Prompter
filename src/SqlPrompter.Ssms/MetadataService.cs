@@ -16,7 +16,11 @@ namespace SqlPrompter.Ssms
         public MetadataService()
         {
             Current = this;
+            Caches.LinkedServerLoaded += (s, e) => LinkedServerLoaded?.Invoke(this, e);
         }
+
+        /// <summary>Raised on a background thread when a lazy load of a linked server has finished (#357); an open list asks again.</summary>
+        public event System.EventHandler LinkedServerLoaded;
 
         /// <summary>Instance for the package commands; null until MEF creates the service.</summary>
         public static MetadataService Current { get; private set; }
@@ -60,6 +64,14 @@ namespace SqlPrompter.Ssms
         public RemoteSnapshot LinkedMetadata(string server, string database)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            return LinkedMetadata(server, database, out _);
+        }
+
+        /// <summary>As above, with the state of the load (loading, failed with a reason, done) for the indication in the list.</summary>
+        public RemoteSnapshot LinkedMetadata(string server, string database, out LinkedLoadStatus status)
+        {
+            status = LinkedLoadStatus.Loading;
+            ThreadHelper.ThrowIfNotOnUIThread();
             var settings = SsmsConnection.GetActive();
             if (settings == null || !settings.CanConnect)
             {
@@ -68,7 +80,9 @@ namespace SqlPrompter.Ssms
 
             var linked = Caches.GetLinkedServers(settings);
             var loader = CreateLoader(settings);
-            return database == null ? linked.GetServer(server, loader) : linked.GetDatabase(server, database, loader);
+            var loaded = database == null ? linked.GetServer(server, loader) : linked.GetDatabase(server, database, loader);
+            status = loaded != null ? LinkedLoadStatus.Done : database == null ? linked.StatusOfServer(server) : linked.StatusOfDatabase(server, database);
+            return loaded;
         }
 
         /// <summary>

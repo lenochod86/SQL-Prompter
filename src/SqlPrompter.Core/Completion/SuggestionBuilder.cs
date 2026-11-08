@@ -468,7 +468,7 @@ namespace SqlPrompter.Core.Completion
         /// </summary>
         private static IEnumerable<Suggestion> SnippetSuggestions(CaretContext context, SuggestionOptions options)
         {
-            if (context.Qualifier.Count > 0)
+            if (context.Qualifier.Count > 0 || context.AfterDot)
             {
                 yield break;
             }

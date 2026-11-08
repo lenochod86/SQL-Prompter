@@ -235,6 +235,56 @@ namespace SqlPrompter.Tests
             Assert.True(loader.Cancelled);
         }
 
+        [Fact]
+        public void NoSnippetsAreOfferedAfterADot()
+        {
+            var snippets = new[] { SqlPrompter.Core.Snippets.Snippet.Create("ij", "inner join", "INNER JOIN") };
+            var options = new SqlPrompter.Core.Completion.SuggestionOptions(SqlPrompter.Core.Settings.KeywordCase.MatchTyped, null, null, null, snippets);
+
+            // Remote1.Crm.| while the objects load (no metadata yet) and after they are loaded: names only.
+            Assert.True(LinkedServerName.TryResolve(Analyze("SELECT * FROM Remote1.Crm.|"), Current(), out _, out _, out var inside));
+            Assert.Empty(SuggestionBuilder.Build(inside, null, null, options));
+            Assert.DoesNotContain(SuggestionBuilder.Build(inside, RemoteDb(), null, options), i => i.Kind == SuggestionKind.Snippet || i.Kind == SuggestionKind.Keyword);
+
+            Assert.True(LinkedServerName.TryResolve(Analyze("SELECT * FROM Remote1.|"), Current(), out _, out _, out var server));
+            Assert.Empty(SuggestionBuilder.Build(server, null, null, options));
+
+            // Where a name may start the snippets are still offered.
+            Assert.Contains(SuggestionBuilder.Build(Analyze("SELECT * FROM |"), Current(), null, options), i => i.Kind == SuggestionKind.Snippet);
+        }
+
+        [Fact]
+        public async Task TheCacheSaysWhenALoadHasFinishedAndWhereItStands()
+        {
+            var loader = new FakeLinked();
+            var cache = new LinkedServerCache();
+            var finished = new TaskCompletionSource<bool>();
+            cache.Loaded += (s, e) => finished.TrySetResult(true);
+
+            Assert.Null(cache.GetServer("Remote1", loader));
+            Assert.True(cache.StatusOfServer("Remote1").IsLoading);
+            Assert.True(await Task.WhenAny(finished.Task, Task.Delay(5000)) == finished.Task);
+
+            Assert.True(cache.StatusOfServer("Remote1").IsDone);
+            Assert.NotNull(cache.GetServer("Remote1", loader));
+        }
+
+        [Fact]
+        public async Task AFailedLoadIsReportedWithItsReason()
+        {
+            var loader = new FakeLinked { Fail = true };
+            var cache = new LinkedServerCache();
+            var finished = new TaskCompletionSource<bool>();
+            cache.Loaded += (s, e) => finished.TrySetResult(true);
+
+            Assert.Null(cache.GetDatabase("Remote1", "Crm", loader));
+            Assert.True(await Task.WhenAny(finished.Task, Task.Delay(5000)) == finished.Task);
+
+            var status = cache.StatusOfDatabase("Remote1", "Crm");
+            Assert.False(status.IsLoading);
+            Assert.False(status.IsDone);
+            Assert.Equal("linked server down", status.Error);
+        }
         private sealed class FakeLinked : IMetadataLoader
         {
             private readonly SemaphoreSlim called = new SemaphoreSlim(0);
