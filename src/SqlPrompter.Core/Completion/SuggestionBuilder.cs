@@ -172,19 +172,92 @@ namespace SqlPrompter.Core.Completion
         {
             options = options ?? SuggestionOptions.Default;
             var suggestions = BuildCore(context, metadata, script ?? ScriptModel.Empty, options);
-            var keywordCase = options.KeywordCase;
-            return keywordCase == KeywordCase.MatchTyped ? suggestions : suggestions.Select(s => ForceCase(s, keywordCase)).ToList();
+            var cases = CasesOf(options);
+            return cases == null ? suggestions : suggestions.Select(s => ForceCase(s, cases)).ToList();
         }
 
-        private static Suggestion ForceCase(Suggestion s, KeywordCase keywordCase)
+        /// <summary>The case of keywords, built-in functions and data types: null leaves what the generators made (the case of the typed text).</summary>
+        private sealed class Cases
+        {
+            public Formatting.CaseStyle Keyword;
+            public Formatting.CaseStyle Function;
+            public Formatting.CaseStyle DataType;
+        }
+
+        private static Cases CasesOf(SuggestionOptions options)
+        {
+            switch (options.KeywordCase)
+            {
+                case KeywordCase.Upper:
+                    return new Cases { Keyword = Formatting.CaseStyle.Upper, Function = Formatting.CaseStyle.Upper, DataType = Formatting.CaseStyle.Upper };
+                case KeywordCase.Lower:
+                    return new Cases { Keyword = Formatting.CaseStyle.Lower, Function = Formatting.CaseStyle.Lower, DataType = Formatting.CaseStyle.Lower };
+                case KeywordCase.FollowStyle:
+                    var style = options.Editor.Style;
+                    return style == null ? null : new Cases { Keyword = style.KeywordCase, Function = style.FunctionCase, DataType = style.DataTypeCase };
+                default:
+                    return null;
+            }
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex Words = new System.Text.RegularExpressions.Regex(@"'[^']*'|\$[^$]*\$|[A-Za-z_][A-Za-z_0-9]*", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private static readonly HashSet<string> KeywordWords = new HashSet<string>(Keywords.All.SelectMany(k => k.Split(' ')), StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> FunctionWords = new HashSet<string>(Keywords.BuiltInFunctions, StringComparer.OrdinalIgnoreCase);
+
+        private static string ApplyCase(string text, Formatting.CaseStyle style) => style == Formatting.CaseStyle.Upper ? text.ToUpperInvariant() : style == Formatting.CaseStyle.Lower ? text.ToLowerInvariant() : text;
+
+        /// <summary>
+        /// Recases the words of an inserted keyword, function or type (a snippet field <c>$name$</c> and a string stay as they are). A keyword
+        /// suggestion that contains a word which is not a keyword (a column name in a fragment) is left as it is: the generator cased it.
+        /// </summary>
+        private static string Recase(string text, SuggestionKind kind, Cases cases)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            if (kind == SuggestionKind.Keyword && Words.Matches(text).Cast<System.Text.RegularExpressions.Match>().Any(m => (char.IsLetter(m.Value[0]) || m.Value[0] == '_') && !KeywordWords.Contains(m.Value)))
+            {
+                return text;
+            }
+
+            return Words.Replace(text, m =>
+            {
+                if (!char.IsLetter(m.Value[0]) && m.Value[0] != '_')
+                {
+                    return m.Value;
+                }
+
+                switch (kind)
+                {
+                    case SuggestionKind.Function:
+                        return ApplyCase(m.Value, FunctionWords.Contains(m.Value) ? cases.Function : cases.Keyword);
+                    case SuggestionKind.DataType:
+                        return ApplyCase(m.Value, cases.DataType);
+                    default:
+                        return ApplyCase(m.Value, cases.Keyword);
+                }
+            });
+        }
+
+        private static Suggestion ForceCase(Suggestion s, Cases cases)
         {
             if (s.IsBlock || (s.Kind != SuggestionKind.Keyword && s.Kind != SuggestionKind.Function && s.Kind != SuggestionKind.DataType))
             {
                 return s;
             }
 
-            string Convert(string text) => keywordCase == KeywordCase.Upper ? text.ToUpperInvariant() : text.ToLowerInvariant();
-            return new Suggestion(s.Kind, Convert(s.DisplayText), Convert(s.InsertText), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, s.Tag, s.CaretBack, s.BeforeLine, s.IsBlock).WithDefinition(s.DefinitionSchema, s.DefinitionName);
+            var tag = s.Tag;
+            if (tag is SqlPrompter.Core.Snippets.Snippet snippet && s.Kind == SuggestionKind.Function)
+            {
+                // The window function snippet: its body follows the same case (the $fields$ are kept).
+                tag = SqlPrompter.Core.Snippets.Snippet.Create(snippet.Prefix, snippet.Description, Recase(snippet.Body, s.Kind, cases), snippet.Placeholders);
+            }
+
+            return new Suggestion(s.Kind, Recase(s.DisplayText, s.Kind, cases), Recase(s.InsertText, s.Kind, cases), s.FilterText, s.Suffix, s.Description, s.Group, s.FromClause, s.Detail, s.Key, tag, s.CaretBack, s.BeforeLine, s.IsBlock).WithDefinition(s.DefinitionSchema, s.DefinitionName);
         }
 
         private static IReadOnlyList<Suggestion> BuildCore(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
@@ -836,19 +909,7 @@ namespace SqlPrompter.Core.Completion
                 return " " + quoted;
             }
 
-            string asKeyword;
-            switch (options.KeywordCase)
-            {
-                case KeywordCase.Lower:
-                    asKeyword = "as";
-                    break;
-                case KeywordCase.Upper:
-                    asKeyword = "AS";
-                    break;
-                default:
-                    asKeyword = "AS";
-                    break;
-            }
+var asKeyword = options.Kw("AS");
 
             return " " + asKeyword + " " + quoted;
         }

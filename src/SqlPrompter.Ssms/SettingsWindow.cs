@@ -138,8 +138,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.LooseMatching, v => work.Behavior.LooseMatching = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Rank by usage", "Items you choose more often come first in their group. The counts are kept on this computer only (%APPDATA%\\SqlPrompter\\usage.json); reset them with SQL Prompter > Reset Usage Statistics.",
                 () => work.Behavior.RankByUsage, v => work.Behavior.RankByUsage = v, () => work.Behavior.SuggestionsEnabled);
-            completion.Choice("Keyword case", "How keywords are inserted. \"Match what I typed\" inserts upper case, or lower case if you started typing in lower case.",
-                new[] { O(KeywordCase.MatchTyped, "Match what I typed"), O(KeywordCase.Upper, "UPPER CASE"), O(KeywordCase.Lower, "lower case") },
+            completion.Choice("Keyword case", "The case of the keywords, built-in functions and data types that are inserted. \"Follow the formatting style\" uses the case options of the active style; \"Match what I typed\" inserts upper case, or lower case if you started typing in lower case.",
+                new[] { O(KeywordCase.FollowStyle, "Follow the formatting style"), O(KeywordCase.MatchTyped, "Match what I typed"), O(KeywordCase.Upper, "UPPER CASE"), O(KeywordCase.Lower, "lower case") },
                 () => work.Behavior.KeywordCase, v => work.Behavior.KeywordCase = v, () => work.Behavior.SuggestionsEnabled);
             completion.Check("Show the column picker hint", "A line under the list that says Ctrl+Left switches to the column picker (Ctrl+Space opens the list).",
                 () => work.Behavior.ShowColumnPickerHint, v => work.Behavior.ShowColumnPickerHint = v, () => work.Behavior.SuggestionsEnabled);

@@ -9,5 +9,8 @@ namespace SqlPrompter.Core.Settings
         Upper,
 
         Lower,
+
+        /// <summary>The case of the active formatting style (keywords, built-in functions and data types each have their own); where the style leaves the case as written the typed text decides (#354).</summary>
+        FollowStyle,
     }
 }

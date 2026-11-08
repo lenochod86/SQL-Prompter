@@ -305,7 +305,7 @@ namespace SqlPrompter.Core.Settings
         private string KeywordCaseText
         {
             get => KeywordCase.ToString();
-            set => KeywordCase = Enum.TryParse(value, true, out KeywordCase parsed) ? parsed : KeywordCase.MatchTyped;
+            set => KeywordCase = Enum.TryParse(value, true, out KeywordCase parsed) ? parsed : KeywordCase.FollowStyle;
         }
 
         public CommitKeys ToCommitKeys() =>
@@ -326,7 +326,7 @@ namespace SqlPrompter.Core.Settings
             CommitOnParentheses = false;
             CommitOnSemicolon = false;
             CommitOnClosingBracket = false;
-            KeywordCase = KeywordCase.MatchTyped;
+            KeywordCase = KeywordCase.FollowStyle;
             LooseMatching = true;
             RankByUsage = true;
             AutoClose = true;

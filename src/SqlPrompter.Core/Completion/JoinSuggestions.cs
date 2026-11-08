@@ -71,9 +71,9 @@ namespace SqlPrompter.Core.Completion
         private const int GroupNamed = -1;
 
         /// <param name="pairs">(column of the new table, column of the other table).</param>
-        private static string Condition(IEnumerable<KeyValuePair<string, string>> pairs, string newReference, string otherReference, bool newTableOnLeft, bool quote) =>
+        private static string Condition(IEnumerable<KeyValuePair<string, string>> pairs, string newReference, string otherReference, bool newTableOnLeft, bool quote, string and = " AND ") =>
             string.Join(
-                " AND ",
+                and,
                 pairs.Select(p =>
                 {
                     var left = newReference + "." + SqlIdentifier.Quote(p.Key, quote);
@@ -140,7 +140,7 @@ namespace SqlPrompter.Core.Completion
                             covered.Add(p.Key + "|" + p.Value);
                         }
 
-                        var whole = Condition(pairs, targetReference, otherReference, options.Joins.NewTableOnLeft, quote);
+                        var whole = Condition(pairs, targetReference, otherReference, options.Joins.NewTableOnLeft, quote, " " + options.Kw("AND") + " ");
                         if (seen.Add(whole))
                         {
                             yield return ConditionItem(whole, fk.Name, "join by foreign key " + fk.Name, GroupKey);
@@ -150,7 +150,7 @@ namespace SqlPrompter.Core.Completion
                         {
                             foreach (var p in pairs)
                             {
-                                var single = Condition(new[] { p }, targetReference, otherReference, options.Joins.NewTableOnLeft, quote);
+                                var single = Condition(new[] { p }, targetReference, otherReference, options.Joins.NewTableOnLeft, quote, " " + options.Kw("AND") + " ");
                                 if (seen.Add(single))
                                 {
                                     yield return ConditionItem(single, fk.Name, "one column of the foreign key " + fk.Name, GroupPartialKey);
@@ -185,7 +185,7 @@ namespace SqlPrompter.Core.Completion
 
                     var keyColumn = targetPrimary.Contains(column.Name) || targetForeign.Contains(column.Name) ||
                         otherPrimary.Contains(match.Name) || otherForeign.Contains(match.Name);
-                    var text = Condition(new[] { new KeyValuePair<string, string>(column.Name, match.Name) }, targetReference, otherReference, options.Joins.NewTableOnLeft, quote);
+                    var text = Condition(new[] { new KeyValuePair<string, string>(column.Name, match.Name) }, targetReference, otherReference, options.Joins.NewTableOnLeft, quote, " " + options.Kw("AND") + " ");
                     if (seen.Add(text))
                     {
                         yield return ConditionItem(text, "same name", "columns with the same name", keyColumn ? GroupKeyNamed : GroupNamed);
@@ -217,8 +217,8 @@ namespace SqlPrompter.Core.Completion
             var alias = options.Aliases.AddAliases ? AliasGenerator.Generate(table.Name, used, options.Aliases) : null;
             var newReference = SqlIdentifier.Quote(alias ?? table.Name, quote);
             var existingReference = SqlIdentifier.Quote(source.ReferenceName, quote);
-            var condition = Condition(pairs, newReference, existingReference, options.Joins.NewTableOnLeft, quote);
-            var on = options.KeywordCase == KeywordCase.Lower ? "on" : "ON";
+            var condition = Condition(pairs, newReference, existingReference, options.Joins.NewTableOnLeft, quote, " " + options.Kw("AND") + " ");
+            var on = options.Kw("ON");
             var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(table.Schema, quote) + "." : string.Empty) +
                 SqlIdentifier.Quote(table.Name, quote) +
                 (alias != null ? SuggestionBuilder.AliasDefinition(alias, options, quote) : string.Empty) +
