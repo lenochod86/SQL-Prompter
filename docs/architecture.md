@@ -569,3 +569,7 @@ Verified in SSMS 22.11 (VSIX 0.60.0): after `dbo.` the list opens; `ca` filters 
 ### History entry of a tab on another server with a SQL login (#361)
 
 Opening such an entry through `OpenNewWindow` (a copy of the active window's connection info, with server and login replaced) opened SSMS with SQL Server Authentication and the login but did not connect, even with Remember Password ticked. The entry is now opened like a restored tab (`OpenSavedTab`: a fresh connection info with the live or remembered password, SSMS's Connect dialog otherwise). Verified in SSMS 22 with the front window on localhost,1433: the entry of localhost,1434 / claude opened connected (log: "connected as claude ... with the live connection of the same login").
+
+### Exact scroll range of the settings pages (#356)
+
+`SettingsPage` put the controls into a `FlowLayoutPanel` with `AutoScroll`, whose scroll range ignored the bottom padding and went wrong with wrapped texts. The flow now sizes itself (`AutoSize`, bottom padding 16) inside a plain scrolling `Panel`, so the range is exactly the height of the content. Verified in SSMS 22 (light theme, default window size, 100% DPI): the Completion page ends with the whole *Closing bracket ]* check box, the Aliases page with both grids fully visible, the History and tabs page right below its last option. Not verified: 125% and 150% DPI, the minimum window size and the dark theme.
