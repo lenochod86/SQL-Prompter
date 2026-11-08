@@ -90,7 +90,14 @@ namespace SqlPrompter.Ssms
                 }
 
                 var span = snapshot.CreateTrackingSpan(batchStart + info.Start, info.Length, SpanTrackingMode.EdgeInclusive);
-                var lines = text.Split('\n').Select(l => (object)new ClassifiedTextElement(new ClassifiedTextRun("natural language", l))).ToArray();
+                var lines = text.Split('\n').Select(l => (object)new ClassifiedTextElement(new ClassifiedTextRun("natural language", l))).ToList();
+                if (info.DescriptionObject != null && info.DescriptionColumn == null && cache?.Current is DatabaseSnapshot database)
+                {
+                    // The definition of the object below the short info, loaded in the background (#350).
+                    lines.Add(HoverDefinitionPanel.Create(new DefinitionRef(database.DatabaseName, info.DescriptionSchema, info.DescriptionObject),
+                        SqlPrompter.Core.Model.ObjectSummary.For(database, info.DescriptionSchema, info.DescriptionObject)));
+                }
+
                 return new QuickInfoItem(span, new ContainerElement(ContainerElementStyle.Stacked, lines));
             }
             catch (OperationCanceledException)
