@@ -23,7 +23,7 @@ namespace SqlPrompter.Ssms
 {
     /// <summary>
     /// Our own completion list (research #61). Each row shows the kind icon, the name with the typed text in bold,
-    /// a detail (column type) after it and the suffix (alias, schema, "SQL Prompter") on the right.
+    /// a detail (column type) after it and the suffix (alias, schema) on the right.
     /// Only <see cref="SqlCompletionPresenter.VisibleRows"/> rows exist, whatever the number of items, so thousands of items stay cheap.
     /// </summary>
     [Export(typeof(ICompletionPresenterProvider))]

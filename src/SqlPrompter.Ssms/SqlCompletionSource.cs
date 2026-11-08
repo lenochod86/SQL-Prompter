@@ -389,7 +389,7 @@ namespace SqlPrompter.Ssms
                 this,
                 Icons[suggestion.Kind],
                 Filters,
-                SettingsService.Current.Behavior.MarkItems ? suggestion.MarkedSuffix : suggestion.Suffix ?? string.Empty,
+                suggestion.Suffix ?? string.Empty,
                 suggestion.InsertText,
                 rank ? suggestion.RankedSortText(UsageService.Statistics.CountOf(usageKey)) : suggestion.SortText,
                 suggestion.FilterText,

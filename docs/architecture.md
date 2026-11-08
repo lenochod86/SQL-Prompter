@@ -573,3 +573,7 @@ Opening such an entry through `OpenNewWindow` (a copy of the active window's con
 ### Exact scroll range of the settings pages (#356)
 
 `SettingsPage` put the controls into a `FlowLayoutPanel` with `AutoScroll`, whose scroll range ignored the bottom padding and went wrong with wrapped texts. The flow now sizes itself (`AutoSize`, bottom padding 16) inside a plain scrolling `Panel`, so the range is exactly the height of the content. Verified in SSMS 22 (light theme, default window size, 100% DPI): the Completion page ends with the whole *Closing bracket ]* check box, the Aliases page with both grids fully visible, the History and tabs page right below its last option. Not verified: 125% and 150% DPI, the minimum window size and the dark theme.
+
+### The "SQL Prompter" marker was removed (#355)
+
+The setting *Mark items with "SQL Prompter"* (`Behavior.MarkItems`) and the marker text on the right of every item are gone (`Suggestion.MarkedSuffix`, `SuggestionBuilder.MarkerText`): our list is the only one shown, so the marker told nothing. The items keep their normal right-hand text (schema, alias, type). An old settings file with `markItems` loads without an error (the serializer ignores the unknown member) and the value is dropped at the next save.
