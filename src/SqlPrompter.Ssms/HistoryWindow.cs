@@ -114,7 +114,8 @@ namespace SqlPrompter.Ssms
             };
             PreviewKeyDown += (s, e) =>
             {
-                if (e.Key == Key.Escape)
+                // As a tab Esc is left to the editor and the rest of SSMS; the window closes with it as before.
+                if (e.Key == Key.Escape && Picked == null)
                 {
                     Close();
                 }
@@ -135,7 +136,7 @@ namespace SqlPrompter.Ssms
             views.Children.Add(ViewButton("\uE734", "Favourites", HistoryView.Favourites, false));
             views.Children.Add(ViewButton("\uE838", "Open tabs", HistoryView.Open, false));
             views.Children.Add(ViewButton("\uE8B7", "Closed tabs", HistoryView.Closed, false));
-            var hint = SnippetUi.Label("Type words to filter (text, tab, server, database). Enter or a double click opens the query in a new tab; Esc closes.");
+            var hint = SnippetUi.Label("Type words to filter (text, tab, server, database). Enter or a double click opens the query in a new tab.");
             hint.VerticalAlignment = VerticalAlignment.Center;
             heading.Children.Add(hint);
             root.Children.Add(heading);
@@ -175,13 +176,21 @@ namespace SqlPrompter.Ssms
             {
                 if (list.SelectedItem is Row picked)
                 {
-                    Chosen = picked.Entry;
-                    MakeSnippet = true;
-                    Close();
+                    Done(picked.Entry, true);
                 }
             }));
             buttons.Children.Add(SnippetUi.Button("Delete", Delete));
-            buttons.Children.Add(SnippetUi.Button("Close", Close));
+            buttons.Children.Add(SnippetUi.Button("Close", () =>
+            {
+                if (CloseRequested != null)
+                {
+                    CloseRequested();
+                }
+                else
+                {
+                    Close();
+                }
+            }));
             bottom.Children.Add(buttons);
             bottom.Children.Add(status);
             Grid.SetRow(bottom, 4);
@@ -191,6 +200,28 @@ namespace SqlPrompter.Ssms
             EnvironmentCache.Reset();
             Fill();
             Loaded += (s, e) => filter.Focus();
+        }
+
+        /// <summary>
+        /// Set when the content is hosted in a tab (#385): an entry that is chosen is handed over here and the history stays open; without it the window
+        /// closes with <see cref="Chosen"/> set, as before.
+        /// </summary>
+        internal Action<HistoryEntry, bool> Picked { get; set; }
+
+        /// <summary>Set when the content is hosted in a tab: what the Close button does (closes the tab).</summary>
+        internal Action CloseRequested { get; set; }
+
+        private void Done(HistoryEntry entry, bool makeSnippet)
+        {
+            if (Picked != null)
+            {
+                Picked(entry, makeSnippet);
+                return;
+            }
+
+            Chosen = entry;
+            MakeSnippet = makeSnippet;
+            Close();
         }
 
         /// <summary>The run the user chose, or null.</summary>
@@ -212,8 +243,7 @@ namespace SqlPrompter.Ssms
                 var item = new MenuItem { Header = picked.AtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + "  (" + picked.Text.Length + " characters)" };
                 item.Click += (sender, args) =>
                 {
-                    Chosen = new HistoryEntry(entry.Id, picked.Text, entry.Server, entry.Database, entry.Login, picked.AtUtc, entry.ClosedAtUtc, entry.Tab, entry.File) { Kind = HistoryKind.Tab, FromOlderVersion = true };
-                    Close();
+                    Done(new HistoryEntry(entry.Id, picked.Text, entry.Server, entry.Database, entry.Login, picked.AtUtc, entry.ClosedAtUtc, entry.Tab, entry.File) { Kind = HistoryKind.Tab, FromOlderVersion = true }, false);
                 };
                 item.MouseEnter += (sender, args) => preview.PlainText = picked.Text;
                 versionsMenu.Items.Add(item);
@@ -356,8 +386,7 @@ namespace SqlPrompter.Ssms
         {
             if (list.SelectedItem is Row row)
             {
-                Chosen = row.Entry;
-                Close();
+                Done(row.Entry, false);
             }
         }
 
