@@ -98,7 +98,7 @@ namespace SqlPrompter.Metadata
 
                 if (type == "U")
                 {
-                    var script = await BuildTableScriptAsync(connection, prefix, objectId, foundSchema, foundName, cancellationToken).ConfigureAwait(false);
+                    var script = await BuildTableScriptAsync(connection, prefix, database, objectId, foundSchema, foundName, cancellationToken).ConfigureAwait(false);
                     return new ObjectDefinition(database, foundSchema, foundName, type, script);
                 }
 
@@ -131,50 +131,198 @@ namespace SqlPrompter.Metadata
             }
         }
 
-        private static async Task<string> BuildTableScriptAsync(DbConnection connection, string prefix, int objectId, string schema, string name, CancellationToken cancellationToken)
+        private static async Task<string> BuildTableScriptAsync(DbConnection connection, string prefix, string database, int objectId, string schema, string name, CancellationToken cancellationToken)
         {
-            var columns = new List<ScriptTableColumn>();
+            var model = new TableScriptModel { Schema = schema, Name = name };
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = "SELECT c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable, "
-                    + "CASE WHEN ic.object_id IS NOT NULL THEN 'IDENTITY(' + CONVERT(varchar(40), ic.seed_value) + ',' + CONVERT(varchar(40), ic.increment_value) + ')' END "
+                    + "CASE WHEN ic.object_id IS NOT NULL THEN 'IDENTITY(' + CONVERT(varchar(40), ic.seed_value) + ',' + CONVERT(varchar(40), ic.increment_value) + ')' END, "
+                    + "CASE WHEN c.collation_name COLLATE DATABASE_DEFAULT <> (SELECT d.collation_name COLLATE DATABASE_DEFAULT FROM " + prefix + "sys.databases AS d WHERE d.name = @db) THEN c.collation_name END, "
+                    + "cc.definition, cc.is_persisted, dc.name, dc.definition "
                     + "FROM " + prefix + "sys.columns AS c JOIN " + prefix + "sys.types AS t ON t.user_type_id = c.user_type_id "
                     + "LEFT JOIN " + prefix + "sys.identity_columns AS ic ON ic.object_id = c.object_id AND ic.column_id = c.column_id "
+                    + "LEFT JOIN " + prefix + "sys.computed_columns AS cc ON cc.object_id = c.object_id AND cc.column_id = c.column_id "
+                    + "LEFT JOIN " + prefix + "sys.default_constraints AS dc ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id "
                     + "WHERE c.object_id = @id ORDER BY c.column_id";
                 Add(command, "@id", objectId);
+                Add(command, "@db", string.IsNullOrEmpty(database) ? connection.Database : database);
                 using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
                     while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
-                        columns.Add(new ScriptTableColumn(
+                        model.Columns.Add(new ScriptTableColumn(
                             reader.GetString(0),
                             SqlMetadataLoader.FormatType(reader.GetString(1), reader.GetInt16(2), reader.GetByte(3), reader.GetByte(4)),
                             reader.GetBoolean(5),
-                            reader.IsDBNull(6) ? null : reader.GetString(6)));
+                            reader.IsDBNull(6) ? null : reader.GetString(6))
+                        {
+                            Collation = reader.IsDBNull(7) ? null : reader.GetString(7),
+                            ComputedText = reader.IsDBNull(8) ? null : reader.GetString(8),
+                            IsPersisted = !reader.IsDBNull(9) && reader.GetBoolean(9),
+                            DefaultName = reader.IsDBNull(10) ? null : reader.GetString(10),
+                            DefaultText = reader.IsDBNull(11) ? null : reader.GetString(11),
+                        });
                     }
                 }
             }
 
-            string keyName = null;
-            var keyColumns = new List<string>();
+            // Primary key, unique constraints and the clustered and nonclustered indexes; the key columns come in key order, the included ones after them.
+            var indexes = new Dictionary<int, TableIndexScript>();
             using (var command = connection.CreateCommand())
             {
-                command.CommandText = "SELECT i.name, c.name FROM " + prefix + "sys.indexes AS i "
+                command.CommandText = "SELECT i.index_id, i.name, i.type, i.is_unique, i.is_primary_key, i.is_unique_constraint, i.has_filter, i.filter_definition, i.fill_factor, "
+                    + "i.is_padded, i.ignore_dup_key, i.allow_row_locks, i.allow_page_locks, i.is_disabled, c.name, ic.is_descending_key, ic.is_included_column "
+                    + "FROM " + prefix + "sys.indexes AS i "
                     + "JOIN " + prefix + "sys.index_columns AS ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id "
                     + "JOIN " + prefix + "sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id "
-                    + "WHERE i.object_id = @id AND i.is_primary_key = 1 AND ic.is_included_column = 0 ORDER BY ic.key_ordinal";
+                    + "WHERE i.object_id = @id AND i.type IN (1, 2) AND i.is_hypothetical = 0 "
+                    + "ORDER BY i.index_id, ic.is_included_column, ic.key_ordinal, ic.index_column_id";
                 Add(command, "@id", objectId);
                 using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
                     while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
-                        keyName = reader.GetString(0);
-                        keyColumns.Add(reader.GetString(1));
+                        var indexId = reader.GetInt32(0);
+                        if (!indexes.TryGetValue(indexId, out var index))
+                        {
+                            index = new TableIndexScript
+                            {
+                                Name = reader.GetString(1),
+                                IsClustered = reader.GetByte(2) == 1,
+                                IsUnique = reader.GetBoolean(3),
+                                IsPrimaryKey = reader.GetBoolean(4),
+                                IsUniqueConstraint = reader.GetBoolean(5),
+                                Filter = !reader.GetBoolean(6) || reader.IsDBNull(7) ? null : reader.GetString(7),
+                                IsDisabled = reader.GetBoolean(13),
+                            };
+                            var fillFactor = reader.GetByte(8);
+                            if (fillFactor > 0 && fillFactor < 100)
+                            {
+                                index.Options.Add("FILLFACTOR = " + fillFactor);
+                            }
+
+                            if (reader.GetBoolean(9))
+                            {
+                                index.Options.Add("PAD_INDEX = ON");
+                            }
+
+                            if (reader.GetBoolean(10))
+                            {
+                                index.Options.Add("IGNORE_DUP_KEY = ON");
+                            }
+
+                            if (!reader.GetBoolean(11))
+                            {
+                                index.Options.Add("ALLOW_ROW_LOCKS = OFF");
+                            }
+
+                            if (!reader.GetBoolean(12))
+                            {
+                                index.Options.Add("ALLOW_PAGE_LOCKS = OFF");
+                            }
+
+                            indexes[indexId] = index;
+                            model.Indexes.Add(index);
+                        }
+
+                        var column = "[" + reader.GetString(14).Replace("]", "]]") + "]";
+                        if (reader.GetBoolean(16))
+                        {
+                            index.IncludedColumns.Add(column);
+                        }
+                        else
+                        {
+                            index.KeyColumns.Add(column + (reader.GetBoolean(15) ? " DESC" : string.Empty));
+                        }
                     }
                 }
             }
 
-            return DefinitionScript.ForTable(schema, name, columns, keyName, keyColumns);
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT name, definition, is_disabled, is_not_trusted FROM " + prefix + "sys.check_constraints WHERE parent_object_id = @id ORDER BY name";
+                Add(command, "@id", objectId);
+                using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        model.Checks.Add(new TableCheckScript { Name = reader.GetString(0), Definition = reader.GetString(1), IsDisabled = reader.GetBoolean(2), IsNotTrusted = reader.GetBoolean(3) });
+                    }
+                }
+            }
+
+            var keys = new Dictionary<int, TableForeignKeyScript>();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT fk.object_id, fk.name, rs.name, ro.name, fk.delete_referential_action_desc, fk.update_referential_action_desc, fk.is_disabled, fk.is_not_trusted, "
+                    + "fk.is_not_for_replication, pc.name, rc.name "
+                    + "FROM " + prefix + "sys.foreign_keys AS fk "
+                    + "JOIN " + prefix + "sys.objects AS ro ON ro.object_id = fk.referenced_object_id "
+                    + "JOIN " + prefix + "sys.schemas AS rs ON rs.schema_id = ro.schema_id "
+                    + "JOIN " + prefix + "sys.foreign_key_columns AS fkc ON fkc.constraint_object_id = fk.object_id "
+                    + "JOIN " + prefix + "sys.columns AS pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id "
+                    + "JOIN " + prefix + "sys.columns AS rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id "
+                    + "WHERE fk.parent_object_id = @id ORDER BY fk.name, fkc.constraint_column_id";
+                Add(command, "@id", objectId);
+                using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        var keyId = reader.GetInt32(0);
+                        if (!keys.TryGetValue(keyId, out var key))
+                        {
+                            key = new TableForeignKeyScript
+                            {
+                                Name = reader.GetString(1),
+                                ReferencedSchema = reader.GetString(2),
+                                ReferencedTable = reader.GetString(3),
+                                DeleteAction = reader.GetString(4),
+                                UpdateAction = reader.GetString(5),
+                                IsDisabled = reader.GetBoolean(6),
+                                IsNotTrusted = reader.GetBoolean(7),
+                                IsNotForReplication = reader.GetBoolean(8),
+                            };
+                            keys[keyId] = key;
+                            model.ForeignKeys.Add(key);
+                        }
+
+                        key.Columns.Add(reader.GetString(9));
+                        key.ReferencedColumns.Add(reader.GetString(10));
+                    }
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT s.name, o.name, fk.name FROM " + prefix + "sys.foreign_keys AS fk "
+                    + "JOIN " + prefix + "sys.objects AS o ON o.object_id = fk.parent_object_id JOIN " + prefix + "sys.schemas AS s ON s.schema_id = o.schema_id "
+                    + "WHERE fk.referenced_object_id = @id AND fk.parent_object_id <> @id ORDER BY s.name, o.name, fk.name";
+                Add(command, "@id", objectId);
+                using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        model.ReferencedBy.Add(new TableReferencedBy { Schema = reader.GetString(0), Table = reader.GetString(1), ForeignKey = reader.GetString(2) });
+                    }
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT t.name, m.definition FROM " + prefix + "sys.triggers AS t JOIN " + prefix + "sys.sql_modules AS m ON m.object_id = t.object_id "
+                    + "WHERE t.parent_id = @id AND m.definition IS NOT NULL ORDER BY t.name";
+                Add(command, "@id", objectId);
+                using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        model.Triggers.Add(new TableTriggerScript { Name = reader.GetString(0), Definition = reader.GetString(1) });
+                    }
+                }
+            }
+
+            return DefinitionScript.ForTable(model);
         }
 
         private static void Add(DbCommand command, string name, object value)
