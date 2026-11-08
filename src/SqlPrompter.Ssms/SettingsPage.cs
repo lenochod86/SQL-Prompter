@@ -15,6 +15,7 @@ namespace SqlPrompter.Ssms
     {
         private const int TextWidth = 600;
         private readonly FlowLayoutPanel flow;
+        private readonly Panel scroller;
         private readonly List<Action> refreshers = new List<Action>();
         private readonly List<Action> commits = new List<Action>();
         private readonly List<Action> enablers = new List<Action>();
@@ -29,15 +30,19 @@ namespace SqlPrompter.Ssms
         {
             Dock = DockStyle.Fill;
             Title = title;
+            // The flow sizes itself to its content (so the scroll range is exactly its height, bottom padding included) and the panel around it scrolls (#356).
+            scroller = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
             flow = new FlowLayoutPanel
             {
-                Dock = DockStyle.Fill,
+                Location = Point.Empty,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
-                AutoScroll = true,
-                Padding = new Padding(14, 10, 14, 10),
+                Padding = new Padding(14, 10, 14, 16),
             };
-            Controls.Add(flow);
+            scroller.Controls.Add(flow);
+            Controls.Add(scroller);
             flow.Controls.Add(new Label { Text = title, AutoSize = true, Font = new Font(Font.FontFamily, Font.Size + 4, FontStyle.Bold), Margin = new Padding(0, 0, 0, 4) });
             if (intro != null)
             {
@@ -100,7 +105,7 @@ namespace SqlPrompter.Ssms
 
             panel.Controls.Add(header);
             Controls.Add(panel);
-            flow.BringToFront();
+            scroller.BringToFront();
         }
 
         private void RefreshPreview()
