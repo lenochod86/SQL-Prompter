@@ -28,6 +28,12 @@ namespace SqlPrompter.Core.Completion
 
         public KeywordCase KeywordCase { get; }
 
+        /// <summary>The case of a keyword the code writes itself (AS, ON, WHERE...): lower when the settings or the formatting style say so, otherwise upper.</summary>
+        public string Kw(string upperKeyword)
+        {
+            var lower = KeywordCase == KeywordCase.Lower || (KeywordCase == KeywordCase.FollowStyle && Editor.Style != null && Editor.Style.KeywordCase == SqlPrompter.Core.Formatting.CaseStyle.Lower);
+            return lower ? upperKeyword.ToLowerInvariant() : upperKeyword;
+        }
         public AliasSettings Aliases { get; }
 
         public JoinSettings Joins { get; }

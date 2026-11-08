@@ -24,7 +24,7 @@ namespace SqlPrompter.Tests
             Assert.False(behavior.CommitOnParentheses);
             Assert.False(behavior.CommitOnSemicolon);
             Assert.False(behavior.CommitOnClosingBracket);
-            Assert.Equal(KeywordCase.MatchTyped, behavior.KeywordCase);
+            Assert.Equal(KeywordCase.FollowStyle, behavior.KeywordCase);
             Assert.True(behavior.ToCommitKeys().Commits(' '));
             Assert.False(behavior.ToCommitKeys().Commits('.'));
         }

@@ -64,13 +64,15 @@ namespace SqlPrompter.Core.Completion
                 .Select(name => all.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
             var values = listed.Select(c => c == null ? "NULL" : SqlDefaults.ValueFor(c.TypeName, c.IsNullable)).ToList();
-            var valuesText = "VALUES" + InsertBuilder.ParenthesizedList(values, options.Inserts.Layout, editor, editor.LineIndent.Length + "VALUES".Length);
-            yield return new Suggestion(SuggestionKind.Keyword, "VALUES (...)", valuesText, "VALUES", null,
+            var valuesWord = options.Kw("VALUES");
+            var valuesText = valuesWord + InsertBuilder.ParenthesizedList(values, options.Inserts.Layout, editor, editor.LineIndent.Length + valuesWord.Length);
+            yield return new Suggestion(SuggestionKind.Keyword, valuesWord + " (...)", valuesText, "VALUES", null,
                 "one value per listed column of " + table + " by its type", Group, isBlock: true);
 
             var names = context.InsertTailColumns.Select(n => SqlIdentifier.Quote(n, quote)).ToList();
-            var selectText = "SELECT " + FormattedList.Join(names, editor.LinePrefix + "SELECT ", editor) + editor.NewLine + editor.LineIndent + "FROM ";
-            yield return new Suggestion(SuggestionKind.Keyword, "SELECT ... FROM", selectText, "SELECT", null,
+            var selectWord = options.Kw("SELECT");
+            var selectText = selectWord + " " + FormattedList.Join(names, editor.LinePrefix + selectWord + " ", editor) + editor.NewLine + editor.LineIndent + options.Kw("FROM") + " ";
+            yield return new Suggestion(SuggestionKind.Keyword, selectWord + " ... " + options.Kw("FROM"), selectText, "SELECT", null,
                 "the listed columns of " + table + " selected from a source", Group, isBlock: true);
         }
 
@@ -86,7 +88,7 @@ namespace SqlPrompter.Core.Completion
             };
             foreach (var condition in JoinSuggestions.Conditions(joined, metadata, options))
             {
-                var where = options.KeywordCase == Settings.KeywordCase.Lower ? "where" : "WHERE";
+                var where = options.Kw("WHERE");
                 yield return new Suggestion(SuggestionKind.JoinCondition, where + " " + condition.DisplayText, where + " " + condition.InsertText, "WHERE", condition.Suffix,
                     condition.Description, Group + condition.Group);
             }
@@ -116,7 +118,7 @@ namespace SqlPrompter.Core.Completion
                 };
                 foreach (var condition in JoinSuggestions.Conditions(joined, metadata, options))
                 {
-                    yield return new Suggestion(SuggestionKind.JoinCondition, "ON " + condition.DisplayText, "ON " + condition.InsertText, "ON", condition.Suffix,
+                    yield return new Suggestion(SuggestionKind.JoinCondition, options.Kw("ON") + " " + condition.DisplayText, options.Kw("ON") + " " + condition.InsertText, "ON", condition.Suffix,
                         condition.Description, Group + condition.Group);
                 }
 
@@ -150,9 +152,9 @@ namespace SqlPrompter.Core.Completion
                 var assignments = updatable
                     .Select(c => targetRef + "." + SqlIdentifier.Quote(c.Name, quote) + " = " + sourceRef + "." + SqlIdentifier.Quote(c.Name, quote))
                     .ToList();
-                var head = editor.LineIndent + unit + "UPDATE SET ";
-                yield return new Suggestion(SuggestionKind.Keyword, "WHEN MATCHED THEN UPDATE SET ...",
-                    "WHEN MATCHED THEN" + editor.NewLine + head + FormattedList.Join(assignments, head, editor), "WHEN MATCHED", null,
+                var head = editor.LineIndent + unit + options.Kw("UPDATE SET") + " ";
+                yield return new Suggestion(SuggestionKind.Keyword, options.Kw("WHEN MATCHED THEN UPDATE SET") + " ...",
+                    options.Kw("WHEN MATCHED THEN") + editor.NewLine + head + FormattedList.Join(assignments, head, editor), "WHEN MATCHED", null,
                     "update the columns of " + targetObject + " that " + sourceObject + " has too, except the key", Group, isBlock: true);
             }
 
@@ -160,17 +162,17 @@ namespace SqlPrompter.Core.Completion
             {
                 var names = shared.Select(c => SqlIdentifier.Quote(c.Name, quote)).ToList();
                 var values = shared.Select(c => sourceRef + "." + SqlIdentifier.Quote(c.Name, quote)).ToList();
-                var insertHead = editor.LineIndent + unit + "INSERT";
-                var valuesHead = editor.LineIndent + unit + "VALUES";
-                var text = "WHEN NOT MATCHED THEN" + editor.NewLine
+                var insertHead = editor.LineIndent + unit + options.Kw("INSERT");
+                var valuesHead = editor.LineIndent + unit + options.Kw("VALUES");
+                var text = options.Kw("WHEN NOT MATCHED THEN") + editor.NewLine
                     + insertHead + InsertBuilder.ParenthesizedList(names, options.Inserts.Layout, inner, insertHead.Length) + editor.NewLine
                     + valuesHead + InsertBuilder.ParenthesizedList(values, options.Inserts.Layout, inner, valuesHead.Length);
-                yield return new Suggestion(SuggestionKind.Keyword, "WHEN NOT MATCHED THEN INSERT ...", text, "WHEN NOT MATCHED", null,
+                yield return new Suggestion(SuggestionKind.Keyword, options.Kw("WHEN NOT MATCHED THEN INSERT") + " ...", text, "WHEN NOT MATCHED", null,
                     "insert the rows of " + sourceObject + " that " + targetObject + " lacks", Group, isBlock: true);
             }
 
-            yield return new Suggestion(SuggestionKind.Keyword, "WHEN NOT MATCHED BY SOURCE THEN DELETE",
-                "WHEN NOT MATCHED BY SOURCE THEN DELETE", "WHEN NOT MATCHED BY SOURCE", null,
+            yield return new Suggestion(SuggestionKind.Keyword, options.Kw("WHEN NOT MATCHED BY SOURCE THEN DELETE"),
+                options.Kw("WHEN NOT MATCHED BY SOURCE THEN DELETE"), "WHEN NOT MATCHED BY SOURCE", null,
                 "delete the rows of " + targetObject + " that " + sourceObject + " lacks", Group, isBlock: true);
         }
     }
