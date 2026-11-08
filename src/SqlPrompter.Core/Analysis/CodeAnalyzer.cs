@@ -22,6 +22,8 @@ namespace SqlPrompter.Core.Analysis
         TypeWithoutLength,
         NotInSubquery,
         OldStyleJoin,
+        AmbiguousColumn,
+        ImplicitConversion,
     }
 
     public enum CodeIssueSeverity
@@ -98,7 +100,8 @@ namespace SqlPrompter.Core.Analysis
             "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "ON", "SET", "VALUES", "INTO", "JOIN",
         };
 
-        public static IReadOnlyList<CodeIssue> Analyze(string script, AnalysisSettings settings)
+        /// <param name="metadata">The loaded metadata of the database, or null: the rules that need it (a repair of TOP without ORDER BY, #208) are then silent or without a repair.</param>
+        public static IReadOnlyList<CodeIssue> Analyze(string script, AnalysisSettings settings, SqlPrompter.Core.Model.IDatabaseMetadata metadata = null)
         {
             var issues = new List<CodeIssue>();
             if (settings == null || !settings.Enabled || string.IsNullOrWhiteSpace(script))
@@ -143,7 +146,7 @@ namespace SqlPrompter.Core.Analysis
                 FindLockHints(tokens, issues);
             }
 
-            FindMoreIssues(tokens, settings, issues);
+            FindMoreIssues(script, tokens, settings, metadata, issues);
 
             return issues.OrderBy(i => i.Start).ToList();
         }
