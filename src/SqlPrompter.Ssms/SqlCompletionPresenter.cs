@@ -895,7 +895,7 @@ namespace SqlPrompter.Ssms
             return button;
         }
 
-        private static Brush DimBrush()
+        internal static Brush DimBrush()
         {
             var dark = BackgroundColor.R + BackgroundColor.G + BackgroundColor.B < 384;
             var brush = new SolidColorBrush(dark ? Color.FromRgb(0xB0, 0xB0, 0xB0) : Color.FromRgb(0x70, 0x70, 0x70));
@@ -904,7 +904,7 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>The script colored as SQL (keywords, strings, comments, variables) for the light or the dark theme.</summary>
-        private static void FillColored(TextBlock block, string text)
+        internal static void FillColored(TextBlock block, string text)
         {
             var dark = BackgroundColor.R + BackgroundColor.G + BackgroundColor.B < 384;
             var colors = new Color?[]
@@ -939,7 +939,7 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private static Button HeaderButton(string text, string tip, Action click)
+        internal static Button HeaderButton(string text, string tip, Action click)
         {
             var button = new Button { Content = text, ToolTip = tip, Focusable = false, Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(4, 0, 0, 0), FontSize = 11 };
             button.Click += (s, e) => click();
