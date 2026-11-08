@@ -26,6 +26,7 @@ namespace SqlPrompter.Ssms
             Width = 720;
             Height = 520;
             ShowInTaskbar = false;
+            Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
             SnippetUi.Theme(this);
             SnippetUi.Theme(tabs);
 

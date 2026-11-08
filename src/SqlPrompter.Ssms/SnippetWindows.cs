@@ -13,6 +13,9 @@ namespace SqlPrompter.Ssms
     /// <summary>Small shared helpers for the code-only snippet windows (theme colors of the shell).</summary>
     internal static class SnippetUi
     {
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+
         public static void Theme(Control control)
         {
             control.SetResourceReference(Control.BackgroundProperty, VsBrushes.WindowKey);
@@ -21,8 +24,23 @@ namespace SqlPrompter.Ssms
 
         public static void Theme(Window window)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             window.SetResourceReference(Window.BackgroundProperty, VsBrushes.WindowKey);
             window.SetResourceReference(Window.ForegroundProperty, VsBrushes.WindowTextKey);
+
+            // The title bar follows a dark theme.
+            window.SourceInitialized += (s, e) =>
+            {
+                try
+                {
+                    var back = Microsoft.VisualStudio.PlatformUI.VSColorTheme.GetThemedColor(Microsoft.VisualStudio.PlatformUI.EnvironmentColors.ToolWindowBackgroundColorKey);
+                    var dark = (back.R * 299 + back.G * 587 + back.B * 114) / 1000 < 128 ? 1 : 0;
+                    DwmSetWindowAttribute(new System.Windows.Interop.WindowInteropHelper(window).Handle, 20, ref dark, sizeof(int));
+                }
+                catch (Exception)
+                {
+                }
+            };
 
             // The scroll bars of the lists and boxes in the window follow the theme of the shell too.
             if (window.TryFindResource(VsResourceKeys.ScrollBarStyleKey) is Style scrollBars)
@@ -69,6 +87,7 @@ namespace SqlPrompter.Ssms
         public static Button Button(string text, Action click)
         {
             var button = new Button { Content = text, Padding = new Thickness(14, 4, 14, 4), Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+            button.SetResourceReference(FrameworkElement.StyleProperty, VsResourceKeys.ButtonStyleKey);
             button.Click += (s, e) => click();
             return button;
         }
@@ -93,6 +112,7 @@ namespace SqlPrompter.Ssms
             Height = 520;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ShowInTaskbar = false;
+            Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
             SnippetUi.Theme(this);
             SnippetUi.Theme(list);
             preview.IsReadOnly = true;

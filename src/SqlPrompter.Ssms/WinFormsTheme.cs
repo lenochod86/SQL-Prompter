@@ -166,7 +166,8 @@ namespace SqlPrompter.Ssms
                     preview.ForeColor = p.Fore;
                     return;
                 case Button button:
-                    if (button.BackColor.IsSystemColor || button.BackColor == Color.Empty || button.BackColor == p.Button)
+                    // A button takes the background of its form as its own until it gets one (so a system color is not enough to tell); a button with a color of its own (the color picker) keeps it.
+                    if (button.BackColor.IsSystemColor || button.BackColor == Color.Empty || button.BackColor == p.Back || button.BackColor == p.Button || (button.Tag as string) == "themed")
                     {
                         button.FlatStyle = FlatStyle.Flat;
                         button.FlatAppearance.BorderColor = p.Border;
