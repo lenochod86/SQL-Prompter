@@ -82,16 +82,21 @@ namespace SqlPrompter.Tests
         [Fact]
         public void OnlyARealFileIsTheFileOfATab()
         {
-            const string temp = @"C:\Users\x\AppData\Local\Temp";
-            Assert.Equal(@"C:\work\report.sql", HistoryFile.OfDocument(@"C:\work\report.sql", true, temp));
-            Assert.Equal(string.Empty, HistoryFile.OfDocument(@"C:\Users\x\AppData\Local\Temp\SQLQuery3.sql", true, temp));
-            Assert.Equal(string.Empty, HistoryFile.OfDocument(@"C:\work\gone.sql", false, temp));
+            // Paths of this machine, so that the test also runs where the path separator is not a backslash.
+            var root = Path.Combine(Path.GetTempPath(), "SqlPrompterFileRule");
+            var temp = Path.Combine(root, "Temp");
+            var work = Path.Combine(root, "work", "report.sql");
+            var temporary = Path.Combine(temp, "SQLQuery3.sql");
+            var notes = Path.Combine(temp, "notes.sql");
+
+            Assert.Equal(work, HistoryFile.OfDocument(work, true, temp));
+            Assert.Equal(string.Empty, HistoryFile.OfDocument(temporary, true, temp));
+            Assert.Equal(string.Empty, HistoryFile.OfDocument(Path.Combine(root, "work", "gone.sql"), false, temp));
             Assert.Equal(string.Empty, HistoryFile.OfDocument("SQLQuery1.sql", true, temp));
             Assert.Equal(string.Empty, HistoryFile.OfDocument(null, true, temp));
             // A saved script that lives in the temp folder under another name is a file.
-            Assert.Equal(@"C:\Users\x\AppData\Local\Temp\notes.sql", HistoryFile.OfDocument(@"C:\Users\x\AppData\Local\Temp\notes.sql", true, temp));
+            Assert.Equal(notes, HistoryFile.OfDocument(notes, true, temp));
         }
-
         [Fact]
         public void TheDecisionIsFileTextOrBoth()
         {
