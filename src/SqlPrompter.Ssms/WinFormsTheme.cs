@@ -154,7 +154,7 @@ namespace SqlPrompter.Ssms
         private static void One(Control control, Palette p)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            if (!(control is Button) && !(control is Label) && !(control is CheckBox))
+            if (!(control is Button) && !(control is Label) && !(control is CheckBox) && !(control is ComboBox))
             {
                 NativeTheme(control, p);
             }
