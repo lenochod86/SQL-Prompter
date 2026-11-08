@@ -84,6 +84,53 @@ namespace SqlPrompter.Ssms
             }
 
             Log.Write("Snippet \"" + snippet.Prefix + "\" expanded (" + expanded.Fields.Count + " fields).");
+            if (expanded.Fields.Count == 0 && !snippet.NoSuggestions && view is IWpfTextView listView)
+            {
+                OpenListAfter(listView);
+            }
+        }
+
+        /// <summary>
+        /// The caret stands where the context has items (a table after JOIN, a column after WHERE): the list opens, the same one Ctrl+Space gives (#353). It is
+        /// opened after the editor has finished the commit, so that it does not take part in it; with the automatic list switched off nothing opens.
+        /// </summary>
+        private static void OpenListAfter(IWpfTextView view)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (!SettingsService.Current.Behavior.SuggestionsEnabled)
+                {
+                    return;
+                }
+
+                var caret = view.Caret.Position.BufferPosition;
+                if (!SqlBatch.TryGet(caret.Snapshot, caret.Position, out var batchStart, out var batch))
+                {
+                    return;
+                }
+
+                var context = SqlPrompter.Core.Analysis.ContextAnalyzer.Analyze(batch, caret.Position - batchStart);
+                if (!SqlPrompter.Core.Completion.ListAfterInsertion.ShouldOpen(context))
+                {
+                    return;
+                }
+
+#pragma warning disable VSSDK007 // fire and forget on purpose: the list opens once the commit is over
+                ThreadHelper.JoinableTaskFactory.StartOnIdle(() =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    if (!view.IsClosed && !SnippetSession.IsActive(view))
+                    {
+                        InvokedList.Open(view);
+                    }
+                }).Task.FileAndForget("SqlPrompter/ListAfterSnippet");
+#pragma warning restore VSSDK007
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening the list after a snippet failed", ex);
+            }
         }
     }
 }

@@ -44,6 +44,10 @@ namespace SqlPrompter.Core.Snippets
         [DataMember(Name = "placeholders", Order = 4, EmitDefaultValue = false)]
         public List<SnippetPlaceholder> Placeholders { get; set; }
 
+        /// <summary>The snippet does not open the suggestion list after it is inserted (#353); omitted from the file when it does (the default).</summary>
+        [DataMember(Name = "noSuggestions", Order = 5, EmitDefaultValue = false)]
+        public bool NoSuggestions { get; set; }
+
         /// <summary>The snippet comes from a shared folder (not saved in the file).</summary>
         public bool IsShared { get; set; }
 
