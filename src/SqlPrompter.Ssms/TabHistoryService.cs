@@ -60,6 +60,8 @@ namespace SqlPrompter.Ssms
             return name;
         }
 
+        public static void Touch(IEnumerable<string> ids, DateTime nowUtc) => Store.Touch(ids, nowUtc);
+
         public static void Delete(IEnumerable<string> ids) => Store.Delete(ids);
 
         public static void SetPinned(IEnumerable<string> ids, bool pinned) => Store.SetPinned(ids, pinned);

@@ -71,6 +71,12 @@ namespace SqlPrompter.Core.History
         /// <summary>Name of the query window the query was run in (empty for entries recorded before it was stored).</summary>
         public string Tab { get; }
 
+        /// <summary>When the user last opened the entry from the history window; null when never. It moves the entry to the top of the list (below the pinned ones).</summary>
+        public DateTime? OpenedAtUtc { get; internal set; }
+
+        /// <summary>The time the list is ordered by: the run (the last change of a tab) or the last opening from the history, whichever is later (#378).</summary>
+        public DateTime SortUtc => OpenedAtUtc.HasValue && OpenedAtUtc.Value > RanAtUtc ? OpenedAtUtc.Value : RanAtUtc;
+
         /// <summary>
         /// The document the entry belongs to while its window is open (the name of the window); empty for a closed tab and for a run recorded in an earlier session.
         /// Not stored (#375): an entry with a key goes to that window, whatever the view of the history.
@@ -154,6 +160,11 @@ namespace SqlPrompter.Core.History
                             {
                                 known.Favourite = record.Favourite == "1";
                             }
+
+                            if (TryParseTime(record.Opened, out var opened))
+                            {
+                                known.OpenedAtUtc = opened;
+                            }
                         }
 
                         continue;
@@ -234,6 +245,25 @@ namespace SqlPrompter.Core.History
             }
         }
 
+        /// <summary>The runs were opened from the history now: they go to the top of the list (below the pinned ones).</summary>
+        public void Touch(IEnumerable<string> ids, DateTime nowUtc)
+        {
+            lock (sync)
+            {
+                foreach (var id in ids)
+                {
+                    var entry = entries.FirstOrDefault(e => e.Id == id);
+                    if (entry == null)
+                    {
+                        continue;
+                    }
+
+                    entry.OpenedAtUtc = nowUtc;
+                    Append(Serialize(new Record { Id = id, Opened = FormatTime(nowUtc) }));
+                }
+            }
+        }
+
         /// <summary>Marks or unmarks runs as favourites; a favourite is kept by <see cref="Prune"/> but stays where the normal order puts it.</summary>
         public void SetFavourite(IEnumerable<string> ids, bool favourite)
         {
@@ -264,7 +294,7 @@ namespace SqlPrompter.Core.History
             lock (sync)
             {
                 var limit = nowUtc.AddDays(-keepDays);
-                var removed = entries.RemoveAll(e => !e.Pinned && !e.Favourite && e.RanAtUtc < limit);
+                var removed = entries.RemoveAll(e => !e.Pinned && !e.Favourite && e.SortUtc < limit);
                 if (removed > 0)
                 {
                     Rewrite();
@@ -305,7 +335,7 @@ namespace SqlPrompter.Core.History
                     e.File.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     e.Database.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0))
                 .OrderByDescending(e => e.Pinned)
-                .ThenByDescending(e => e.RanAtUtc)
+                .ThenByDescending(e => e.SortUtc)
                 .ToList();
         }
 
@@ -368,6 +398,7 @@ namespace SqlPrompter.Core.History
             File = e.File.Length > 0 ? e.File : null,
             Pinned = e.Pinned ? "1" : null,
             Favourite = e.Favourite ? "1" : null,
+            Opened = e.OpenedAtUtc.HasValue ? FormatTime(e.OpenedAtUtc.Value) : null,
         });
 
         private static string FormatTime(DateTime utc) => utc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
@@ -439,6 +470,9 @@ namespace SqlPrompter.Core.History
 
             [DataMember(Name = "favourite", EmitDefaultValue = false)]
             public string Favourite { get; set; }
+
+            [DataMember(Name = "opened", EmitDefaultValue = false)]
+            public string Opened { get; set; }
         }
     }
 }

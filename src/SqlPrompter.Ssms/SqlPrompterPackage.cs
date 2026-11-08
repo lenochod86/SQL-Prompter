@@ -248,7 +248,7 @@ namespace SqlPrompter.Ssms
                     ActiveEditor.SetOwner(manager);
                     manager.ShowDialog();
                 }
-                else if (chosen != null && GoToTabOfEntry(chosen))
+                else if (chosen != null && TouchEntry(chosen) && GoToTabOfEntry(chosen))
                 {
                     // The entry is of a tab that is open: that tab is in front (#375), no second tab and no second record.
                 }
@@ -284,6 +284,13 @@ namespace SqlPrompter.Ssms
                 Log.Error("Opening the query history failed", ex);
                 ShowMessage("Opening the query history failed: " + ex.Message);
             }
+        }
+
+        /// <summary>An entry that is opened from the history comes first in the list afterwards (below the pinned ones, #378). Always true.</summary>
+        private static bool TouchEntry(SqlPrompter.Core.History.HistoryEntry chosen)
+        {
+            HistoryService.Touch(chosen.Id);
+            return true;
         }
 
         /// <summary>
