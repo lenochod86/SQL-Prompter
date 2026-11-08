@@ -73,6 +73,8 @@ namespace SqlPrompter.Ssms
                         return;
                     }
 
+                    entry.Key = key;
+
                     lock (Gate)
                     {
                         if (!RunsByDocument.TryGetValue(key, out var runs))
