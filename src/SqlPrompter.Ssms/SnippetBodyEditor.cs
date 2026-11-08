@@ -36,6 +36,25 @@ namespace SqlPrompter.Ssms
                     Recolor(CaretIndex());
                 }
             };
+
+            // The colors of the words are brushes of their own, so a change of the SSMS theme while the editor is open has to color the text again
+            // (otherwise the light colors of one theme stay on the background of the other until SSMS is restarted).
+            Loaded += (s, e) => Microsoft.VisualStudio.PlatformUI.VSColorTheme.ThemeChanged += OnThemeChanged;
+            Unloaded += (s, e) => Microsoft.VisualStudio.PlatformUI.VSColorTheme.ThemeChanged -= OnThemeChanged;
+        }
+
+        private void OnThemeChanged(Microsoft.VisualStudio.PlatformUI.ThemeChangedEventArgs args)
+        {
+            // The resources of the window (the background and the text color) follow the theme a moment later; the text is colored after that.
+#pragma warning disable VSTHRD001, VSTHRD110 // the dispatcher of the control itself: the colors are applied after the resources of the window have changed
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (IsLoaded)
+                {
+                    Recolor(-1);
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+#pragma warning restore VSTHRD001, VSTHRD110
         }
 
         /// <summary>The plain text, lines separated by CR LF.</summary>
@@ -131,11 +150,13 @@ namespace SqlPrompter.Ssms
             return null;
         }
 
+#pragma warning disable VSTHRD010 // the editor is a WPF control: it is only used on the UI thread
         private Brush[] Palette()
         {
-            var background = (Background as SolidColorBrush)?.Color ?? Colors.White;
-            var dark = (background.R * 299 + background.G * 587 + background.B * 114) / 1000 < 128;
-            var plain = (Foreground as SolidColorBrush)?.Color ?? (dark ? Colors.White : Colors.Black);
+            var themed = Microsoft.VisualStudio.PlatformUI.VSColorTheme.GetThemedColor(Microsoft.VisualStudio.PlatformUI.EnvironmentColors.ToolWindowBackgroundColorKey);
+            var dark = (themed.R * 299 + themed.G * 587 + themed.B * 114) / 1000 < 128;
+            var text = Microsoft.VisualStudio.PlatformUI.VSColorTheme.GetThemedColor(Microsoft.VisualStudio.PlatformUI.EnvironmentColors.ToolWindowTextColorKey);
+            var plain = Color.FromRgb(text.R, text.G, text.B);
             return new Brush[]
             {
                 new SolidColorBrush(plain),
@@ -146,5 +167,6 @@ namespace SqlPrompter.Ssms
                 new SolidColorBrush(dark ? Color.FromRgb(0xC5, 0x86, 0xC0) : Color.FromRgb(0xAF, 0x00, 0xDB)),
             };
         }
+#pragma warning restore VSTHRD010
     }
 }
