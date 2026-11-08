@@ -59,6 +59,7 @@ namespace SqlPrompter.Ssms
         private List<CompletionItemWithHighlight> shown = new List<CompletionItemWithHighlight>();
         private int selected;
         private bool refreshing;
+        private bool deleted;
 
         // The column picker.
         private bool pickerMode;
@@ -74,7 +75,16 @@ namespace SqlPrompter.Ssms
             this.source = source;
             // The keys come from the command handlers (InvokedListCommands: SSMS does not give the editor's WPF key events to us); the text and the
             // caret are watched here to filter again after Backspace, Delete or a caret move.
-            view.TextBuffer.Changed += (s, e) => LookAgain();
+            view.TextBuffer.Changed += (s, e) =>
+            {
+                // A deletion (Backspace, Delete, cut, undo) can change the context, so the items are made again, not only filtered (#352).
+                if (e.Changes.Any(c => c.NewLength < c.OldLength))
+                {
+                    deleted = true;
+                }
+
+                LookAgain();
+            };
             view.Caret.PositionChanged += (s, e) => LookAgain();
             view.LostAggregateFocus += (s, e) => Close();
             view.Closed += (s, e) => Close();
@@ -660,6 +670,16 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
+            if (deleted)
+            {
+                deleted = false;
+                if (!pickerMode && !AskAgain())
+                {
+                    Close();
+                    return;
+                }
+            }
+
             var span = suggestions.Span.GetSpan(view.TextSnapshot);
             var caret = view.Caret.Position.BufferPosition.Position;
             if (caret < span.Start.Position || caret > span.End.Position)
@@ -676,6 +696,29 @@ namespace SqlPrompter.Ssms
             }
 
             Show();
+        }
+
+        /// <summary>
+        /// After a deletion the context at the caret is analyzed again and the items replaced when they differ from those of the open list (an
+        /// unchanged context keeps the list, so it does not flicker). False when the new position has no suggestions.
+        /// </summary>
+        private bool AskAgain()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var fresh = source.BuildForInvoke(view.Caret.Position.BufferPosition);
+            if (fresh == null || fresh.Items.Length == 0)
+            {
+                return false;
+            }
+
+            if (!fresh.Items.Select(i => i.InsertText).SequenceEqual(suggestions.Items.Select(i => i.InsertText)))
+            {
+                suggestions = fresh;
+                selected = 0;
+                BuildPickerItems();
+            }
+
+            return true;
         }
 
         /// <summary>Inserts the item in place of the typed text and closes the list.</summary>
