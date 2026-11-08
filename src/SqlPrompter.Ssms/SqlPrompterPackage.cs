@@ -293,7 +293,7 @@ namespace SqlPrompter.Ssms
         private static bool GoToTabOfEntry(SqlPrompter.Core.History.HistoryEntry chosen)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            return chosen.Kind == SqlPrompter.Core.History.HistoryKind.Tab && !chosen.FromOlderVersion && !chosen.ClosedAtUtc.HasValue && !string.IsNullOrEmpty(chosen.Key) &&
+            return !chosen.FromOlderVersion && !chosen.ClosedAtUtc.HasValue && !string.IsNullOrEmpty(chosen.Key) &&
                 TabSessionService.Current != null && TabSessionService.Current.ActivateDocument(chosen.Key);
         }
 

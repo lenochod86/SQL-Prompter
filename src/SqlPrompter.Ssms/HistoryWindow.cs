@@ -77,7 +77,7 @@ namespace SqlPrompter.Ssms
                 ShowPreview();
                 // An entry of a tab that is open goes to that tab (#375).
                 var open = (list.SelectedItem as Row)?.Entry;
-                var goTo = open != null && open.Kind == HistoryKind.Tab && !open.ClosedAtUtc.HasValue && !string.IsNullOrEmpty(open.Key);
+                var goTo = open != null && !open.ClosedAtUtc.HasValue && !string.IsNullOrEmpty(open.Key);
                 if (openButton != null)
                 {
                     openButton.Content = goTo ? "Go To Tab" : "Open In New Tab";

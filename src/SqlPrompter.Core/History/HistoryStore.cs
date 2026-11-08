@@ -71,8 +71,11 @@ namespace SqlPrompter.Core.History
         /// <summary>Name of the query window the query was run in (empty for entries recorded before it was stored).</summary>
         public string Tab { get; }
 
-        /// <summary>The document a tab entry belongs to while the tab is open (the name of the window); empty for a closed tab and for a run (#375).</summary>
-        public string Key { get; internal set; } = string.Empty;
+        /// <summary>
+        /// The document the entry belongs to while its window is open (the name of the window); empty for a closed tab and for a run recorded in an earlier session.
+        /// Not stored (#375): an entry with a key goes to that window, whatever the view of the history.
+        /// </summary>
+        public string Key { get; set; } = string.Empty;
 
         /// <summary>The full path of the file the tab had (a saved .sql document), empty for an unsaved tab (#372).</summary>
         public string File { get; }
