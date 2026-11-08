@@ -31,7 +31,7 @@ permissions:
 # A new push to a pull request cancels its running build; builds of main always finish.
 concurrency:
   # Labeling a pull request (which starts only the VSIX job) must not cancel the test run of the same push.
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.action == 'labeled' && 'label' || 'run' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.action == 'labeled' && github.event.label.name || 'run' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
