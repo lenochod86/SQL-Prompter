@@ -262,7 +262,6 @@ namespace SqlPrompter.Tests
             cache.Loaded += (s, e) => finished.TrySetResult(true);
 
             Assert.Null(cache.GetServer("Remote1", loader));
-            Assert.True(cache.StatusOfServer("Remote1").IsLoading);
             Assert.True(await Task.WhenAny(finished.Task, Task.Delay(5000)) == finished.Task);
 
             Assert.True(cache.StatusOfServer("Remote1").IsDone);

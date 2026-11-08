@@ -71,8 +71,7 @@ namespace SqlPrompter.Metadata
                     return LinkedLoadStatus.Done;
                 }
 
-                var loading = entry.Loading != null && !entry.Loading.IsCompleted;
-                return !loading && entry.Error != null ? LinkedLoadStatus.Failed(entry.Error) : LinkedLoadStatus.Loading;
+                return !entry.Busy && entry.Error != null ? LinkedLoadStatus.Failed(entry.Error) : LinkedLoadStatus.Loading;
             }
         }
 
@@ -110,9 +109,9 @@ namespace SqlPrompter.Metadata
                     return (T)entry.Result;
                 }
 
-                var loading = entry.Loading != null && !entry.Loading.IsCompleted;
-                if (!loading && clock() - entry.LastFailure >= RetryDelay)
+                if (!entry.Busy && clock() - entry.LastFailure >= RetryDelay)
                 {
+                    entry.Busy = true;
                     entry.Loading = Task.Run(async () =>
                     {
                         try
@@ -124,6 +123,7 @@ namespace SqlPrompter.Metadata
                                 {
                                     entry.Result = result;
                                     entry.Error = null;
+                                    entry.Busy = false;
                                 }
 
                                 log("Linked server: loaded " + what + ".");
@@ -137,6 +137,7 @@ namespace SqlPrompter.Metadata
                             {
                                 entry.LastFailure = clock();
                                 entry.Error = ex is OperationCanceledException ? "timed out" : ex.Message;
+                                entry.Busy = false;
                             }
 
                             log("Linked server: loading " + what + " failed: " + ex.Message);
@@ -154,6 +155,9 @@ namespace SqlPrompter.Metadata
         {
             public object Result;
             public Task Loading;
+
+            /// <summary>A load is running: set before the task starts and cleared before <see cref="LinkedServerCache.Loaded"/> is raised (the task itself is still running then).</summary>
+            public bool Busy;
             public DateTime LastFailure = DateTime.MinValue;
             public string Error;
         }
