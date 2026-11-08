@@ -287,7 +287,27 @@ namespace SqlPrompter.Ssms
                 SetProperty(clone, "ServerName", server);
                 SetProperty(clone, "AuthenticationType", login == null ? 0 : 1);
                 SetProperty(clone, "UserName", login);
-                SetProperty(clone, "Password", null);
+                // A SQL login gets the password of a live connection or the one SSMS remembered (never stored by us); without one SSMS asks.
+                ConnectionSettings known = null;
+                if (login != null && !LiveSqlLogins.TryGetValue(LoginKey(server, login), out known))
+                {
+                    known = FindRemembered(server, login, database);
+                }
+
+                SetProperty(clone, "Password", known?.Password);
+                SetProperty(clone, "InMemoryPassword", null);
+                LastSeenByServer.TryGetValue(server.ToUpperInvariant(), out var seen);
+                var encrypt = known?.Encrypt ?? seen?.Encrypt;
+                var trust = known?.TrustServerCertificate ?? seen?.TrustServerCertificate;
+                if (!string.IsNullOrEmpty(encrypt))
+                {
+                    cloneOptions["ENCRYPT_CONNECTION"] = encrypt;
+                }
+
+                if (!string.IsNullOrEmpty(trust))
+                {
+                    cloneOptions["TRUST_SERVER_CERTIFICATE"] = trust;
+                }
             }
 
             var create = factory.GetType().GetMethods().FirstOrDefault(m =>

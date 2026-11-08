@@ -98,6 +98,7 @@ namespace SqlPrompter.Ssms
             public string Key;
             public string Name;
             public string Server;
+            public string Login;
             public string Database;
             public string Text;
         }
@@ -134,7 +135,7 @@ namespace SqlPrompter.Ssms
                     Store.MinVersionInterval = TimeSpan.FromSeconds(Math.Max(1, behavior.TabCheckSeconds));
                     foreach (var tab in snapshots)
                     {
-                        Store.Track(tab.Key, tab.Name, tab.Server, tab.Database, tab.Text, now);
+                        Store.Track(tab.Key, tab.Name, tab.Server, tab.Database, tab.Text, now, tab.Login);
                         if (flush)
                         {
                             Store.Flush(tab.Key, tab.Text, now);
@@ -218,6 +219,7 @@ namespace SqlPrompter.Ssms
                         Key = document.FullName,
                         Name = TabSessionService.Current?.NameOf(document.FullName) ?? Path.GetFileName(document.FullName),
                         Server = connection?.Server,
+                        Login = connection != null && connection.Authentication == AuthenticationKind.SqlPassword ? connection.UserName : null,
                         Database = connection?.Database,
                         Text = text,
                     });
