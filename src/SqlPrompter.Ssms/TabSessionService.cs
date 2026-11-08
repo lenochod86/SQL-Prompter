@@ -199,9 +199,26 @@ namespace SqlPrompter.Ssms
         private void OnOpenedOrSaved()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            Save(true);
-            TabHistoryService.Check(true);
+            // Not inside the event of the running document table: reading the documents there (DTE) while one is locked or unlocked kept a closed file
+            // from being opened again in the same run (Ctrl+O and the history did nothing, "the user cancelled the save dialog"). The work is done after the
+            // event has returned, once for a burst of events.
+            if (afterEvent == null)
+            {
+                afterEvent = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(400) };
+                afterEvent.Tick += (s, e) =>
+                {
+                    afterEvent.Stop();
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    Save(true);
+                    TabHistoryService.Check(true);
+                };
+            }
+
+            afterEvent.Stop();
+            afterEvent.Start();
         }
+
+        private DispatcherTimer afterEvent;
 
         private const int WmClose = 0x0010;
         private const int WmQueryEndSession = 0x0011;
@@ -616,6 +633,112 @@ namespace SqlPrompter.Ssms
             if (Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsStatusbar)) is Microsoft.VisualStudio.Shell.Interop.IVsStatusbar statusBar)
             {
                 statusBar.SetText(message);
+            }
+        }
+
+        /// <summary>
+        /// Opens the file of a history entry (#372): an open window of the file is brought to the front instead of opening a second copy; a window that is
+        /// not connected gets the connection of the entry silently (as a restored tab does), when there is something to connect with.
+        /// </summary>
+        private void OpenDocumentFile(string file)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                dte.ItemOperations.OpenFile(file);
+            }
+            catch (System.Runtime.InteropServices.COMException first)
+            {
+                // After the window of this file was closed in this run, ItemOperations.OpenFile fails with a cancelled save prompt; the shell opens it.
+                Log.Write("Opening " + System.IO.Path.GetFileName(file) + " with ItemOperations failed (" + first.Message + "); trying the command File.OpenFile.");
+                try
+                {
+                    dte.ExecuteCommand("File.OpenFile", "\"" + file + "\"");
+                }
+                catch (System.Runtime.InteropServices.COMException second)
+                {
+                    Log.Write("File.OpenFile failed too (" + second.Message + "); trying Documents.Open.");
+                    dte.Documents.Open(file, "Auto", false);
+                }
+            }
+        }
+
+        public bool OpenFileTab(SavedTab tab)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                if (!File.Exists(tab.File))
+                {
+                    return false;
+                }
+
+                // A window of the file that is open is brought to the front; the document of a window that was closed stays in the list of SSMS for a while and
+                // would make opening the file again fail (the save prompt is cancelled), so it is closed first.
+                var alreadyOpen = false;
+                foreach (Document known in dte.Documents.Cast<Document>().ToList())
+                {
+                    try
+                    {
+                        if (!string.Equals(known.FullName, tab.File, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        Log.Write("History file: document " + System.IO.Path.GetFileName(known.FullName) + ", windows " + known.Windows.Count + ", saved " + known.Saved + ".");
+                        if (known.Windows.Count > 0)
+                        {
+                            known.Activate();
+                            alreadyOpen = true;
+                        }
+                        else
+                        {
+                            // The document of a window that was closed: asking it to show itself opens a window for it again.
+                            known.Activate();
+                            Log.Write("History file: activated the document of the closed window, windows now " + known.Windows.Count + ".");
+                            alreadyOpen = known.Windows.Count > 0;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write("A document of " + System.IO.Path.GetFileName(tab.File) + " could not be activated or closed: " + ex.Message);
+                    }
+                }
+
+                if (!alreadyOpen)
+                {
+                    OpenDocumentFile(tab.File);
+                }
+
+                var document = dte.ActiveDocument;
+                var main = System.Windows.Application.Current?.MainWindow;
+                if (document == null || main == null || !string.Equals(document.FullName, tab.File, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                var handle = new System.Windows.Interop.WindowInteropHelper(main).Handle;
+                if (tab.IsConnected && WindowStatusColoring.TryGetFront(handle, out var connected, out _) && !connected)
+                {
+                    if (SsmsConnection.ReconnectEditor(WindowStatusColoring.FrontEditor(handle), tab, out var why))
+                    {
+                        if (WindowStatusColoring.TryGetFront(handle, out connected, out _) && connected)
+                        {
+                            connections[document.FullName] = SsmsConnection.GetActiveOfWindow();
+                        }
+                    }
+                    else
+                    {
+                        Log.Write("The file " + System.IO.Path.GetFileName(tab.File) + " from the history is not connected: " + why + ".");
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Opening the file of a history entry failed", ex);
+                return false;
             }
         }
 

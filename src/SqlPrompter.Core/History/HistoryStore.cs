@@ -38,8 +38,9 @@ namespace SqlPrompter.Core.History
 
     public sealed class HistoryEntry
     {
-        public HistoryEntry(string id, string text, string server, string database, string login, DateTime ranAtUtc, DateTime? closedAtUtc = null, string tab = null)
+        public HistoryEntry(string id, string text, string server, string database, string login, DateTime ranAtUtc, DateTime? closedAtUtc = null, string tab = null, string file = null)
         {
+            File = file ?? string.Empty;
             Id = id;
             Text = text ?? string.Empty;
             Server = server ?? string.Empty;
@@ -70,6 +71,9 @@ namespace SqlPrompter.Core.History
         /// <summary>Name of the query window the query was run in (empty for entries recorded before it was stored).</summary>
         public string Tab { get; }
 
+        /// <summary>The full path of the file the tab had (a saved .sql document), empty for an unsaved tab (#372).</summary>
+        public string File { get; }
+
         /// <summary>When the query tab was closed; null while it is open (or when SSMS ended without telling).</summary>
         public DateTime? ClosedAtUtc { get; internal set; }
 
@@ -78,6 +82,9 @@ namespace SqlPrompter.Core.History
 
         /// <summary>A favourite (#285): marked with a star and found in the Favourites view, it keeps its normal place in the list; it is kept by the cleanup like a pinned run.</summary>
         public bool Favourite { get; internal set; }
+
+        /// <summary>The entry is an older version of a tab (chosen from the versions menu): its text is opened as text, not the file (#372).</summary>
+        public bool FromOlderVersion { get; set; }
     }
 
     /// <summary>
@@ -149,7 +156,7 @@ namespace SqlPrompter.Core.History
                     if (TryParseTime(record.Ran, out var ran) && !byId.ContainsKey(record.Id))
                     {
                         var entry = new HistoryEntry(record.Id, record.Text, record.Server, record.Database, record.Login, ran,
-                            TryParseTime(record.Closed, out var closedAt) ? closedAt : (DateTime?)null, record.Tab) { Pinned = record.Pinned == "1", Favourite = record.Favourite == "1" };
+                            TryParseTime(record.Closed, out var closedAt) ? closedAt : (DateTime?)null, record.Tab, record.File) { Pinned = record.Pinned == "1", Favourite = record.Favourite == "1" };
                         byId[record.Id] = entry;
                         loaded.Add(entry);
                     }
@@ -166,14 +173,14 @@ namespace SqlPrompter.Core.History
         }
 
         /// <summary>Records a run; a blank text is not recorded (null is returned).</summary>
-        public HistoryEntry Add(string text, string server, string database, string login, DateTime nowUtc, string tab = null)
+        public HistoryEntry Add(string text, string server, string database, string login, DateTime nowUtc, string tab = null, string file = null)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
                 return null;
             }
 
-            var entry = new HistoryEntry(Guid.NewGuid().ToString("N"), text, server, database, login, nowUtc, null, tab);
+            var entry = new HistoryEntry(Guid.NewGuid().ToString("N"), text, server, database, login, nowUtc, null, tab, file);
             lock (sync)
             {
                 entries.Add(entry);
@@ -289,6 +296,7 @@ namespace SqlPrompter.Core.History
                     e.Text.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     e.Server.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     e.Tab.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    e.File.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     e.Database.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0))
                 .OrderByDescending(e => e.Pinned)
                 .ThenByDescending(e => e.RanAtUtc)
@@ -351,6 +359,7 @@ namespace SqlPrompter.Core.History
             Ran = FormatTime(e.RanAtUtc),
             Closed = e.ClosedAtUtc.HasValue ? FormatTime(e.ClosedAtUtc.Value) : null,
             Tab = e.Tab.Length > 0 ? e.Tab : null,
+            File = e.File.Length > 0 ? e.File : null,
             Pinned = e.Pinned ? "1" : null,
             Favourite = e.Favourite ? "1" : null,
         });
@@ -415,6 +424,9 @@ namespace SqlPrompter.Core.History
 
             [DataMember(Name = "tab", EmitDefaultValue = false)]
             public string Tab { get; set; }
+
+            [DataMember(Name = "file", EmitDefaultValue = false)]
+            public string File { get; set; }
 
             [DataMember(Name = "pinned", EmitDefaultValue = false)]
             public string Pinned { get; set; }
