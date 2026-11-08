@@ -218,14 +218,20 @@ namespace SqlPrompter.Tests
         public async Task ASlowServerDoesNotBlockAndTimesOut()
         {
             var loader = new FakeLinked { Hang = true };
-            var cache = new LinkedServerCache { LoadTimeout = TimeSpan.FromMilliseconds(100) };
+            // Independent of the speed of the machine: the timeout is long and the call must return well within it; the cancellation is awaited.
+            var cache = new LinkedServerCache { LoadTimeout = TimeSpan.FromSeconds(2) };
             var watch = System.Diagnostics.Stopwatch.StartNew();
 
             Assert.Null(cache.GetServer("Remote1", loader));
 
-            Assert.True(watch.ElapsedMilliseconds < 50, "the call must return at once");
+            Assert.True(watch.ElapsedMilliseconds < 1000, "the call must return without waiting for the server");
             await loader.WaitAsync();
-            await Task.Delay(500);
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (!loader.Cancelled && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(50);
+            }
+
             Assert.True(loader.Cancelled);
         }
 
