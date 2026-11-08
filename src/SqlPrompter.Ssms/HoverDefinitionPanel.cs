@@ -34,7 +34,7 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var border = new Border { Child = new HoverDefinitionPanel(reference, summary), Padding = new Thickness(8, 4, 8, 6), Margin = new Thickness(0, 6, 0, 0) };
-            border.SetResourceReference(Border.BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
+            border.Background = new SolidColorBrush(EditorColors.Background());
             return border;
         }
 

@@ -17,22 +17,24 @@ namespace SqlPrompter.Ssms
             ScrollBars = RichTextBoxScrollBars.Both;
             BackColor = SystemColors.Window;
             BorderStyle = BorderStyle.FixedSingle;
+            // The colors of the words follow the editor of SSMS; after a change of the theme (the window colors change) the text is colored again.
+            BackColorChanged += (s, e) =>
+            {
+                if (last != null)
+                {
+                    ShowText(last);
+                }
+            };
         }
+
+        private string last;
 
         public void ShowText(string text)
         {
             text = text ?? string.Empty;
+            last = text;
             var kinds = SnippetHighlighter.Classify(text);
-            var dark = (BackColor.R * 299 + BackColor.G * 587 + BackColor.B * 114) / 1000 < 128;
-            var colors = new[]
-            {
-                dark ? Color.White : Color.Black,
-                dark ? Color.FromArgb(0x56, 0x9C, 0xD6) : Color.FromArgb(0x00, 0x00, 0xFF),
-                dark ? Color.FromArgb(0xD6, 0x9D, 0x85) : Color.FromArgb(0xA3, 0x15, 0x15),
-                dark ? Color.FromArgb(0x57, 0xA6, 0x4A) : Color.FromArgb(0x00, 0x80, 0x00),
-                dark ? Color.FromArgb(0x9C, 0xDC, 0xFE) : Color.FromArgb(0x1F, 0x37, 0x7F),
-                dark ? Color.FromArgb(0xC5, 0x86, 0xC0) : Color.FromArgb(0xAF, 0x00, 0xDB),
-            };
+            var colors = Array.ConvertAll(EditorColors.ByKind(), c => Color.FromArgb(c.R, c.G, c.B));
             SuspendLayout();
             var firstVisible = GetCharIndexFromPosition(new Point(0, 0));
             Text = text.Replace("\r\n", "\n");

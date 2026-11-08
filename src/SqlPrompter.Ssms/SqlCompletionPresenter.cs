@@ -906,15 +906,10 @@ namespace SqlPrompter.Ssms
         /// <summary>The script colored as SQL (keywords, strings, comments, variables) for the light or the dark theme.</summary>
         internal static void FillColored(TextBlock block, string text)
         {
-            var dark = BackgroundColor.R + BackgroundColor.G + BackgroundColor.B < 384;
+            var palette = EditorColors.ByKind();
             var colors = new Color?[]
             {
-                null,
-                dark ? Color.FromRgb(0x56, 0x9C, 0xD6) : Color.FromRgb(0x00, 0x00, 0xFF),
-                dark ? Color.FromRgb(0xD6, 0x9D, 0x85) : Color.FromRgb(0xA3, 0x15, 0x15),
-                dark ? Color.FromRgb(0x57, 0xA6, 0x4A) : Color.FromRgb(0x00, 0x80, 0x00),
-                dark ? Color.FromRgb(0x9C, 0xDC, 0xFE) : Color.FromRgb(0x1F, 0x37, 0x7F),
-                null,
+                null, palette[1], palette[2], palette[3], palette[4], null, palette[6], palette[7],
             };
             var kinds = SqlPrompter.Core.Snippets.SnippetHighlighter.Classify(text);
             block.Inlines.Clear();
