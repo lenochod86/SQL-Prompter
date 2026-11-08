@@ -26,7 +26,7 @@ namespace SqlPrompter.Core.Analysis
             "VARCHAR", "NVARCHAR", "CHAR", "NCHAR", "VARBINARY", "BINARY",
         };
 
-        private static void FindMoreIssues(List<Token> tokens, AnalysisSettings settings, List<CodeIssue> issues)
+        private static void FindMoreIssues(string script, List<Token> tokens, AnalysisSettings settings, SqlPrompter.Core.Model.IDatabaseMetadata metadata, List<CodeIssue> issues)
         {
             if (settings.FunctionOnColumn)
             {
@@ -40,7 +40,7 @@ namespace SqlPrompter.Core.Analysis
 
             if (settings.TopWithoutOrderBy)
             {
-                FindTopWithoutOrderBy(tokens, issues);
+                FindTopWithoutOrderBy(tokens, metadata, issues);
             }
 
             if (settings.AtAtIdentity)
@@ -55,13 +55,15 @@ namespace SqlPrompter.Core.Analysis
 
             if (settings.NotInSubquery)
             {
-                FindNotInSubquery(tokens, issues);
+                FindNotInSubquery(script, tokens, issues);
             }
 
             if (settings.OldStyleJoin)
             {
-                FindOldStyleJoin(tokens, issues);
+                FindOldStyleJoin(script, tokens, issues);
             }
+
+            FindWithMetadata(script, tokens, settings, metadata, issues);
         }
 
         private static int Matching(List<Token> tokens, int open)
@@ -220,7 +222,7 @@ namespace SqlPrompter.Core.Analysis
         };
 
         /// <summary>SELECT TOP n ... without ORDER BY (outside EXISTS and a UNION): the rows returned are arbitrary.</summary>
-        private static void FindTopWithoutOrderBy(List<Token> tokens, List<CodeIssue> issues)
+        private static void FindTopWithoutOrderBy(List<Token> tokens, SqlPrompter.Core.Model.IDatabaseMetadata metadata, List<CodeIssue> issues)
         {
             for (var i = 0; i + 2 < tokens.Count; i++)
             {
@@ -244,9 +246,11 @@ namespace SqlPrompter.Core.Analysis
                 var depth = 0;
                 var ordered = false;
                 var done = false;
+                var blockEnd = tokens.Count;
                 for (var j = topEnd + 1; j < tokens.Count && !done; j++)
                 {
                     var t = tokens[j];
+                    blockEnd = j + 1;
                     if (t.Kind == TokenKind.OpenParen)
                     {
                         depth++;
@@ -256,11 +260,13 @@ namespace SqlPrompter.Core.Analysis
                         if (--depth < 0)
                         {
                             done = true;
+                            blockEnd = j;
                         }
                     }
                     else if (depth == 0 && t.Kind == TokenKind.Semicolon)
                     {
                         done = true;
+                        blockEnd = j;
                     }
                     else if (depth == 0 && t.IsWord("ORDER") && j + 1 < tokens.Count && tokens[j + 1].IsWord("BY"))
                     {
@@ -272,13 +278,14 @@ namespace SqlPrompter.Core.Analysis
                         // UNION and friends: the ORDER BY of the whole query decides; a new statement ends the block.
                         ordered = t.IsWord("UNION") || t.IsWord("EXCEPT") || t.IsWord("INTERSECT");
                         done = true;
+                        blockEnd = j;
                     }
                 }
 
                 if (!ordered)
                 {
                     issues.Add(new CodeIssue(CodeIssueKind.TopWithoutOrderBy, CodeIssueSeverity.Hint, tokens[i + 1].Start, tokens[topEnd].End - tokens[i + 1].Start,
-                        "TOP without ORDER BY returns arbitrary rows; add an ORDER BY to say which ones."));
+                        "TOP without ORDER BY returns arbitrary rows; add an ORDER BY to say which ones.", TopFix(tokens, topEnd + 1, blockEnd, metadata)));
                 }
             }
         }
@@ -343,14 +350,14 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>NOT IN (SELECT ...): when the subquery returns a NULL the condition is never true.</summary>
-        private static void FindNotInSubquery(List<Token> tokens, List<CodeIssue> issues)
+        private static void FindNotInSubquery(string script, List<Token> tokens, List<CodeIssue> issues)
         {
             for (var i = 0; i + 3 < tokens.Count; i++)
             {
                 if (tokens[i].IsWord("NOT") && tokens[i + 1].IsWord("IN") && tokens[i + 2].Kind == TokenKind.OpenParen && tokens[i + 3].IsWord("SELECT"))
                 {
                     issues.Add(new CodeIssue(CodeIssueKind.NotInSubquery, CodeIssueSeverity.Hint, tokens[i].Start, tokens[i + 1].End - tokens[i].Start,
-                        "NOT IN (subquery) returns no rows at all when the subquery returns a NULL; NOT EXISTS does not have that problem."));
+                        "NOT IN (subquery) returns no rows at all when the subquery returns a NULL; NOT EXISTS does not have that problem.", NotInFix(script, tokens, i)));
                 }
             }
         }
@@ -362,7 +369,7 @@ namespace SqlPrompter.Core.Analysis
         };
 
         /// <summary>FROM a, b: the tables are joined in the WHERE clause; JOIN ... ON says what is meant.</summary>
-        private static void FindOldStyleJoin(List<Token> tokens, List<CodeIssue> issues)
+        private static void FindOldStyleJoin(string script, List<Token> tokens, List<CodeIssue> issues)
         {
             for (var i = 0; i < tokens.Count; i++)
             {
@@ -397,7 +404,7 @@ namespace SqlPrompter.Core.Analysis
                     else if (depth == 0 && t.Kind == TokenKind.Comma)
                     {
                         issues.Add(new CodeIssue(CodeIssueKind.OldStyleJoin, CodeIssueSeverity.Hint, t.Start, t.End - t.Start,
-                            "A comma between tables is an old-style join; use JOIN ... ON so that the condition cannot be forgotten."));
+                            "A comma between tables is an old-style join; use JOIN ... ON so that the condition cannot be forgotten.", OldJoinFix(script, tokens, j)));
                         break;
                     }
                 }

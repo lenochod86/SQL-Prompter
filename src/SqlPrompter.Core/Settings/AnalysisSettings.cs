@@ -65,6 +65,14 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "oldStyleJoin")]
         public bool OldStyleJoin { get; set; }
 
+        /// <summary>An unqualified column that two tables of the query have (needs the loaded metadata).</summary>
+        [DataMember(Name = "ambiguousColumn")]
+        public bool AmbiguousColumn { get; set; }
+
+        /// <summary>A column compared with a literal of another type family (needs the loaded metadata).</summary>
+        [DataMember(Name = "implicitConversion")]
+        public bool ImplicitConversion { get; set; }
+
         public AnalysisSettings Clone() => (AnalysisSettings)MemberwiseClone();
 
         [OnDeserializing]
@@ -88,6 +96,8 @@ namespace SqlPrompter.Core.Settings
             TypeWithoutLength = true;
             NotInSubquery = true;
             OldStyleJoin = true;
+            AmbiguousColumn = true;
+            ImplicitConversion = true;
         }
     }
 }

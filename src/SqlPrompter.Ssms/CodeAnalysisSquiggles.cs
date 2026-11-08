@@ -123,12 +123,13 @@ namespace SqlPrompter.Ssms
 
                 var run = ++version;
                 var text = current.GetText();
+                var metadata = MetadataService.Current?.MetadataForScript(text);
 #pragma warning disable VSSDK007 // fire and forget on purpose: the result comes back through SetIssues
                 ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
                 {
                     try
                     {
-                        var found = await Task.Run(() => CodeAnalyzer.Analyze(text, settings));
+                        var found = await Task.Run(() => CodeAnalyzer.Analyze(text, settings, metadata));
                         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
                         // A newer run or a closed window makes this result obsolete.

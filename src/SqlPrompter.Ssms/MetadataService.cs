@@ -1,4 +1,5 @@
 using System.ComponentModel.Composition;
+using System.Threading;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
@@ -27,6 +28,11 @@ namespace SqlPrompter.Ssms
 
         public MetadataCacheManager Caches { get; } = new MetadataCacheManager(Log.Write);
 
+        /// <summary>The metadata that the active window had loaded when it was last seen (never loads, never waits); null when there is none. Safe from any thread.</summary>
+        public SqlPrompter.Core.Model.IDatabaseMetadata CachedMetadata => Volatile.Read(ref lastMetadata);
+
+        private SqlPrompter.Core.Model.IDatabaseMetadata lastMetadata;
+
         /// <summary>
         /// Cache for the active window's connection; starts loading its snapshot in the background if there is none yet.
         /// Null when the window is not connected or the authentication type is not supported.
@@ -39,6 +45,7 @@ namespace SqlPrompter.Ssms
             var settings = SsmsConnection.GetActive();
             if (settings == null || !settings.CanConnect)
             {
+                Volatile.Write(ref lastMetadata, null);
                 return null;
             }
 
@@ -54,7 +61,28 @@ namespace SqlPrompter.Ssms
                 _ = cache.EnsureLoaded(loader);
             }
 
+            // Whatever window is active now decides which metadata the analysis may use (none while it has none): never the one of another connection.
+            Volatile.Write(ref lastMetadata, cache.Current);
             return cache;
+        }
+
+        /// <summary>
+        /// The loaded metadata of the database a script works in (the last USE line of the text, else the database of the window), for the code analysis (#208);
+        /// null while it is not loaded (loading starts, nothing is waited for). Remembered for <see cref="CachedMetadata"/>.
+        /// </summary>
+        public SqlPrompter.Core.Model.IDatabaseMetadata MetadataForScript(string text)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            string database = null;
+            foreach (var line in (text ?? string.Empty).Split('\n'))
+            {
+                if (line.Length <= 300 && SqlPrompter.Core.Analysis.UseStatement.TryParse(line.TrimEnd('\r'), out var used))
+                {
+                    database = used;
+                }
+            }
+
+            return CacheForActiveWindow(out _, database)?.Current;
         }
 
         /// <summary>

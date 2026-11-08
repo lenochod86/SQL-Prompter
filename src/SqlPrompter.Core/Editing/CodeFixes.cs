@@ -11,7 +11,7 @@ namespace SqlPrompter.Core.Editing
         /// The script with the repair of every issue that has one (the rules switched on in <paramref name="settings"/>); text that is not an issue stays as it was.
         /// Overlapping repairs: the first one wins.
         /// </summary>
-        public static string Apply(string text, AnalysisSettings settings)
+        public static string Apply(string text, AnalysisSettings settings, SqlPrompter.Core.Model.IDatabaseMetadata metadata = null)
         {
             if (string.IsNullOrEmpty(text) || settings == null)
             {
@@ -21,7 +21,7 @@ namespace SqlPrompter.Core.Editing
             // The command works also when the squiggles are off.
             var rules = settings.Clone();
             rules.Enabled = true;
-            var fixes = CodeAnalyzer.Analyze(text, rules).Where(i => i.Fix != null).Select(i => i.Fix).OrderBy(f => f.Start).ToList();
+            var fixes = CodeAnalyzer.Analyze(text, rules, metadata).Where(i => i.Fix != null).Select(i => i.Fix).OrderBy(f => f.Start).ToList();
             var result = text;
             var limit = int.MaxValue;
             foreach (var fix in Enumerable.Reverse(fixes))
