@@ -34,6 +34,9 @@ namespace SqlPrompter.Ssms
             public bool Dark;
         }
 
+        /// <summary>The palette of the last application, read by the paint handlers of the buttons (it follows a theme change).</summary>
+        private static Palette latest;
+
         private static Palette Current()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -72,6 +75,7 @@ namespace SqlPrompter.Ssms
                 {
                     ThreadHelper.ThrowIfNotOnUIThread();
                     var palette = Current();
+                    latest = palette;
                     form.BackColor = palette.Back;
                     form.ForeColor = palette.Fore;
                     Tree(form, palette);
@@ -115,6 +119,7 @@ namespace SqlPrompter.Ssms
 
         private static void Tree(Control control, Palette p)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             foreach (Control child in control.Controls)
             {
                 One(child, p);
@@ -148,6 +153,7 @@ namespace SqlPrompter.Ssms
 
         private static void One(Control control, Palette p)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             if (!(control is Button) && !(control is Label) && !(control is CheckBox))
             {
                 NativeTheme(control, p);
@@ -167,6 +173,25 @@ namespace SqlPrompter.Ssms
                         button.BackColor = p.Button;
                         button.ForeColor = p.Fore;
                         button.UseVisualStyleBackColor = false;
+                        button.FlatAppearance.BorderSize = 1;
+                        button.FlatAppearance.MouseOverBackColor = Blend(p.Button, p.Fore, 0.12);
+                        button.FlatAppearance.MouseDownBackColor = Blend(p.Button, p.Fore, 0.22);
+                        if (!(button.Tag is string tag) || tag != "themed")
+                        {
+                            button.Tag = "themed";
+                            // The flat button draws a thick border in the text color when it is the default or focused one; a frame of our own covers it.
+                            button.Paint += (s, e) =>
+                            {
+                                var b = (Button)s;
+                                var theme = latest ?? p;
+                                using (var outer = new Pen(Blend(theme.Back, theme.Fore, 0.35)))
+                                using (var inner = new Pen(b.Enabled ? b.BackColor : theme.Back))
+                                {
+                                    e.Graphics.DrawRectangle(inner, 1, 1, b.Width - 3, b.Height - 3);
+                                    e.Graphics.DrawRectangle(outer, 0, 0, b.Width - 1, b.Height - 1);
+                                }
+                            };
+                        }
                     }
 
                     return;
