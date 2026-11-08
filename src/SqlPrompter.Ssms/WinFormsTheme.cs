@@ -48,7 +48,8 @@ namespace SqlPrompter.Ssms
                 Back = back,
                 Fore = fore,
                 Border = Blend(back, fore, 0.35),
-                Input = Blend(back, fore, 0.07),
+                // Dark: a little lighter than the window; light: white, like a normal input field (a gray one looks disabled).
+                Input = Brightness(back) < 128 ? Blend(back, fore, 0.07) : Color.White,
                 Button = Blend(back, fore, 0.14),
                 Muted = Blend(fore, back, 0.45),
                 Dark = Brightness(back) < 128,
@@ -205,8 +206,9 @@ namespace SqlPrompter.Ssms
                 case RichTextBox _:
                     control.BackColor = p.Input;
                     control.ForeColor = p.Fore;
-                    if (control is ComboBox combo)
+                    if (control is ComboBox combo && p.Dark)
                     {
+                        // Flat only in a dark theme: the flat combo box has no frame, which a light theme needs.
                         combo.FlatStyle = FlatStyle.Flat;
                     }
 
