@@ -20,7 +20,7 @@ namespace SqlPrompter.Ssms
         private readonly List<SettingsPage> pages = new List<SettingsPage>();
         private PrompterSettings work = SettingsService.Current.Clone();
 
-        public SettingsWindow()
+        public SettingsWindow(string startPage = null)
         {
             Text = "SQL Prompter Settings";
             StartPosition = FormStartPosition.CenterParent;
@@ -62,7 +62,8 @@ namespace SqlPrompter.Ssms
             Controls.Add(groups);
             Controls.Add(buttons);
             ReloadPages();
-            groups.SelectedIndex = 0;
+            var start = startPage == null ? -1 : pages.FindIndex(p => string.Equals(p.Title, startPage, StringComparison.OrdinalIgnoreCase));
+            groups.SelectedIndex = start >= 0 ? start : 0;
             WinFormsTheme.Apply(this);
         }
 
