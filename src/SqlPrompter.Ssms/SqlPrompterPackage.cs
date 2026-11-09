@@ -80,6 +80,7 @@ namespace SqlPrompter.Ssms
             HistoryService.Start();
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             TabColoring.Start();
+            HideSsmsTabColor.Register();
             DefaultKeyBindings.Apply();
             GridContextMenu.Install();
             ToolbarVisibility.ShowOnce();

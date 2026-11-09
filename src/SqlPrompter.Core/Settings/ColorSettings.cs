@@ -59,6 +59,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "colorShellStatusBar")]
         public bool ColorShellStatusBar { get; set; }
 
+        /// <summary>Hide the SSMS item "Set Tab Color" (its fixed palette) in the tab menu, so that only our "Tab Color" is there (#407).</summary>
+        [DataMember(Name = "hideSsmsTabColorMenu")]
+        public bool HideSsmsTabColorMenu { get; set; }
+
         [DataMember(Name = "environments")]
         public List<ColorEnvironment> Environments { get; set; }
 
@@ -72,6 +76,7 @@ namespace SqlPrompter.Core.Settings
             ColorTab = ColorTab,
             ColorWindowStatusBar = ColorWindowStatusBar,
             ColorShellStatusBar = ColorShellStatusBar,
+            HideSsmsTabColorMenu = HideSsmsTabColorMenu,
             Environments = Environments.Select(e => new ColorEnvironment { Name = e.Name, Color = e.Color }).ToList(),
             Rules = Rules.Select(r => new ColorRule { Server = r.Server, Database = r.Database, Environment = r.Environment, AskBeforeChanges = r.AskBeforeChanges }).ToList(),
         };
@@ -92,6 +97,7 @@ namespace SqlPrompter.Core.Settings
             ColorTab = true;
             ColorWindowStatusBar = true;
             ColorShellStatusBar = false;
+            HideSsmsTabColorMenu = true;
             Environments = new List<ColorEnvironment>();
             Rules = new List<ColorRule>();
         }
