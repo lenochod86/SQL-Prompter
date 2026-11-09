@@ -44,7 +44,7 @@ namespace SqlPrompter.Ssms
         {
             try
             {
-                if (cCmds == 1 && pguidCmdGroup == TabWellGroup && prgCmds[0].cmdID >= FirstId && prgCmds[0].cmdID <= LastId && SettingsService.Current.Coloring.HideSsmsTabColorMenu)
+                if (cCmds == 1 && pguidCmdGroup == TabWellGroup && prgCmds[0].cmdID >= FirstId && prgCmds[0].cmdID <= LastId && SettingsService.Current.Coloring.Enabled)
                 {
                     prgCmds[0].cmdf = (uint)(OLECMDF.OLECMDF_SUPPORTED | OLECMDF.OLECMDF_INVISIBLE);
                     return 0;
