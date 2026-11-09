@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using SqlPrompter.Core.Coloring;
 using SqlPrompter.Core.Settings;
@@ -44,7 +45,7 @@ namespace SqlPrompter.Tests
 
             var problems = ColorSettingsValidator.Validate(settings);
 
-            Assert.Contains("Rule 2 has no server (use * for every server).", problems);
+            Assert.DoesNotContain(problems, p => p.StartsWith("Rule 2 ", StringComparison.Ordinal));
             Assert.Contains("Rule 3 uses the environment \"Missing\", which does not exist.", problems);
             Assert.Contains("Rule 4 has no environment.", problems);
         }

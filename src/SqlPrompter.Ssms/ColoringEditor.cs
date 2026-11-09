@@ -45,7 +45,7 @@ namespace SqlPrompter.Ssms
             top.Controls.Add(enabled);
             top.Controls.Add(parts);
             layout.Controls.Add(top, 0, 0);
-            layout.Controls.Add(Heading("Rules: server and database with * and ? wildcards (an empty database means every database). The environment gives the color; " +
+            layout.Controls.Add(Heading("Rules: server and database with * and ? wildcards (an empty server or database means every server or database, shown as a gray placeholder). The environment gives the color; " +
                 "pick one or choose \"New environment...\", and click the color of a row to change the color of that environment. The most specific rule wins, " +
                 "whatever the order: a rule with a database, then one without wildcards, then the longer pattern."), 0, 1);
 
@@ -64,6 +64,7 @@ namespace SqlPrompter.Ssms
             };
             rules.CellValueChanged += RuleCellValueChanged;
             rules.CellClick += RuleCellClick;
+            rules.CellPainting += PaintPlaceholder;
             rules.UserDeletedRow += (s, e) => Revalidate();
             layout.Controls.Add(rules, 0, 2);
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
@@ -259,6 +260,36 @@ namespace SqlPrompter.Ssms
             }
 
             environmentColumn.Items.Add(NewEnvironmentItem);
+        }
+
+        /// <summary>An empty Server or Database cell shows a muted placeholder that says what empty means; the cell value stays empty. The colors come from the grid, which follows the SSMS theme.</summary>
+        private void PaintPlaceholder(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.ColumnIndex > 1 || e.Graphics == null)
+            {
+                return;
+            }
+
+            var cell = rules[e.ColumnIndex, e.RowIndex];
+            if (!string.IsNullOrEmpty(Convert.ToString(cell.Value)) || cell.IsInEditMode)
+            {
+                return;
+            }
+
+            e.Paint(e.ClipBounds, e.PaintParts & ~DataGridViewPaintParts.ContentForeground);
+            var selected = (e.State & DataGridViewElementStates.Selected) != 0;
+            var back = selected ? e.CellStyle.SelectionBackColor : e.CellStyle.BackColor;
+            var fore = selected ? e.CellStyle.SelectionForeColor : e.CellStyle.ForeColor;
+            var muted = Color.FromArgb(
+                (int)(fore.R * 0.55 + back.R * 0.45), (int)(fore.G * 0.55 + back.G * 0.45), (int)(fore.B * 0.55 + back.B * 0.45));
+            using (var italic = new Font(e.CellStyle.Font ?? rules.Font, FontStyle.Italic))
+            {
+                var bounds = Rectangle.Inflate(e.CellBounds, -2, 0);
+                TextRenderer.DrawText(e.Graphics, e.ColumnIndex == 0 ? "All servers" : "All databases", italic, bounds, muted,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
+
+            e.Handled = true;
         }
 
         private void PaintAllColors()
