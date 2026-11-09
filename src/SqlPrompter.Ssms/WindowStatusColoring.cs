@@ -115,7 +115,7 @@ namespace SqlPrompter.Ssms
             public Color? Color;
         }
 
-        private static Color? Wanted(Control editor, ColorSettings coloring)
+        internal static Color? Wanted(Control editor, ColorSettings coloring)
         {
             var type = editor.GetType();
             if (!(type.GetProperty("IsConnected")?.GetValue(editor) is bool connected) || !connected)
