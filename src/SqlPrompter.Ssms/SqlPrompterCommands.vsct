@@ -36,6 +36,14 @@
           <CommandName>Formatting Styles</CommandName>
         </Strings>
       </Menu>
+      <!-- The Tab Color item of the context menu of a document tab: the environments of the coloring settings (dynamic items) and Edit Environments. -->
+      <Menu guid="guidSqlPrompterCmdSet" id="TabColorMenu" priority="0x0200" type="Menu">
+        <Parent guid="guidSqlPrompterCmdSet" id="TabColorHostGroup" />
+        <Strings>
+          <ButtonText>Tab Color</ButtonText>
+          <CommandName>Tab Color</CommandName>
+        </Strings>
+      </Menu>
       <!-- A toolbar of its own for the query history, so that the button is not lost among the standard buttons. -->
       <Menu guid="guidSqlPrompterCmdSet" id="SqlHistoryToolbar" priority="0x0100" type="Toolbar">
         <CommandFlag>DefaultDocked</CommandFlag>
@@ -71,6 +79,15 @@
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="StylesEditGroup" priority="0x0200">
         <Parent guid="guidSqlPrompterCmdSet" id="FormattingStylesMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="TabColorHostGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_EZDOCWINTAB" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="TabColorListGroup" priority="0x0100">
+        <Parent guid="guidSqlPrompterCmdSet" id="TabColorMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="TabColorEditGroup" priority="0x0200">
+        <Parent guid="guidSqlPrompterCmdSet" id="TabColorMenu" />
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="FormattingGroup" priority="0x0540">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
@@ -115,6 +132,21 @@
         <CommandFlag>TextChanges</CommandFlag>
         <Strings>
           <ButtonText>Style</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidEditEnvironments" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="TabColorEditGroup" />
+        <Strings>
+          <ButtonText>Edit Environments...</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidTabColorItem" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="TabColorListGroup" />
+        <CommandFlag>DynamicItemStart</CommandFlag>
+        <CommandFlag>DynamicVisibility</CommandFlag>
+        <CommandFlag>TextChanges</CommandFlag>
+        <Strings>
+          <ButtonText>Environment</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidSurroundWithSnippet" priority="0x0090" type="Button">
@@ -382,6 +414,12 @@
       <IDSymbol name="StylesListGroup" value="0x101C" />
       <IDSymbol name="StylesEditGroup" value="0x101D" />
       <IDSymbol name="cmdidFormattingStyleItem" value="0x0400" />
+      <IDSymbol name="TabColorMenu" value="0x1006" />
+      <IDSymbol name="TabColorListGroup" value="0x101E" />
+      <IDSymbol name="TabColorEditGroup" value="0x101F" />
+      <IDSymbol name="TabColorHostGroup" value="0x1020" />
+      <IDSymbol name="cmdidTabColorItem" value="0x0600" />
+      <IDSymbol name="cmdidEditEnvironments" value="0x0134" />
       <IDSymbol name="RefactorMenu" value="0x1002" />
       <IDSymbol name="RefactorHostGroup" value="0x1019" />
       <IDSymbol name="CopyAsMenu" value="0x1003" />

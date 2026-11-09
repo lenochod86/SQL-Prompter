@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 43)]
+    [ProvideMenuResource("Menus.ctmenu", 44)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -25,6 +25,7 @@ namespace SqlPrompter.Ssms
         public const int OpenLogId = 0x0101;
         public const int SettingsId = 0x011F;
         public const int FormattingStylesId = 0x0120;
+        public const int EditEnvironmentsId = 0x0134;
         public const int ShowSuggestionsId = 0x0121;
         public const int PickerLeftId = 0x0122;
         public const int PickerRightId = 0x0123;
@@ -89,6 +90,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => OpenSettings(), new CommandID(CommandSet, SettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => FormattingStylesWindow.Open(), new CommandID(CommandSet, FormattingStylesId)));
                 FormattingStylesMenu.Register(commands, CommandSet);
+                TabColorMenu.Register(commands, CommandSet, EditEnvironmentsId);
                 commands.AddCommand(new MenuCommand((s, e) => ShowSuggestions(), new CommandID(CommandSet, ShowSuggestionsId)));
                 commands.AddCommand(new MenuCommand((s, e) => PickerKey(left: true), new CommandID(CommandSet, PickerLeftId)));
                 commands.AddCommand(new MenuCommand((s, e) => PickerKey(left: false), new CommandID(CommandSet, PickerRightId)));
@@ -164,12 +166,12 @@ namespace SqlPrompter.Ssms
             public IntPtr Handle => System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
         }
 
-        internal static void OpenSettings()
+        internal static void OpenSettings(string page = null)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
-                using (var window = new SettingsWindow())
+                using (var window = new SettingsWindow(page))
                 {
                     window.ShowDialog(new MainWindowOwner());
                 }
