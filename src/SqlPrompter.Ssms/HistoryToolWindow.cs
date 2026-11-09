@@ -28,11 +28,22 @@ namespace SqlPrompter.Ssms
             (Frame as IVsWindowFrame)?.CloseFrame((uint)__FRAMECLOSE.FRAMECLOSE_NoSave);
         }
 
-        /// <summary>Builds the content again, with the entries as they are now (the history is opened again).</summary>
-        internal void Reload()
+        private HistoryWindow window;
+
+        /// <summary>The content was built a moment ago by the constructor: the first opening does not read the entries again.</summary>
+        internal bool JustCreated { get; set; } = true;
+
+        /// <summary>Reads the entries again into the content that is shown (the history is opened again).</summary>
+        internal void Refresh()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var window = new HistoryWindow
+            window?.Refresh();
+        }
+
+        private void Reload()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            window = new HistoryWindow
             {
                 Picked = (entry, makeSnippet) => SqlPrompterPackage.OpenHistoryEntry(entry, makeSnippet),
                 CloseRequested = CloseTab,

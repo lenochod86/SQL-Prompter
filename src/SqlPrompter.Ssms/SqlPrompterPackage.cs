@@ -275,9 +275,15 @@ namespace SqlPrompter.Ssms
                     return false;
                 }
 
-                if (frame.IsVisible() == VSConstants.S_OK)
+                // An open tab is read again every time the history is opened, also when it is behind another tab (IsVisible is false then): the tab
+                // showed the entries of the time it was created.
+                if (pane.JustCreated)
                 {
-                    pane.Reload();
+                    pane.JustCreated = false;
+                }
+                else
+                {
+                    pane.Refresh();
                 }
 
                 Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(frame.Show());

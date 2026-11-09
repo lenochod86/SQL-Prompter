@@ -348,6 +348,22 @@ namespace SqlPrompter.Ssms
             "</StackPanel>" +
             "</Grid></DataTemplate>";
 
+        /// <summary>Reads the entries again (the history is opened again while its tab is open) and keeps the filter and the view.</summary>
+        internal void Refresh()
+        {
+            EnvironmentCache.Reset();
+            var id = (list.SelectedItem as Row)?.Entry.Id;
+            Fill();
+            foreach (Row item in list.Items)
+            {
+                if (item.Entry.Id == id)
+                {
+                    list.SelectedItem = item;
+                    break;
+                }
+            }
+        }
+
         private void Fill()
         {
             var everything = HistoryService.Entries;
