@@ -24,6 +24,9 @@ namespace SqlPrompter.Core.Compatibility
 
         /// <summary>Ctrl+Left / Ctrl+Right keep their meaning of moving by a word where the column picker does not take them.</summary>
         WordKeys,
+
+        /// <summary>Ctrl+F12: selecting the object under the caret in Object Explorer (#222).</summary>
+        ObjectExplorer,
     }
 
     /// <summary>One undocumented thing SQL Prompter relies on (a type, a member, a DTE command) and the features that need it.</summary>
@@ -58,6 +61,7 @@ namespace SqlPrompter.Core.Compatibility
         public const string CommandDisconnect = "Command.Query.Disconnect";
         public const string CommandWordPrevious = "Command.Edit.WordPrevious";
         public const string CommandWordNext = "Command.Edit.WordNext";
+        public const string ObjectExplorerService = "ObjectExplorerService.Members";
 
         public static IReadOnlyList<CompatibilityRequirement> All { get; } = new[]
         {
@@ -80,6 +84,7 @@ namespace SqlPrompter.Core.Compatibility
             new CompatibilityRequirement(CommandDisconnect, "command Query.Disconnect", SsmsFeature.RestoreTabs),
             new CompatibilityRequirement(CommandWordPrevious, "command Edit.WordPrevious", SsmsFeature.WordKeys),
             new CompatibilityRequirement(CommandWordNext, "command Edit.WordNext", SsmsFeature.WordKeys),
+            new CompatibilityRequirement(ObjectExplorerService, "IObjectExplorerService with FindNode(string) and SynchronizeTree(INodeInformation) (SqlWorkbench.Interfaces)", SsmsFeature.ObjectExplorer),
         };
     }
 
@@ -160,6 +165,7 @@ namespace SqlPrompter.Core.Compatibility
                 case SsmsFeature.ResultsGrid: return "the results grid actions";
                 case SsmsFeature.ExecuteHook: return "the actions around running a query (metadata refresh, warnings, history)";
                 case SsmsFeature.WordKeys: return "Ctrl+Left / Ctrl+Right as word keys";
+                case SsmsFeature.ObjectExplorer: return "Ctrl+F12 (select the object in Object Explorer)";
                 default: return feature.ToString();
             }
         }

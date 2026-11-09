@@ -126,6 +126,8 @@ namespace SqlPrompter.Ssms
                     return Command(dte, "Edit.WordPrevious");
                 case CompatibilityRequirements.CommandWordNext:
                     return Command(dte, "Edit.WordNext");
+                case CompatibilityRequirements.ObjectExplorerService:
+                    return LocateInObjectExplorer.Problem();
                 default:
                     return "no probe for this requirement";
             }

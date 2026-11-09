@@ -161,6 +161,12 @@
           <ButtonText>Go To Definition</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidLocateInObjectExplorer" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
+        <Strings>
+          <ButtonText>Show In Object Explorer</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidRunStatement" priority="0x0101" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
         <Strings>
@@ -421,6 +427,7 @@
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />
       <IDSymbol name="cmdidAddQuotesAndCommas" value="0x0110" />
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
+      <IDSymbol name="cmdidLocateInObjectExplorer" value="0x0133" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
       <IDSymbol name="cmdidParameterInfo" value="0x010D" />
       <IDSymbol name="cmdidSurroundWithSnippet" value="0x0107" />
