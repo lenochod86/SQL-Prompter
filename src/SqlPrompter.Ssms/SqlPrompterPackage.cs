@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 42)]
+    [ProvideMenuResource("Menus.ctmenu", 43)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -37,6 +37,7 @@ namespace SqlPrompter.Ssms
         public const int NewSnippetFromSelectionId = 0x0108;
         public const int ManageSnippetsId = 0x0109;
         public const int GoToDefinitionId = 0x010B;
+        public const int LocateInObjectExplorerId = 0x0133;
         public const int RunStatementId = 0x010C;
         public const int ParameterInfoId = 0x010D;
         public const int AddCommasId = 0x010F;
@@ -95,6 +96,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => NewSnippetFromSelection(), new CommandID(CommandSet, NewSnippetFromSelectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
                 commands.AddCommand(new MenuCommand((s, e) => GoToDefinitionHandler.Run(ActiveEditor.GetView()), new CommandID(CommandSet, GoToDefinitionId)));
+                commands.AddCommand(new MenuCommand((s, e) => LocateInObjectExplorer.Run(ActiveEditor.GetView()), new CommandID(CommandSet, LocateInObjectExplorerId)));
                 commands.AddCommand(new MenuCommand((s, e) => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddCommas, "commas"), new CommandID(CommandSet, AddCommasId)));
                 commands.AddCommand(new MenuCommand((s, e) => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddQuotesAndCommas, "quotes and commas"), new CommandID(CommandSet, AddQuotesAndCommasId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenQueryHistory(), new CommandID(CommandSet, QueryHistoryId)));
