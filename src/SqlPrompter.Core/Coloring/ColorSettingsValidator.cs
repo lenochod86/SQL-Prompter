@@ -34,11 +34,6 @@ namespace SqlPrompter.Core.Coloring
             for (var i = 0; i < settings.Rules.Count; i++)
             {
                 var rule = settings.Rules[i];
-                if (string.IsNullOrWhiteSpace(rule.Server))
-                {
-                    problems.Add("Rule " + (i + 1) + " has no server (use * for every server).");
-                }
-
                 var environment = (rule.Environment ?? string.Empty).Trim();
                 if (environment.Length == 0)
                 {
