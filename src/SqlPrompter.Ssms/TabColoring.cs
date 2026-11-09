@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -49,26 +50,71 @@ namespace SqlPrompter.Ssms
                 // The status bar inside each query window is colored by the connection of that window, whichever tab is in front. The window in
                 // front also decides the tab and the shell status bar, from its own connection state: an unconnected window gets no color (#317).
                 var front = WindowStatusColoring.Update(new System.Windows.Interop.WindowInteropHelper(window).Handle, coloring, coloring.Enabled && coloring.ColorWindowStatusBar);
-                var document = front.Found ? FindActiveDocumentView(window) : null;
-                if (document == null)
+
+                // The tab (accent bar, tint and the frame that comes with it) of every query window follows the connection of that window, so two
+                // tab groups side by side each show their own color (#393). Windows that are not query windows get nothing.
+                var documents = new List<object>();
+                foreach (Window w in Application.Current.Windows)
                 {
-                    return;
+                    CollectDocumentViews(w, documents);
                 }
 
-                Brush wanted = null;
-                if (coloring.Enabled && front.Color is System.Drawing.Color color)
+                foreach (var document in documents)
                 {
-                    wanted = new SolidColorBrush(System.Windows.Media.Color.FromRgb(color.R, color.G, color.B));
-                    wanted.Freeze();
+                    try
+                    {
+                        Apply(document, coloring.Enabled && coloring.ColorTab ? WantedBrush(EditorOf(document), coloring) : null);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Coloring a tab failed", ex);
+                    }
                 }
 
-                Apply(document, coloring.ColorTab ? wanted : null);
-                ApplyStatusBar(window, coloring.ColorShellStatusBar ? wanted : null);
-            }            catch (Exception ex)
+                // The shell status bar follows the window in front only.
+                if (front.Found)
+                {
+                    Brush wanted = null;
+                    if (coloring.Enabled && front.Color is System.Drawing.Color color)
+                    {
+                        wanted = new SolidColorBrush(System.Windows.Media.Color.FromRgb(color.R, color.G, color.B));
+                        wanted.Freeze();
+                    }
+
+                    ApplyStatusBar(window, coloring.ColorShellStatusBar ? wanted : null);
+                }
+            }
+            catch (Exception ex)
             {
                 Log.Error("Coloring the tab failed", ex);
             }
         }
+
+        /// <summary>The query editor control (<c>SqlScriptEditorControl</c>) of the window frame of a <c>DocumentView</c>; null for other documents. Verified in SSMS 22.11: the DocView of the frame is that control.</summary>
+        private static System.Windows.Forms.Control EditorOf(object document)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var frame = document.GetType().GetProperty("WindowFrame", BindingFlags.Public | BindingFlags.Instance)?.GetValue(document) as Microsoft.VisualStudio.Shell.Interop.IVsWindowFrame;
+            if (frame == null || frame.GetProperty((int)Microsoft.VisualStudio.Shell.Interop.__VSFPROPID.VSFPROPID_DocView, out var docView) != 0)
+            {
+                return null;
+            }
+
+            return docView is System.Windows.Forms.Control control && control.GetType().Name == "SqlScriptEditorControl" ? control : null;
+        }
+
+        private static Brush WantedBrush(System.Windows.Forms.Control editor, SqlPrompter.Core.Settings.ColorSettings coloring)
+        {
+            if (editor == null || !(WindowStatusColoring.Wanted(editor, coloring) is System.Drawing.Color color))
+            {
+                return null;
+            }
+
+            var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(color.R, color.G, color.B));
+            brush.Freeze();
+            return brush;
+        }
+
         private static void Apply(object document, Brush wanted)
         {
             var type = document.GetType();
@@ -174,30 +220,29 @@ namespace SqlPrompter.Ssms
             return null;
         }
 
-        private static object FindActiveDocumentView(DependencyObject root)
+        /// <summary>The <c>DocumentView</c> of every tab in the visual tree (every tab group, and floating windows when their window is passed), not only the active one.</summary>
+        private static void CollectDocumentViews(DependencyObject root, List<object> found)
         {
             if (root == null)
             {
-                return null;
+                return;
             }
 
             if (root.GetType().Name == "DocumentTabItem" && root is FrameworkElement tab && tab.DataContext?.GetType().Name == "DocumentView")
             {
-                var isActive = tab.GetType().GetProperty("IsActive")?.GetValue(tab) as bool?;
-                return isActive == true ? tab.DataContext : null;
+                if (!found.Contains(tab.DataContext))
+                {
+                    found.Add(tab.DataContext);
+                }
+
+                return;
             }
 
             var count = root is Visual || root is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetChildrenCount(root) : 0;
             for (var i = 0; i < count; i++)
             {
-                var found = FindActiveDocumentView(VisualTreeHelper.GetChild(root, i));
-                if (found != null)
-                {
-                    return found;
-                }
+                CollectDocumentViews(VisualTreeHelper.GetChild(root, i), found);
             }
-
-            return null;
         }
 
         private sealed class AppliedColor
