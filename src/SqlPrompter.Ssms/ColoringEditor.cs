@@ -43,7 +43,7 @@ namespace SqlPrompter.Ssms
             var parts = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Margin = new Padding(0, 2, 0, 4) };
             parts.Controls.AddRange(new Control[] { new Label { Text = "Colored parts:", AutoSize = true, Margin = new Padding(0, 3, 0, 0) }, colorTab, colorWindowBar, colorShellBar });
             top.Controls.Add(enabled);
-            top.Controls.Add(new Label { Text = "Hides the default SSMS Set Tab Color of SSMS in the tab menu and uses Tab Color of SQL Prompter.", AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(20, 0, 0, 4) });
+            top.Controls.Add(new Label { Text = "Hides the default SSMS Set Tab Color in the tab menu and uses Tab Color of SQL Prompter.", AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(20, 0, 0, 4) });
             top.Controls.Add(parts);
             layout.Controls.Add(top, 0, 0);
             layout.Controls.Add(Heading("Rules: server and database with * and ? wildcards (an empty server or database means every server or database, shown as a gray placeholder). The environment gives the color; " +
