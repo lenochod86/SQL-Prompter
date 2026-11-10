@@ -179,6 +179,11 @@ namespace SqlPrompter.Core.Formatting
                 applied.Add("onOnNewLine = " + onNewLine.Value);
             }
 
+            ImportFlag("lists.alignItemsAcrossClauses", "alignAcrossClauses", v => style.AlignAcrossClauses = v);
+            ImportFlag("joinStatements.join.indentJoinTable", "indentJoinTable", v => style.IndentJoinTable = v);
+            ImportFlag("variables.placeEqualsSignOnNewLine", "equalsOnNewLine", v => style.EqualsOnNewLine = v);
+            ImportFlag("controlFlow.indentBeginAndEndKeywords", "indentBeginEnd", v => style.IndentBeginEnd = v);
+
             foreach (var path in Leaves(root, string.Empty))
             {
                 if (!used.Contains(path) && !path.StartsWith("metadata.", StringComparison.Ordinal))
@@ -188,6 +193,18 @@ namespace SqlPrompter.Core.Formatting
             }
 
             return new StyleImportResult(style, applied, notes, (Find(root, "metadata.name", used) as string), approximate);
+
+            void ImportFlag(string path, string name, Action<bool> set)
+            {
+                var value = Flag(path);
+                if (value == null)
+                {
+                    return;
+                }
+
+                set(value.Value);
+                applied.Add(name + " = " + value.Value);
+            }
 
             void SetCase(string path, Action<CaseStyle> set, string name)
             {

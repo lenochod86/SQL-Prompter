@@ -114,6 +114,22 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "alignComparisons")]
         public bool AlignComparisons { get; set; }
 
+        /// <summary>The items of every clause of a statement start in one column (that of the longest keyword), not each after its own keyword (#305).</summary>
+        [DataMember(Name = "alignAcrossClauses")]
+        public bool AlignAcrossClauses { get; set; }
+
+        /// <summary>JOIN lines are indented to the column of the table after FROM (#305).</summary>
+        [DataMember(Name = "indentJoinTable")]
+        public bool IndentJoinTable { get; set; }
+
+        /// <summary><c>SET @x = value</c> that is not collapsed puts the equals sign and the value on the next line (#305).</summary>
+        [DataMember(Name = "equalsOnNewLine")]
+        public bool EqualsOnNewLine { get; set; }
+
+        /// <summary>BEGIN and END are indented one level under the IF, WHILE or ELSE they belong to, and the contents one more level (#305).</summary>
+        [DataMember(Name = "indentBeginEnd")]
+        public bool IndentBeginEnd { get; set; }
+
         /// <summary>The contents of BEGIN … END are indented.</summary>
         [DataMember(Name = "indentBlocks")]
         public bool IndentBlocks { get; set; }
@@ -149,6 +165,10 @@ namespace SqlPrompter.Core.Formatting
             OnOnNewLine = false;
             AlignAliases = false;
             AlignComparisons = false;
+            AlignAcrossClauses = false;
+            IndentJoinTable = false;
+            EqualsOnNewLine = false;
+            IndentBeginEnd = false;
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;
