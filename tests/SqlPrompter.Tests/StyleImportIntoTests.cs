@@ -49,9 +49,22 @@ namespace SqlPrompter.Tests
             var second = SqlPromptStyleImporter.ImportInto(styles, Style, "a.json", out _);
             var third = SqlPromptStyleImporter.ImportInto(styles, Style, "a.json", out _);
 
-            Assert.Equal(new[] { "Default", "Team style", "Team style 2", "Team style 3" }, styles.Select(s => s.Name).ToArray());
-            Assert.Equal("Team style 3", third.Name);
+            Assert.Equal(new[] { "Default", "Team style", "Team style (1)", "Team style (2)" }, styles.Select(s => s.Name).ToArray());
+            Assert.Equal("Team style (2)", third.Name);
             Assert.NotSame(second, third);
+        }
+
+        [Fact]
+        public void AGapInTheNumbersIsFilledWithTheLowestFreeOne()
+        {
+            var styles = new List<NamedFormatStyle>
+            {
+                new NamedFormatStyle("Team style", new FormatStyle()),
+                new NamedFormatStyle("Team style (2)", new FormatStyle()),
+            };
+
+            Assert.Equal("Team style (1)", SqlPromptStyleImporter.ImportInto(styles, Style, "a.json", out _).Name);
+            Assert.Equal("Team style (3)", SqlPromptStyleImporter.ImportInto(styles, Style, "a.json", out _).Name);
         }
 
         [Fact]
@@ -59,7 +72,7 @@ namespace SqlPrompter.Tests
         {
             var styles = new List<NamedFormatStyle> { new NamedFormatStyle("TEAM STYLE", new FormatStyle()) };
 
-            Assert.Equal("Team style 2", SqlPromptStyleImporter.ImportInto(styles, Style, "a.json", out _).Name);
+            Assert.Equal("Team style (1)", SqlPromptStyleImporter.ImportInto(styles, Style, "a.json", out _).Name);
         }
 
         [Theory]
