@@ -86,6 +86,7 @@ namespace SqlPrompter.Core.Formatting
                 var output = new StringBuilder();
                 var level = 0;
                 var blocks = new Stack<int>();
+                var extras = new Stack<int>();
                 var bodyDepth = 0;
                 string carry = null; // "ELSE " in front of the IF that follows
                 var previousEnd = -1;
@@ -111,12 +112,14 @@ namespace SqlPrompter.Core.Formatting
                                        secondWord != "DIALOG" && secondWord != "CONVERSATION";
                     var isBlockEnd = head == "END";
                     var isHeader = head == "IF" || head == "WHILE" || head == "ELSE";
+                    var endExtra = 0;
                     if (isBlockEnd && blocks.Count > 0 && style.IndentBlocks)
                     {
                         level -= blocks.Pop();
+                        endExtra = extras.Pop();
                     }
 
-                    var effective = isGo ? 0 : level + (isBlockEnd ? 0 : isBlockStart ? Math.Max(0, bodyDepth - 1) : bodyDepth);
+                    var effective = isGo ? 0 : level + (isBlockEnd ? endExtra : isBlockStart ? (style.IndentBeginEnd ? bodyDepth : Math.Max(0, bodyDepth - 1)) : bodyDepth);
                     foreach (var comment in statement.Leading)
                     {
                         output.Append(Indent(effective * style.TabWidth)).Append(comment.Text).Append(nl);
@@ -128,6 +131,7 @@ namespace SqlPrompter.Core.Formatting
                         body = FormatTokens.Apply("GO", style.KeywordCase) + string.Concat(statement.Body.Skip(1).Select(t => " " + t.Text));
                         level = 0;
                         blocks.Clear();
+                        extras.Clear();
                         bodyDepth = 0;
                     }
                     else
@@ -161,7 +165,8 @@ namespace SqlPrompter.Core.Formatting
                         {
                             if (style.IndentBlocks)
                             {
-                                var offset = Math.Max(0, bodyDepth - 1);
+                                var offset = style.IndentBeginEnd ? bodyDepth : Math.Max(0, bodyDepth - 1);
+                                extras.Push(style.IndentBeginEnd ? bodyDepth : 0);
                                 blocks.Push(offset + 1);
                                 level += offset + 1;
                             }
@@ -393,6 +398,15 @@ namespace SqlPrompter.Core.Formatting
                 {
                     lines = LayoutCreateTable(r, column);
                 }
+                else if (head == "SET" && style.EqualsOnNewLine && r.Count > 3 && r[1].Kind == TokenKind.Variable && r[2].Kind == TokenKind.Operator && r[2].Text == "=")
+                {
+                    // SET @x = value with the equals sign on a line of its own, unless the statement is short enough to stay on one line (#305).
+                    var flat = Flat(r, 0, r.Count);
+                    if (style.CollapseStatementsShorterThan <= 0 || flat.Length >= style.CollapseStatementsShorterThan)
+                    {
+                        lines = new List<string> { Indent(column) + Flat(r, 0, 2), Indent(column + style.TabWidth) + Flat(r, 2, r.Count) };
+                    }
+                }
 
                 if (lines == null || lines.Count == 0)
                 {
@@ -427,13 +441,40 @@ namespace SqlPrompter.Core.Formatting
                 }
 
                 var lines = new List<string>();
+                var minContent = 0;
+                if (style.AlignAcrossClauses)
+                {
+                    foreach (var clause in clauses)
+                    {
+                        if (!IsJoinClause(clause))
+                        {
+                            minContent = Math.Max(minContent, NextStop(column + string.Join(" ", clause.Keyword.Select(k => k.Text)).Length));
+                        }
+                    }
+                }
+
+                var fromContent = 0;
                 foreach (var clause in clauses)
                 {
-                    LayoutClause(clause, column, lines);
+                    if (clause.Keyword[0].IsWord("FROM") && clause.Keyword.Count == 1)
+                    {
+                        fromContent = Math.Max(NextStop(column + clause.Keyword[0].Text.Length), minContent);
+                    }
+
+                    if (style.IndentJoinTable && fromContent > 0 && IsJoinClause(clause))
+                    {
+                        LayoutClause(clause, fromContent, lines);
+                    }
+                    else
+                    {
+                        LayoutClause(clause, column, lines, minContent);
+                    }
                 }
 
                 return lines;
             }
+
+            private static bool IsJoinClause(Clause clause) => clause.Keyword[clause.Keyword.Count - 1].IsWord("JOIN", "APPLY");
 
             private List<string> LayoutCte(List<R> r, int column)
             {
@@ -627,7 +668,7 @@ namespace SqlPrompter.Core.Formatting
                 }
             }
 
-            private void LayoutClause(Clause clause, int column, List<string> lines)
+            private void LayoutClause(Clause clause, int column, List<string> lines, int minContent = 0)
             {
                 var keyword = string.Join(" ", clause.Keyword.Select(k => k.Text));
                 var body = clause.Body;
@@ -646,7 +687,7 @@ namespace SqlPrompter.Core.Formatting
                     }
                 }
 
-                var contentColumn = NextStop(column + keyword.Length);
+                var contentColumn = Math.Max(NextStop(column + keyword.Length), minContent);
                 var head = Indent(column) + keyword;
                 if (body.Count == 0)
                 {
