@@ -184,6 +184,21 @@ namespace SqlPrompter.Core.Formatting
             ImportFlag("variables.placeEqualsSignOnNewLine", "equalsOnNewLine", v => style.EqualsOnNewLine = v);
             ImportFlag("controlFlow.indentBeginAndEndKeywords", "indentBeginEnd", v => style.IndentBeginEnd = v);
 
+            ImportStyle("parentheses.parenthesisStyle", "parenOnNewLine", v => style.ParenOnNewLine = v);
+            ImportFlag("parentheses.indentParenthesesContents", "indentParenContents", v => style.IndentParenContents = v);
+            ImportStyle("cte.parenthesisStyle", "cteParenOnNewLine", v => style.CteParenOnNewLine = v);
+            ImportFlag("cte.indentContents", "cteIndentContents", v => style.CteIndentContents = v);
+            ImportFlag("cte.placeAsOnNewLine", "cteAsOnNewLine", v => style.CteAsOnNewLine = v);
+            ImportStyle("ddl.parenthesisStyle", "ddlParenOnNewLine", v => style.DdlParenOnNewLine = v);
+            ImportFlag("ddl.indentParenthesesContents", "ddlIndentContents", v => style.DdlIndentContents = v);
+            ImportFlag("ddl.alignDataTypesAndConstraints", "alignDdlColumns", v => style.AlignDdlColumns = v);
+            var procParameter = Text("ddl.placeFirstProcedureParameterOnNewLine");
+            if (procParameter != null)
+            {
+                style.ProcedureParametersOnNewLines = !string.Equals(procParameter, "never", StringComparison.OrdinalIgnoreCase);
+                applied.Add("procedureParametersOnNewLines = " + style.ProcedureParametersOnNewLines);
+            }
+
             foreach (var path in Leaves(root, string.Empty))
             {
                 if (!used.Contains(path) && !path.StartsWith("metadata.", StringComparison.Ordinal))
@@ -204,6 +219,20 @@ namespace SqlPrompter.Core.Formatting
 
                 set(value.Value);
                 applied.Add(name + " = " + value.Value);
+            }
+
+            // "expandedToStatement" puts the opening parenthesis on a line of its own; "expandedSimple" and the compact styles keep it at the end of the line.
+            void ImportStyle(string path, string name, Action<bool> set)
+            {
+                var value = Text(path);
+                if (value == null)
+                {
+                    return;
+                }
+
+                var onNewLine = value.EndsWith("ToStatement", StringComparison.OrdinalIgnoreCase);
+                set(onNewLine);
+                applied.Add(name + " = " + onNewLine);
             }
 
             void SetCase(string path, Action<CaseStyle> set, string name)
@@ -263,16 +292,17 @@ namespace SqlPrompter.Core.Formatting
                     return "left out: comments are kept where they are written";
                 case "lists.addSpaceBeforeComma":
                     return "left out: the formatter has one fixed spacing around the commas of a list";
-                case "ddl.placeFirstProcedureParameterOnNewLine":
-                case "ddl.alignDataTypesAndConstraints":
                 case "ddl.placeConstraintColumnsOnNewLines":
-                case "ddl.parenthesisStyle":
-                case "ddl.indentParenthesesContents":
-                    return "planned: the layout of DDL statements";
-                case "parentheses.parenthesisStyle":
-                case "parentheses.indentParenthesesContents":
+                    return "left out: the constraints of CREATE TABLE are kept as one line each";
                 case "parentheses.collapseParenthesesShorterThan":
-                    return "planned: the layout of parentheses";
+                    return "left out: the length below which a subquery stays on one line is the option dml.collapseSubqueriesShorterThan; other parentheses are never broken";
+                case "cte.placeColumnsOnNewLine":
+                case "cte.columnAlignment":
+                    return "left out: the column list of a CTE is kept on one line";
+                case "cte.asAlignment":
+                    return "left out: AS of a CTE follows the name (or has a line of its own with cte.placeAsOnNewLine)";
+                case "controlFlow.collapseStatementsShorterThan":
+                    return "left out: control-flow statements (IF, WHILE, BEGIN ... END) are never collapsed to one line";
                 default:
                     break;
             }
