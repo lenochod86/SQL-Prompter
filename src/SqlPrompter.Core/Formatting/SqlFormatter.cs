@@ -686,6 +686,11 @@ namespace SqlPrompter.Core.Formatting
                 }
 
                 var aliasAligned = name == "SELECT" && style.AlignAliases ? AlignedAliases(items) : null;
+                if (separators != null && style.AlignComparisons)
+                {
+                    aliasAligned = AlignedComparisons(items);
+                }
+
                 for (var k = 0; k < items.Count; k++)
                 {
                     var itemStart = contentColumn;
@@ -796,6 +801,72 @@ namespace SqlPrompter.Core.Formatting
                 return result;
             }
 
+            private static readonly string[] ComparisonOperators = { "=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>" };
+
+            /// <summary>
+            /// For the conditions of a WHERE, HAVING or ON: each condition with a comparison operator at the top level written with the left side padded so that the
+            /// operators start in one column; null for the other conditions (and for everything when fewer than two conditions have one) (#305).
+            /// </summary>
+            private static string[] AlignedComparisons(List<List<R>> items)
+            {
+                var split = new int[items.Count];
+                var width = 0;
+                var found = 0;
+                for (var k = 0; k < items.Count; k++)
+                {
+                    split[k] = -1;
+                    var item = items[k];
+                    var depth = 0;
+                    var caseDepth = 0;
+                    for (var i = 0; i < item.Count && split[k] < 0; i++)
+                    {
+                        if (item[i].Kind == TokenKind.OpenParen)
+                        {
+                            depth++;
+                        }
+                        else if (item[i].Kind == TokenKind.CloseParen)
+                        {
+                            depth--;
+                        }
+                        else if (item[i].IsWord("CASE"))
+                        {
+                            caseDepth++;
+                        }
+                        else if (item[i].IsWord("END") && caseDepth > 0)
+                        {
+                            caseDepth--;
+                        }
+                        else if (depth == 0 && caseDepth == 0 && i > 0 && !item[0].IsWord("CASE") && item[i].Kind == TokenKind.Operator && Array.IndexOf(ComparisonOperators, item[i].Text) >= 0)
+                        {
+                            split[k] = i;
+                        }
+                    }
+
+                    if (split[k] >= 0)
+                    {
+                        width = Math.Max(width, Flat(item, 0, split[k]).Length);
+                        found++;
+                    }
+                }
+
+                if (found < 2)
+                {
+                    return null;
+                }
+
+                var result = new string[items.Count];
+                for (var k = 0; k < items.Count; k++)
+                {
+                    if (split[k] >= 0)
+                    {
+                        var left = Flat(items[k], 0, split[k]);
+                        result[k] = left + new string(' ', width - left.Length + 1) + Flat(items[k], split[k], items[k].Count);
+                    }
+                }
+
+                return result;
+            }
+
             private void LayoutJoin(string head, int column, int contentColumn, List<R> body, List<string> lines)
             {
                 var on = -1;
@@ -829,17 +900,19 @@ namespace SqlPrompter.Core.Formatting
 
                 var conditions = SplitConditions(body.GetRange(on + 1, body.Count - on - 1), out var separators);
                 var onText = body[on].Text;
+                var aligned = style.AlignComparisons ? AlignedComparisons(conditions) : null;
+                string Condition(int k) => aligned != null && aligned[k] != null ? aligned[k] : Flat(conditions[k], 0, conditions[k].Count);
                 var last = rendered.Count - 1;
                 if (style.OnOnNewLine)
                 {
                     // ON on a line of its own, one level under the JOIN; the further conditions follow under its first one (#305).
                     lines.AddRange(rendered);
                     var onColumn = column + style.TabWidth;
-                    lines.Add(Indent(onColumn) + onText + " " + Flat(conditions[0], 0, conditions[0].Count));
                     var follow = NextStop(onColumn + onText.Length);
+                    lines.Add(Indent(onColumn) + onText + (aligned != null ? Pad(onColumn + onText.Length, follow) : " ") + Condition(0));
                     for (var k = 1; k < conditions.Count; k++)
                     {
-                        var text = Flat(conditions[k], 0, conditions[k].Count);
+                        var text = Condition(k);
                         if (style.AndOrBeforeConditions)
                         {
                             var opColumn = Math.Max(onColumn, follow - separators[k - 1].Length - 1);
@@ -855,11 +928,11 @@ namespace SqlPrompter.Core.Formatting
                     return;
                 }
 
-                rendered[last] += " " + onText + " " + Flat(conditions[0], 0, conditions[0].Count);
+                rendered[last] += " " + onText + " " + Condition(0);
                 lines.AddRange(rendered);
                 for (var k = 1; k < conditions.Count; k++)
                 {
-                    var text = Flat(conditions[k], 0, conditions[k].Count);
+                    var text = Condition(k);
                     if (style.AndOrBeforeConditions)
                     {
                         lines.Add(Indent(contentColumn) + separators[k - 1] + " " + text);

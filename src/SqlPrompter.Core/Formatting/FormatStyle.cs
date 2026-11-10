@@ -110,6 +110,10 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "onOnNewLine")]
         public bool OnOnNewLine { get; set; }
 
+        /// <summary>The comparison operators of conditions on separate lines (WHERE, HAVING, ON) start in one column (#305).</summary>
+        [DataMember(Name = "alignComparisons")]
+        public bool AlignComparisons { get; set; }
+
         /// <summary>The contents of BEGIN … END are indented.</summary>
         [DataMember(Name = "indentBlocks")]
         public bool IndentBlocks { get; set; }
@@ -144,6 +148,7 @@ namespace SqlPrompter.Core.Formatting
             GroupOrderBySeparateLines = true;
             OnOnNewLine = false;
             AlignAliases = false;
+            AlignComparisons = false;
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;
