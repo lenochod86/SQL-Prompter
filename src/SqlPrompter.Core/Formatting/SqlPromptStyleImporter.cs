@@ -46,7 +46,7 @@ namespace SqlPrompter.Core.Formatting
 
         /// <summary>
         /// Reads the style from <paramref name="json"/> and adds it to <paramref name="styles"/> as a new named style (#304): the name comes from the file's
-        /// metadata, otherwise from <paramref name="fileName"/> (without extension), with a number added when the name is taken. The existing styles are not touched.
+        /// metadata, otherwise from <paramref name="fileName"/> (without extension), with " (1)", " (2)" and so on (the lowest free number) added when the name is taken. The existing styles are not touched.
         /// </summary>
         /// <exception cref="FormatException">The text is not JSON, or is JSON that is not a style.</exception>
         public static NamedFormatStyle ImportInto(IList<NamedFormatStyle> styles, string json, string fileName, out StyleImportResult result, FormatStyle baseStyle = null)
@@ -59,9 +59,9 @@ namespace SqlPrompter.Core.Formatting
             }
 
             var unique = name;
-            for (var i = 2; styles.Any(s => string.Equals(s.Name, unique, StringComparison.OrdinalIgnoreCase)); i++)
+            for (var i = 1; styles.Any(s => string.Equals(s.Name, unique, StringComparison.OrdinalIgnoreCase)); i++)
             {
-                unique = name + " " + i;
+                unique = name + " (" + i + ")";
             }
 
             var imported = new NamedFormatStyle(unique, result.Style);

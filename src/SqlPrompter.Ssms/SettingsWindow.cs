@@ -272,7 +272,7 @@ namespace SqlPrompter.Ssms
                     Imported();
                 }
             }, "Several named styles with one active, a tree of the options with a search box and a preview of a sample for every group (or of your current query).");
-            formatting.Button("Import a SQL Prompt style...", () => { if (SettingsFiles.ImportFormatStyle(this)) { Imported(); } }, "Reads a style exported from SQL Prompt (.json) and applies the options this formatter has to the active style.");
+            formatting.Button("Import a SQL Prompt style...", () => { if (SettingsFiles.ImportFormatStyle(this)) { Imported(); } }, "Reads a style exported from SQL Prompt (.json) and adds it as a new style, which becomes the active one. The other styles are kept.");
             var coloringPage = Add("Coloring", "Colors the tab, frame and status bar of every query window by its own server and database.");
             var coloring = new ColoringEditor();
             coloringPage.Host(coloring, () => coloring.ShowSettings(work.Coloring), () => work.Coloring = coloring.ToSettings(), () => coloring.CurrentProblems);

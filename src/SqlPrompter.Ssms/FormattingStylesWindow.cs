@@ -280,6 +280,7 @@ namespace SqlPrompter.Ssms
             if (imported != null)
             {
                 current = imported;
+                activeName = imported.Name;
                 RefreshStyles();
                 ShowPage(true);
             }
