@@ -227,7 +227,7 @@ namespace SqlPrompter.Ssms
             AddRow(label, box, suffix, help, enabledWhen, box);
         }
 
-        public void Folder(string label, string help, Func<string> get, Action<string> set)
+        public void Folder(string label, string help, Func<string> get, Action<string> set, Action<string> open = null)
         {
             var text = new TextBox { Width = 380 };
             var browse = new Button { Text = "Browse...", AutoSize = true };
@@ -252,6 +252,13 @@ namespace SqlPrompter.Ssms
             var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0) };
             panel.Controls.Add(text);
             panel.Controls.Add(browse);
+            if (open != null)
+            {
+                text.Width = 280;
+                var openButton = new Button { Text = "Open folder", AutoSize = true };
+                openButton.Click += (s, e) => open(text.Text);
+                panel.Controls.Add(openButton);
+            }
             AddRow(label, panel, null, help, null, null);
         }
 

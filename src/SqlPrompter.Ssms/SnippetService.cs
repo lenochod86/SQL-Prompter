@@ -77,13 +77,10 @@ namespace SqlPrompter.Ssms
                     var shared = SettingsService.Current.Snippets.SharedFolderList().Select(f => Environment.ExpandEnvironmentVariables(f)).ToList();
                     Watch(new[] { folder }.Concat(shared).ToList());
                     var store = new SnippetStore(folder);
-                    if (SettingsService.Current.Snippets.InstallBuiltIn)
+                    var installed = new BuiltInInstaller(store).Install();
+                    if (installed > 0)
                     {
-                        var installed = new BuiltInInstaller(store).Install();
-                        if (installed > 0)
-                        {
-                            Log.Write("Snippets: installed " + installed + " built-in snippets into " + folder + ".");
-                        }
+                        Log.Write("Snippets: installed " + installed + " built-in snippets into " + folder + ".");
                     }
 
                     var result = store.Load();

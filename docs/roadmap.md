@@ -240,3 +240,7 @@ By the user on 2026-11-05 (answers on #48 and #49):
 By the user on 2026-11-06 (answer on #183, architecture review):
 
 20. **Architecture:** the in-process VSIX stays (see [architecture-review.md](architecture-review.md)). Improvements, each its own issue: a compatibility gate for the undocumented SSMS access (#186), the typing path through our own list controller so that there is one list implementation (#187), one sort and filter implementation (#188), and CI enforcement of the dependency boundary of Core and Metadata (#189). A language server and VisualStudio.Extensibility are not pursued; revisit if SSMS documents out-of-process extensions with an editor completion API or breaks the in-process model.
+
+By the user on 2026-11-10 (issue #417):
+
+21. **Built-in snippets (#417):** the setting *Install the built-in snippets* is removed; the built-in snippets are installed once each automatically, and the button *Reset built-in snippets...* in Settings > Snippets (with a Yes / No confirmation, default No) always writes all of them back in their original text, also deleted and edited ones; a snippet of the user with the prefix of a built-in one is replaced too, the other snippets are not touched. *Open folder* moved next to *Snippet folder* and *Import snippets...* to the Snippets page of the settings; the *Reload* button of the snippet editor was removed (the folders are watched). The editor has one row of buttons with Close at the right edge.

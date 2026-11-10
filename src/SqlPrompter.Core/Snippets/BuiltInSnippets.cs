@@ -93,6 +93,20 @@ namespace SqlPrompter.Core.Snippets
         }
     }
 
+    /// <summary>What <see cref="BuiltInInstaller.ResetAll"/> did: how many built-in snippets were missing and written, and how many were there and written over.</summary>
+    public sealed class BuiltInResetResult
+    {
+        public BuiltInResetResult(int added, int restored)
+        {
+            Added = added;
+            Restored = restored;
+        }
+
+        public int Added { get; }
+
+        public int Restored { get; }
+    }
+
     /// <summary>Puts the built-in snippets into the snippet folder, once each, and restores one to its original text.</summary>
     public sealed class BuiltInInstaller
     {
@@ -154,6 +168,42 @@ namespace SqlPrompter.Core.Snippets
             }
 
             return written;
+        }
+
+        /// <summary>
+        /// Writes every built-in snippet into the folder in its original text (#417): one that was deleted comes back, one that was edited is restored, and one that
+        /// is there untouched is written again. A snippet of the folder with the id or the prefix of a built-in one is replaced, never duplicated; the other
+        /// snippets of the user are not touched.
+        /// </summary>
+        public BuiltInResetResult ResetAll()
+        {
+            var existing = store.Load().Snippets;
+            var added = 0;
+            var restored = 0;
+            foreach (var snippet in BuiltInSnippets.All)
+            {
+                var matches = existing.Where(e => string.Equals(e.Id, snippet.Id, StringComparison.OrdinalIgnoreCase) ||
+                                                  string.Equals(e.Prefix, snippet.Prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+                foreach (var match in matches.Where(m => !string.Equals(m.Id, snippet.Id, StringComparison.OrdinalIgnoreCase)))
+                {
+                    store.Delete(match.Id);
+                }
+
+                store.Save(snippet);
+                if (matches.Count > 0)
+                {
+                    restored++;
+                }
+                else
+                {
+                    added++;
+                }
+            }
+
+            // Everything is installed now: the automatic install must not run again for these snippets.
+            Directory.CreateDirectory(store.Folder);
+            File.WriteAllLines(Path.Combine(store.Folder, MarkerFile), BuiltInSnippets.All.Select(s => s.Id));
+            return new BuiltInResetResult(added, restored);
         }
 
         /// <summary>Writes the original text of the built-in snippet over the file of its id; false when there is no such built-in snippet.</summary>
