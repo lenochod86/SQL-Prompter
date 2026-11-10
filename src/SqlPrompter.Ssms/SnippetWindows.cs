@@ -233,6 +233,7 @@ namespace SqlPrompter.Ssms
         /// <param name="newDraft">A snippet to start with as a new one (e.g. made of a selection); null lists the existing ones.</param>
         public SnippetManagerWindow(SnippetStore store, Snippet newDraft)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             this.store = store;
             Title = "SQL Prompter snippets — " + store.Folder;
             Width = 900;
@@ -290,17 +291,20 @@ namespace SqlPrompter.Ssms
             fieldsPanel.Children.Add(placeholders);
             Grid.SetRow(fieldsPanel, 5);
             editor.Children.Add(fieldsPanel);
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal };
-            buttons.Children.Add(SnippetUi.Button("New", () => Edit(null)));
-            buttons.Children.Add(SnippetUi.Button("Save", Save));
-            buttons.Children.Add(SnippetUi.Button("Delete", Delete));
-            buttons.Children.Add(SnippetUi.Button("Close", Close));
-            var more = new StackPanel { Orientation = Orientation.Horizontal };
-            more.Children.Add(SnippetUi.Button("Import...", () => { ThreadHelper.ThrowIfNotOnUIThread(); SqlPrompterPackage.ImportSnippets(); Reload(editing?.Id); }));
-            more.Children.Add(SnippetUi.Button("Open folder", SqlPrompterPackage.OpenSnippetsFolder));
-            more.Children.Add(SnippetUi.Button("Reload", () => { SnippetService.Reload(); Reload(editing?.Id); }));
+            // One row: New, Save and Delete on the left, Close at the right edge (Import and Open folder are in the settings, #417).
+            var buttons = new Grid();
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var left = new StackPanel { Orientation = Orientation.Horizontal };
+            left.Children.Add(SnippetUi.Button("New", () => Edit(null)));
+            left.Children.Add(SnippetUi.Button("Save", Save));
+            left.Children.Add(SnippetUi.Button("Delete", Delete));
+            buttons.Children.Add(left);
+            var close = SnippetUi.Button("Close", Close);
+            close.Margin = new Thickness(0);
+            Grid.SetColumn(close, 1);
+            buttons.Children.Add(close);
             var bottom = new StackPanel();
-            bottom.Children.Add(more);
             bottom.Children.Add(buttons);
             bottom.Children.Add(status);
             Grid.SetRow(bottom, 6);

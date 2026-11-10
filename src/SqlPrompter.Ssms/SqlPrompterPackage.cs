@@ -565,17 +565,48 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>Opens the snippet folder in Explorer.</summary>
-        internal static void OpenSnippetsFolder()
+        internal static void OpenSnippetsFolder() => OpenSnippetsFolder(null);
+
+        /// <summary>Opens the snippet folder; <paramref name="configured"/> is the folder as typed in the settings (empty or null: the folder of the saved settings).</summary>
+        internal static void OpenSnippetsFolder(string configured)
         {
             try
             {
-                var folder = SnippetService.Folder;
+                var folder = string.IsNullOrWhiteSpace(configured) ? (configured == null ? SnippetService.Folder : SnippetService.DefaultFolder) : Environment.ExpandEnvironmentVariables(configured.Trim());
                 System.IO.Directory.CreateDirectory(folder);
                 System.Diagnostics.Process.Start("explorer.exe", "\"" + folder + "\"");
             }
             catch (Exception ex)
             {
                 Log.Error("Opening the snippet folder failed", ex);
+            }
+        }
+
+        /// <summary>Writes the built-in snippets over the snippet folder after a confirmation (default No), then reloads the snippets (#417).</summary>
+        internal static void ResetBuiltInSnippets(System.Windows.Forms.IWin32Window owner)
+        {
+            if (System.Windows.Forms.MessageBox.Show(owner,
+                    "This writes all the built-in snippets into the snippet folder in their original text.\r\n\r\n" +
+                    "Built-in snippets you deleted come back, and those you edited are restored: your changes to them will be lost. " +
+                    "A snippet of yours with the prefix of a built-in one is replaced too. Your other snippets are not touched.\r\n\r\nContinue?",
+                    "SQL Prompter", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Warning,
+                    System.Windows.Forms.MessageBoxDefaultButton.Button2) != System.Windows.Forms.DialogResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                var store = new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder);
+                var result = new SqlPrompter.Core.Snippets.BuiltInInstaller(store).ResetAll();
+                SnippetService.Reload();
+                Log.Write("Snippets: reset the built-in snippets in " + store.Folder + " (" + result.Restored + " restored, " + result.Added + " added).");
+                System.Windows.Forms.MessageBox.Show(owner, result.Restored + " built-in snippets restored and " + result.Added + " added in " + store.Folder + ".", "SQL Prompter");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Resetting the built-in snippets failed", ex);
+                System.Windows.Forms.MessageBox.Show(owner, "Resetting the built-in snippets failed: " + ex.Message, "SQL Prompter", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
             }
         }
 

@@ -10,7 +10,6 @@ namespace SqlPrompter.Core.Settings
         public SnippetSettings()
         {
             Folder = string.Empty;
-            InstallBuiltIn = true;
             SharedFolders = string.Empty;
         }
 
@@ -22,10 +21,6 @@ namespace SqlPrompter.Core.Settings
         public System.Collections.Generic.IReadOnlyList<string> SharedFolderList() =>
             (SharedFolders ?? string.Empty).Split(new[] { ';' }, System.StringSplitOptions.RemoveEmptyEntries).Select(f => f.Trim()).Where(f => f.Length > 0).ToList();
 
-        /// <summary>Put the snippets that ship with SQL Prompter into the folder (each one once; edited or deleted ones are left alone).</summary>
-        [DataMember(Name = "installBuiltIn")]
-        public bool InstallBuiltIn { get; set; }
-
         /// <summary>Folder with the snippet files (SQL Prompt's JSON format); empty means the default folder next to the settings file.</summary>
         [DataMember(Name = "folder")]
         public string Folder { get; set; }
@@ -36,7 +31,6 @@ namespace SqlPrompter.Core.Settings
         private void OnDeserializing(StreamingContext context)
         {
             Folder = string.Empty;
-            InstallBuiltIn = true;
             SharedFolders = string.Empty;
         }
 
