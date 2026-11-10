@@ -12,8 +12,9 @@ namespace SqlPrompter.Core.Navigation
     /// <summary>The text of the tooltip that appears when the mouse rests on a name (#220).</summary>
     public sealed class HoverText
     {
-        public HoverText(int start, int length, string text, string descriptionSchema = null, string descriptionObject = null, string descriptionColumn = null)
+        public HoverText(int start, int length, string text, string descriptionSchema = null, string descriptionObject = null, string descriptionColumn = null, int linesInSsms = 0)
         {
+            LinesInSsms = linesInSsms;
             Start = start;
             Length = length;
             Text = text;
@@ -28,6 +29,9 @@ namespace SqlPrompter.Core.Navigation
         public string DescriptionObject { get; }
 
         public string DescriptionColumn { get; }
+
+        /// <summary>The number of leading lines of the text that the quick info of SSMS already shows itself (#422): the kind and name of a table or view (1), the kind, name and parameters of a procedure or function (2); the tooltip leaves them out.</summary>
+        public int LinesInSsms { get; }
 
         /// <summary>The name under the mouse, as a span of the batch.</summary>
         public int Start { get; }
@@ -92,7 +96,20 @@ namespace SqlPrompter.Core.Navigation
             var sources = ContextAnalyzer.SourcesAt(batch, parts[0].Start);
             var script = ScriptModel.Build(batch, parts[0].Start);
             var text = Describe(names, sources, metadata, script, out var descriptionSchema, out var descriptionObject, out var descriptionColumn);
-            return text == null ? null : new HoverText(token.Start, (token.End - token.Start), text, descriptionSchema, descriptionObject, descriptionColumn);
+            var linesInSsms = 0;
+            if (text != null && descriptionObject != null && descriptionColumn == null)
+            {
+                if (text.StartsWith("Procedure ", StringComparison.Ordinal) || text.StartsWith("Scalar function ", StringComparison.Ordinal) || text.StartsWith("Table function ", StringComparison.Ordinal))
+                {
+                    linesInSsms = 2;
+                }
+                else if (text.StartsWith("Table ", StringComparison.Ordinal) || text.StartsWith("View ", StringComparison.Ordinal))
+                {
+                    linesInSsms = 1;
+                }
+            }
+
+            return text == null ? null : new HoverText(token.Start, (token.End - token.Start), text, descriptionSchema, descriptionObject, descriptionColumn, linesInSsms);
         }
 
         private static string Describe(IReadOnlyList<string> names, IReadOnlyList<TableSource> sources, IDatabaseMetadata metadata, ScriptModel script,
