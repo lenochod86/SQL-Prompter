@@ -151,6 +151,7 @@ namespace SqlPrompter.Ssms
             }
 
             ReadSizeSettings();
+            kindBrushes = null;
             scrollBar = new ScrollBar { Orientation = Orientation.Vertical, Width = 14, Visibility = Visibility.Collapsed, Focusable = false };
             scrollBar.ValueChanged += (s, e) =>
             {
@@ -238,6 +239,7 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             ReadSizeSettings();
+            kindBrushes = null;
             ownerSession = session;
             Update(session, presentation);
             popup.IsOpen = true;
@@ -383,10 +385,31 @@ namespace SqlPrompter.Ssms
         public bool IsOpen => popup.IsOpen;
 
         /// <summary>Opens the popup for a list given with <see cref="Present"/> (the editor's session opens it through <see cref="Open"/>).</summary>
+        /// <summary>The editor colors of the classes a suggestion can take (index = <see cref="SqlPrompter.Core.Snippets.SnippetHighlighter"/> class), read again each time the list opens (#418).</summary>
+        private Brush[] kindBrushes;
+
+        private Brush KindBrush(int editorClass)
+        {
+            if (kindBrushes == null)
+            {
+                var palette = EditorColors.ByKind();
+                kindBrushes = new Brush[palette.Length];
+                for (var i = 0; i < palette.Length; i++)
+                {
+                    var brush = new SolidColorBrush(palette[i]);
+                    brush.Freeze();
+                    kindBrushes[i] = brush;
+                }
+            }
+
+            return editorClass < kindBrushes.Length ? kindBrushes[editorClass] : null;
+        }
+
         public void Show()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             ReadSizeSettings();
+            kindBrushes = null;
             ownerSession = null;
             popup.IsOpen = true;
             descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
@@ -1141,6 +1164,15 @@ namespace SqlPrompter.Ssms
                 }
                 suffix.Text = item.Suffix;
                 SetTextColor(isSelected && !isSoft);
+                if (!(isSelected && !isSoft) && item.Properties.TryGetProperty(SqlCompletionSource.KindKey, out SqlPrompter.Core.Completion.SuggestionKind kind))
+                {
+                    var editorClass = SqlPrompter.Core.Completion.SuggestionColors.ClassOf(kind);
+                    var colored = editorClass.HasValue ? owner.KindBrush(editorClass.Value) : null;
+                    if (colored != null)
+                    {
+                        name.Foreground = colored;
+                    }
+                }
                 if (isSelected)
                 {
                     Root.SetResourceReference(Panel.BackgroundProperty, isSoft ? VsBrushes.ToolWindowBorderKey : VsBrushes.HighlightKey);
