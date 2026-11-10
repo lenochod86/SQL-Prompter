@@ -30,7 +30,7 @@ namespace SqlPrompter.Ssms
             Size = new Size(960, 720);
             MinimumSize = new Size(760, 520);
 
-            var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 46, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8, 8, 8, 0) };
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8, 8, 8, 8) };
             var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 90 };
             var apply = new Button { Text = "Apply", Width = 90 };
             var ok = new Button { Text = "OK", Width = 90 };
