@@ -98,6 +98,27 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public async Task RaisesSnapshotReplacedAfterLoadAndAfterChange()
+        {
+            var now = new DateTime(2026, 1, 1);
+            var loader = new FakeLoader();
+            var cache = new DatabaseMetadataCache(clock: () => now);
+            var raised = 0;
+            cache.SnapshotReplaced += (s, e) => raised++;
+
+            await cache.EnsureLoaded(loader);
+            Assert.Equal(1, raised);
+
+            await cache.CheckForChanges(loader, force: true);
+            Assert.Equal(1, raised);
+
+            loader.Version = "v2";
+            await cache.CheckForChanges(loader, force: true);
+            Assert.Equal(2, raised);
+            Assert.Equal("v2", cache.Current.Version);
+        }
+
+        [Fact]
         public async Task ForcedCheckIgnoresInterval()
         {
             var now = new DateTime(2026, 1, 1);

@@ -18,10 +18,18 @@ namespace SqlPrompter.Ssms
         {
             Current = this;
             Caches.LinkedServerLoaded += (s, e) => LinkedServerLoaded?.Invoke(this, e);
+            Caches.SnapshotReplaced += (s, e) =>
+            {
+                DefinitionPreview.Invalidate();
+                SnapshotReplaced?.Invoke(null, e);
+            };
         }
 
         /// <summary>Raised on a background thread when a lazy load of a linked server has finished (#357); an open list asks again.</summary>
         public event System.EventHandler LinkedServerLoaded;
+
+        /// <summary>Raised on a background thread when the objects of a database were loaded or reloaded after a change (#423); the code analysis runs again.</summary>
+        public static event System.EventHandler SnapshotReplaced;
 
         /// <summary>Instance for the package commands; null until MEF creates the service.</summary>
         public static MetadataService Current { get; private set; }
@@ -59,6 +67,12 @@ namespace SqlPrompter.Ssms
             if (cache.Current == null)
             {
                 _ = cache.EnsureLoaded(loader);
+            }
+
+            // Notice changes made elsewhere (another tab, another connection, outside SSMS); at most once per interval (#423).
+            if (cache.Current != null)
+            {
+                _ = cache.CheckForChanges(loader);
             }
 
             // Whatever window is active now decides which metadata the analysis may use (none while it has none): never the one of another connection.
