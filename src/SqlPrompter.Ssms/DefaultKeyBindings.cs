@@ -30,6 +30,7 @@ namespace SqlPrompter.Ssms
                 Set(dte, "SQLPrompter.GoToDefinition", "SQL Query Editor::F12");
                 Set(dte, "SQLPrompter.ShowInObjectExplorer", "SQL Query Editor::Ctrl+F12");
                 Set(dte, "SQLPrompter.RunStatementAtCaret", "SQL Query Editor::Shift+F5");
+                SetOverwriting(dte, "SQLPrompter.RunStatementsUpToCaret", "SQL Query Editor::Ctrl+Shift+F5");
                 Set(dte, "SQLPrompter.ParameterInfo", "SQL Query Editor::Ctrl+Shift+Space");
                 Set(dte, "SQLPrompter.ShowSuggestions", "SQL Query Editor::Ctrl+Space");
                 Set(dte, "SQLPrompter.PickerLeft", "SQL Query Editor::Ctrl+Left Arrow");
@@ -56,6 +57,53 @@ namespace SqlPrompter.Ssms
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Like <see cref="Set"/>, but the key is taken from the command that has it in the same scope (the user's decision for Ctrl+Shift+F5, #420); the log says which
+        /// command lost it. A binding in another scope is only logged: the more specific scope of the editor wins over it anyway. Once, like the other defaults.
+        /// </summary>
+        private static void SetOverwriting(EnvDTE.DTE dte, string commandName, string binding)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var marker = Path.Combine(MarkerFolder, "key-" + commandName + ".applied");
+            if (File.Exists(marker))
+            {
+                return;
+            }
+
+            var command = dte.Commands.Item(commandName);
+            if (command.Bindings is object[] existing && existing.Length > 0)
+            {
+                return;
+            }
+
+            foreach (EnvDTE.Command other in dte.Commands)
+            {
+                if (string.Equals(other.Name, commandName, StringComparison.OrdinalIgnoreCase) || !(other.Bindings is object[] keys))
+                {
+                    continue;
+                }
+
+                var kept = keys.Where(k => !string.Equals(Convert.ToString(k), binding, StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (kept.Length != keys.Length)
+                {
+                    other.Bindings = kept;
+                    Log.Write("Key " + binding + " was taken from " + other.Name + " for " + commandName + ".");
+                }
+            }
+
+            var scopeless = binding.Substring(binding.IndexOf("::", StringComparison.Ordinal) + 2);
+            var global = FindOwner(dte, "Global::" + scopeless);
+            if (global != null)
+            {
+                Log.Write("Global::" + scopeless + " is also used by " + global + "; the key of the editor wins.");
+            }
+
+            command.Bindings = new object[] { binding };
+            Directory.CreateDirectory(MarkerFolder);
+            File.WriteAllText(marker, binding);
+            Log.Write("Default key " + binding + " set for " + commandName + ".");
         }
 
         /// <summary>Sets the first of the bindings that no command uses; the marker is written once one is set, or when none of them is free.</summary>

@@ -142,6 +142,7 @@ Every phase ends with a VSIX the user tests manually. Sizes are rough: **S** day
   - [x] a procedure, view, function or trigger opens in a new window on the same server and database as `CREATE OR ALTER`
   - [x] a table opens its `CREATE TABLE` script
 - [x] **Shift+F5: run the statement at the caret.** The existing statement splitting finds its bounds; the statement is selected, run through Query.Execute and the selection restored. Check for a shortcut conflict. (#42)
+- [x] **Ctrl+Shift+F5: run all statements up to the caret, and a green mark on the statements being run** (#420): from the start of the script to the end of the statement at the caret (earlier GO batches included); a temporary subtle green background (about a second) marks the executed text for both Shift+F5 and Ctrl+Shift+F5. Verified in SSMS 22 (light theme; dark theme to be tested by the user).
 - [ ] Ctrl+F12: show the object in Object Explorer (later) (#41)
 
 ### Phase 6: Extended IntelliSense (L) (#43)
@@ -244,3 +245,7 @@ By the user on 2026-11-06 (answer on #183, architecture review):
 By the user on 2026-11-10 (issue #417):
 
 21. **Built-in snippets (#417):** the setting *Install the built-in snippets* is removed; the built-in snippets are installed once each automatically, and the button *Reset built-in snippets...* in Settings > Snippets (with a Yes / No confirmation, default No) always writes all of them back in their original text, also deleted and edited ones; a snippet of the user with the prefix of a built-in one is replaced too, the other snippets are not touched. *Open folder* moved next to *Snippet folder* and *Import snippets...* to the Snippets page of the settings; the *Reload* button of the snippet editor was removed (the folders are watched). The editor has one row of buttons with Close at the right edge.
+
+By the user on 2026-11-10 (issue #420):
+
+22. **Ctrl+Shift+F5 (#420):** if the key is already bound to another command in the SQL query editor, the binding is overwritten (unlike Shift+F5, which is set only when free); the log names the command that lost it.
