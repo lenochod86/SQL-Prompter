@@ -64,6 +64,9 @@ namespace SqlPrompter.Ssms
         internal const string BlockKey = "SqlPrompter.Block";
         internal const string ModuleKey = "SqlPrompter.Module";
         internal const string UsageKeyKey = "SqlPrompter.UsageKey";
+
+        /// <summary>The <see cref="SuggestionKind"/> of an item, for the color of its name in the list (#418).</summary>
+        internal const string KindKey = "SqlPrompter.Kind";
         internal const string DefinitionKey = "SqlPrompter.Definition";
 
         /// <summary>The table or view of a column item and the column, for its description from the database (#206).</summary>
@@ -518,6 +521,7 @@ namespace SqlPrompter.Ssms
                 suggestion.FilterText,
                 ImmutableArray<ImageElement>.Empty);
             item.Properties.AddProperty(UsageKeyKey, usageKey);
+            item.Properties.AddProperty(KindKey, suggestion.Kind);
             if (suggestion.Tag is SqlPrompter.Core.Snippets.Snippet snippet)
             {
                 item.Properties.AddProperty(SnippetKey, snippet);
