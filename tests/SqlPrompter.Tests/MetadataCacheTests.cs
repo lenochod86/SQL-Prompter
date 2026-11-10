@@ -105,6 +105,8 @@ namespace SqlPrompter.Tests
             var cache = new DatabaseMetadataCache(clock: () => now);
             var raised = 0;
             cache.SnapshotReplaced += (s, e) => raised++;
+            var changed = 0;
+            cache.ObjectsChanged += (s, e) => changed++;
 
             await cache.EnsureLoaded(loader);
             Assert.Equal(1, raised);
@@ -115,6 +117,7 @@ namespace SqlPrompter.Tests
             loader.Version = "v2";
             await cache.CheckForChanges(loader, force: true);
             Assert.Equal(2, raised);
+            Assert.Equal(1, changed);
             Assert.Equal("v2", cache.Current.Version);
         }
 
