@@ -39,7 +39,7 @@ namespace SqlPrompter.Core.Analysis
                 return Array.Empty<TableSource>();
             }
 
-            var tokens = Lexer.Tokenize(text).Where(t => t.Kind != TokenKind.Comment).ToList();
+            var tokens = CodeTokens(text, Lexer.Tokenize(text), position);
             var index = Math.Min(CountBefore(tokens, position), Math.Max(0, tokens.Count - 1));
             if (tokens.Count == 0)
             {
@@ -92,7 +92,7 @@ namespace SqlPrompter.Core.Analysis
                 return CaretContext.None;
             }
 
-            var tokens = WithMissingOn(all.Where(t => t.Kind != TokenKind.Comment).ToList());
+            var tokens = WithMissingOn(CodeTokens(text, all, caret));
             var word = tokens.FirstOrDefault(t => t.Start < caret && caret <= t.End);
             if (word != null && word.Kind == TokenKind.Number)
             {
@@ -661,6 +661,74 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The code tokens of a script without the comments. When the caret stands right after a comment (only white space between them) that begins on a line of
+        /// its own, the comment ends the statement before it as far as the caret is concerned: a token of no width, a semicolon, is put in front of the comment, so
+        /// that the caret is at the start of a statement and not at the continuation of the one above the comment (#412). A comment on the line of the previous
+        /// token (<c>SELECT a /* c */ |FROM</c>) is part of the statement.
+        /// </summary>
+        private static List<Token> CodeTokens(string text, IReadOnlyList<Token> all, int caret)
+        {
+            var tokens = all.Where(t => t.Kind != TokenKind.Comment).ToList();
+            var last = -1;
+            for (var i = 0; i < all.Count; i++)
+            {
+                if (all[i].Kind == TokenKind.Comment && all[i].End <= caret && IsBlank(text, all[i].End, caret))
+                {
+                    last = i;
+                }
+            }
+
+            if (last < 0)
+            {
+                return tokens;
+            }
+
+            // The run of comments that ends at the caret: the first one decides.
+            var first = last;
+            while (first > 0 && all[first - 1].Kind == TokenKind.Comment && IsBlank(text, all[first - 1].End, all[first].Start))
+            {
+                first--;
+            }
+
+            var runStart = all[first].Start;
+            var previous = tokens.FindLastIndex(t => t.End <= runStart);
+            if (previous < 0 || tokens[previous].Kind == TokenKind.Semicolon)
+            {
+                return tokens;
+            }
+
+            var onItsOwnLine = false;
+            for (var i = tokens[previous].End; i < runStart; i++)
+            {
+                if (text[i] == '\n' || text[i] == '\r')
+                {
+                    onItsOwnLine = true;
+                    break;
+                }
+            }
+
+            if (onItsOwnLine)
+            {
+                tokens.Insert(previous + 1, new Token(TokenKind.Semicolon, runStart, runStart, string.Empty, false));
+            }
+
+            return tokens;
+        }
+
+        private static bool IsBlank(string text, int from, int to)
+        {
+            for (var i = from; i < to; i++)
+            {
+                if (!char.IsWhiteSpace(text[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static bool Contains(Token token, int caret)
