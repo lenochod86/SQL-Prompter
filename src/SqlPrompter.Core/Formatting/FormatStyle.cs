@@ -130,6 +130,42 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "indentBeginEnd")]
         public bool IndentBeginEnd { get; set; }
 
+        /// <summary>The opening parenthesis of a subquery that is not collapsed is on a line of its own, at the column of the item (otherwise it ends the line before) (#305).</summary>
+        [DataMember(Name = "parenOnNewLine")]
+        public bool ParenOnNewLine { get; set; }
+
+        /// <summary>The contents of such a subquery are indented one level under the parentheses (#305).</summary>
+        [DataMember(Name = "indentParenContents")]
+        public bool IndentParenContents { get; set; }
+
+        /// <summary>The opening parenthesis of a CTE is on a line of its own (otherwise it ends the line of AS) (#305).</summary>
+        [DataMember(Name = "cteParenOnNewLine")]
+        public bool CteParenOnNewLine { get; set; }
+
+        /// <summary>The contents of a CTE are indented under its parentheses (#305).</summary>
+        [DataMember(Name = "cteIndentContents")]
+        public bool CteIndentContents { get; set; }
+
+        /// <summary>AS of a CTE is on a line of its own, under the name (#305).</summary>
+        [DataMember(Name = "cteAsOnNewLine")]
+        public bool CteAsOnNewLine { get; set; }
+
+        /// <summary>The opening parenthesis of CREATE TABLE is on a line of its own (otherwise it ends the first line) (#305).</summary>
+        [DataMember(Name = "ddlParenOnNewLine")]
+        public bool DdlParenOnNewLine { get; set; }
+
+        /// <summary>The column definitions of CREATE TABLE are indented under the parentheses (#305).</summary>
+        [DataMember(Name = "ddlIndentContents")]
+        public bool DdlIndentContents { get; set; }
+
+        /// <summary>The data types of the columns of CREATE TABLE start in one column (#305).</summary>
+        [DataMember(Name = "alignDdlColumns")]
+        public bool AlignDdlColumns { get; set; }
+
+        /// <summary>The parameters of CREATE / ALTER PROCEDURE are written one per line under the name (#305).</summary>
+        [DataMember(Name = "procedureParametersOnNewLines")]
+        public bool ProcedureParametersOnNewLines { get; set; }
+
         /// <summary>The contents of BEGIN … END are indented.</summary>
         [DataMember(Name = "indentBlocks")]
         public bool IndentBlocks { get; set; }
@@ -169,6 +205,15 @@ namespace SqlPrompter.Core.Formatting
             IndentJoinTable = false;
             EqualsOnNewLine = false;
             IndentBeginEnd = false;
+            ParenOnNewLine = false;
+            IndentParenContents = true;
+            CteParenOnNewLine = true;
+            CteIndentContents = true;
+            CteAsOnNewLine = false;
+            DdlParenOnNewLine = true;
+            DdlIndentContents = true;
+            AlignDdlColumns = true;
+            ProcedureParametersOnNewLines = false;
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;

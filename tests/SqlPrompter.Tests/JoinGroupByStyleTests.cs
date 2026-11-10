@@ -93,14 +93,14 @@ namespace SqlPrompter.Tests
         [Fact]
         public void EveryNoteNamesItsReasonOrDecision()
         {
-            var json = @"{ ""casing"": { ""useObjectDefinitionCase"": true }, ""cte"": { ""indentContents"": true }, ""someNewOption"": 1,
-              ""parentheses"": { ""parenthesisStyle"": ""x"" }, ""lists"": { ""alignComments"": true } }";
+            var json = @"{ ""casing"": { ""useObjectDefinitionCase"": true }, ""cte"": { ""placeColumnsOnNewLine"": true }, ""someNewOption"": 1,
+              ""parentheses"": { ""collapseParenthesesShorterThan"": 5 }, ""lists"": { ""alignComments"": true } }";
 
             var notes = SqlPromptStyleImporter.Import(json).Notes;
 
             Assert.Contains(notes, n => n.StartsWith("casing.useObjectDefinitionCase: left out", StringComparison.Ordinal));
-            Assert.Contains(notes, n => n.StartsWith("cte.indentContents: planned", StringComparison.Ordinal));
-            Assert.Contains(notes, n => n.StartsWith("parentheses.parenthesisStyle: planned", StringComparison.Ordinal));
+            Assert.Contains(notes, n => n.StartsWith("cte.placeColumnsOnNewLine: left out", StringComparison.Ordinal));
+            Assert.Contains(notes, n => n.StartsWith("parentheses.collapseParenthesesShorterThan: left out", StringComparison.Ordinal));
             Assert.Contains(notes, n => n.StartsWith("lists.alignComments: left out", StringComparison.Ordinal));
             Assert.Contains(notes, n => n == "someNewOption: not supported yet");
             Assert.All(notes, n => Assert.Contains(": ", n));

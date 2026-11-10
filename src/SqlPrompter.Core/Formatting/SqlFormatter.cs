@@ -398,6 +398,10 @@ namespace SqlPrompter.Core.Formatting
                 {
                     lines = LayoutCreateTable(r, column);
                 }
+                else if ((head == "CREATE" || head == "ALTER") && style.ProcedureParametersOnNewLines && r.Count > 3 && r[1].IsWord("PROC", "PROCEDURE"))
+                {
+                    lines = LayoutProcedureHeader(r, column);
+                }
                 else if (head == "SET" && style.EqualsOnNewLine && r.Count > 3 && r[1].Kind == TokenKind.Variable && r[2].Kind == TokenKind.Operator && r[2].Text == "=")
                 {
                     // SET @x = value with the equals sign on a line of its own, unless the statement is short enough to stay on one line (#305).
@@ -514,27 +518,38 @@ namespace SqlPrompter.Core.Formatting
                         return null;
                     }
 
-                    var header = Flat(r, i, asIndex + 1);
+                    var name = Flat(r, i, asIndex);
+                    var asText = r[asIndex].Text;
+                    var header = name + " " + asText;
                     var inner = r.GetRange(open + 1, close - open - 1);
                     var innerFlat = Flat(inner, 0, inner.Count);
                     var lead = firstCte ? FormatTokens.Apply("WITH", style.KeywordCase) + " " : style.CommaBeforeItems ? ", " : string.Empty;
-                    var width = lead.Length;
-                    var comma = !firstCte || true;
-                    _ = comma;
                     if (style.CollapseSubqueriesShorterThan > 0 && innerFlat.Length < style.CollapseSubqueriesShorterThan)
                     {
                         lines.Add(Indent(column) + lead + header + " (" + innerFlat + ")");
                     }
                     else
                     {
-                        lines.Add(Indent(column) + lead + header);
-                        lines.Add(Indent(column) + "(");
-                        var nested = LayoutDml(inner, column + style.TabWidth) ?? new List<string> { Indent(column + style.TabWidth) + innerFlat };
+                        if (style.CteAsOnNewLine)
+                        {
+                            lines.Add(Indent(column) + lead + name);
+                            lines.Add(Indent(column) + asText + (style.CteParenOnNewLine ? string.Empty : " ("));
+                        }
+                        else
+                        {
+                            lines.Add(Indent(column) + lead + header + (style.CteParenOnNewLine ? string.Empty : " ("));
+                        }
+
+                        if (style.CteParenOnNewLine)
+                        {
+                            lines.Add(Indent(column) + "(");
+                        }
+
+                        var nested = LayoutDml(inner, column + (style.CteIndentContents ? style.TabWidth : 0)) ?? new List<string> { Indent(column + style.TabWidth) + innerFlat };
                         lines.AddRange(nested);
                         lines.Add(Indent(column) + ")");
                     }
 
-                    _ = width;
                     firstCte = false;
                     var after = close + 1;
                     if (after < r.Count && r[after].Kind == TokenKind.Comma)
@@ -1141,15 +1156,20 @@ namespace SqlPrompter.Core.Formatting
                         continue;
                     }
 
-                    var nested = LayoutDml(inner, startColumn + style.TabWidth);
+                    var nested = LayoutDml(inner, startColumn + (style.IndentParenContents ? style.TabWidth : 0));
                     if (nested == null)
                     {
                         continue;
                     }
 
-                    var before = Flat(item, from, i + 1);
+                    var before = Flat(item, from, style.ParenOnNewLine ? i : i + 1);
                     current += (current.Length > 0 && from > 0 && NeedsSpace(item, from - 1, from) ? " " : string.Empty) + before;
                     lines.Add(current);
+                    if (style.ParenOnNewLine)
+                    {
+                        lines.Add(Indent(startColumn) + "(");
+                    }
+
                     lines.AddRange(nested);
                     var rest = Flat(item, close, item.Count);
                     var tailRest = Expand(item.GetRange(close + 1, item.Count - close - 1), startColumn);
@@ -1174,6 +1194,54 @@ namespace SqlPrompter.Core.Formatting
                 return lines;
             }
 
+            /// <summary>
+            /// CREATE / ALTER PROCEDURE with every parameter on a line of its own, indented one level, and AS (or WITH ...) on the line after them (#305); null when
+            /// the procedure has no parameters.
+            /// </summary>
+            private List<string> LayoutProcedureHeader(List<R> r, int column)
+            {
+                var first = r.FindIndex(2, t => t.Kind == TokenKind.Variable);
+                if (first < 0)
+                {
+                    return null;
+                }
+
+                var end = r.Count;
+                var depth = 0;
+                for (var k = first; k < r.Count; k++)
+                {
+                    if (r[k].Kind == TokenKind.OpenParen)
+                    {
+                        depth++;
+                    }
+                    else if (r[k].Kind == TokenKind.CloseParen)
+                    {
+                        depth--;
+                    }
+                    else if (depth == 0 && r[k].IsWord("AS", "WITH"))
+                    {
+                        end = k;
+                        break;
+                    }
+                }
+
+                var items = SplitCommas(r.GetRange(first, end - first));
+                var lines = new List<string> { Indent(column) + Flat(r, 0, first) };
+                var itemColumn = column + style.TabWidth;
+                for (var k = 0; k < items.Count; k++)
+                {
+                    var lead = style.CommaBeforeItems ? (k == 0 ? Indent(itemColumn) + "  " : Indent(itemColumn) + ", ") : Indent(itemColumn);
+                    lines.Add(lead + Flat(items[k], 0, items[k].Count) + (!style.CommaBeforeItems && k < items.Count - 1 ? "," : string.Empty));
+                }
+
+                if (end < r.Count)
+                {
+                    lines.Add(Indent(column) + Flat(r, end, r.Count));
+                }
+
+                return lines;
+            }
+
             private List<string> LayoutCreateTable(List<R> r, int column)
             {
                 var flat = Flat(r, 0, r.Count);
@@ -1195,20 +1263,22 @@ namespace SqlPrompter.Core.Formatting
                 }
 
                 var items = SplitCommas(r.GetRange(open + 1, close - open - 1));
-                var lines = new List<string> { Indent(column) + Flat(r, 0, open), Indent(column) + "(" };
+                var lines = style.DdlParenOnNewLine
+                    ? new List<string> { Indent(column) + Flat(r, 0, open), Indent(column) + "(" }
+                    : new List<string> { Indent(column) + Flat(r, 0, open) + " (" };
                 var nameWidth = items
                     .Where(i => i.Count > 1 && i[0].Kind != TokenKind.Word || (i.Count > 1 && !i[0].IsWord("CONSTRAINT", "PRIMARY", "UNIQUE", "FOREIGN", "CHECK", "INDEX")))
                     .Select(i => i[0].Text.Length)
                     .DefaultIfEmpty(0)
                     .Max();
-                var itemColumn = column + style.TabWidth;
+                var itemColumn = column + (style.DdlIndentContents ? style.TabWidth : 0);
                 for (var k = 0; k < items.Count; k++)
                 {
                     var item = items[k];
                     string rendered;
                     if (item.Count > 1 && !item[0].IsWord("CONSTRAINT", "PRIMARY", "UNIQUE", "FOREIGN", "CHECK", "INDEX"))
                     {
-                        rendered = item[0].Text.PadRight(nameWidth) + " " + Flat(item, 1, item.Count);
+                        rendered = (style.AlignDdlColumns ? item[0].Text.PadRight(nameWidth) : item[0].Text) + " " + Flat(item, 1, item.Count);
                     }
                     else
                     {
