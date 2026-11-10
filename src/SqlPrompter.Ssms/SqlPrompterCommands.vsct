@@ -205,6 +205,12 @@
           <ButtonText>Run Statement At Caret</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRunStatementsUpToCaret" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
+        <Strings>
+          <ButtonText>Run Statements Up To Caret</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidQueryHistoryToolbar" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="ToolbarGroup" />
         <Icon guid="ImageCatalogGuid" id="History" />
@@ -467,6 +473,7 @@
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidLocateInObjectExplorer" value="0x0133" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
+      <IDSymbol name="cmdidRunStatementsUpToCaret" value="0x0135" />
       <IDSymbol name="cmdidParameterInfo" value="0x010D" />
       <IDSymbol name="cmdidSurroundWithSnippet" value="0x0107" />
       <IDSymbol name="cmdidNewSnippetFromSelection" value="0x0108" />
