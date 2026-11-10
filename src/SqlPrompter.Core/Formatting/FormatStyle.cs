@@ -166,6 +166,30 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "procedureParametersOnNewLines")]
         public bool ProcedureParametersOnNewLines { get; set; }
 
+        /// <summary>The column list of INSERT INTO is written one column per line when the line is longer than this; 1 is always, 0 never (#305).</summary>
+        [DataMember(Name = "insertColumnsBreakLength")]
+        public int InsertColumnsBreakLength { get; set; }
+
+        /// <summary>The opening parenthesis of a broken INSERT column list is on a line of its own (otherwise it ends the first line) (#305).</summary>
+        [DataMember(Name = "insertParenOnNewLine")]
+        public bool InsertParenOnNewLine { get; set; }
+
+        /// <summary>The rows of INSERT ... VALUES each get a line; off keeps them on the line of VALUES (#305).</summary>
+        [DataMember(Name = "insertValuesOnNewLines")]
+        public bool InsertValuesOnNewLines { get; set; }
+
+        /// <summary>A CASE expression shorter than this stays on one line, a longer one is broken into lines for WHEN, ELSE and END; 0 breaks every CASE (#305).</summary>
+        [DataMember(Name = "collapseCaseShorterThan")]
+        public int CollapseCaseShorterThan { get; set; }
+
+        /// <summary>The expression of a simple CASE (<c>CASE expr WHEN ...</c>) is on the line after CASE (#305).</summary>
+        [DataMember(Name = "caseExpressionOnNewLine")]
+        public bool CaseExpressionOnNewLine { get; set; }
+
+        /// <summary>A space after the opening and before the closing parenthesis of the contents of IN: <c>IN ( 1, 2 )</c> (#305).</summary>
+        [DataMember(Name = "spaceAroundInContents")]
+        public bool SpaceAroundInContents { get; set; }
+
         /// <summary>The contents of BEGIN … END are indented.</summary>
         [DataMember(Name = "indentBlocks")]
         public bool IndentBlocks { get; set; }
@@ -214,6 +238,12 @@ namespace SqlPrompter.Core.Formatting
             DdlIndentContents = true;
             AlignDdlColumns = true;
             ProcedureParametersOnNewLines = false;
+            InsertColumnsBreakLength = 0;
+            InsertParenOnNewLine = false;
+            InsertValuesOnNewLines = true;
+            CollapseCaseShorterThan = 35;
+            CaseExpressionOnNewLine = false;
+            SpaceAroundInContents = false;
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;

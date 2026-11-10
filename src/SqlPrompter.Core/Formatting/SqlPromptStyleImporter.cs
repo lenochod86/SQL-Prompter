@@ -199,6 +199,26 @@ namespace SqlPrompter.Core.Formatting
                 applied.Add("procedureParametersOnNewLines = " + style.ProcedureParametersOnNewLines);
             }
 
+            ImportStyle("insertStatements.columns.parenthesisStyle", "insertParenOnNewLine", v => style.InsertParenOnNewLine = v);
+            var insertColumns = Text("insertStatements.columns.placeSubsequentColumnsOnNewLines");
+            if (insertColumns != null)
+            {
+                // never = 0, always = 1, otherwise (the line is longer than the maximum) the maximum line length of the style.
+                style.InsertColumnsBreakLength = string.Equals(insertColumns, "never", StringComparison.OrdinalIgnoreCase) ? 0
+                    : string.Equals(insertColumns, "always", StringComparison.OrdinalIgnoreCase) ? 1 : style.MaxLineLength;
+                applied.Add("insertColumnsBreakLength = " + style.InsertColumnsBreakLength);
+            }
+
+            var insertValues = Text("insertStatements.values.placeSubsequentValuesOnNewLines");
+            if (insertValues != null)
+            {
+                style.InsertValuesOnNewLines = !string.Equals(insertValues, "never", StringComparison.OrdinalIgnoreCase);
+                applied.Add("insertValuesOnNewLines = " + style.InsertValuesOnNewLines);
+            }
+
+            SetLimit("caseExpressions.collapseCaseExpressionsShorterThan", "caseExpressions.collapseShortCaseExpressions", v => style.CollapseCaseShorterThan = v, "collapseCaseShorterThan");
+            ImportFlag("caseExpressions.placeExpressionOnNewLine", "caseExpressionOnNewLine", v => style.CaseExpressionOnNewLine = v);
+            ImportFlag("operators.in.addSpaceAroundInContents", "spaceAroundInContents", v => style.SpaceAroundInContents = v);
             foreach (var path in Leaves(root, string.Empty))
             {
                 if (!used.Contains(path) && !path.StartsWith("metadata.", StringComparison.Ordinal))
@@ -314,27 +334,27 @@ namespace SqlPrompter.Core.Formatting
 
             if (path.StartsWith("insertStatements.", StringComparison.Ordinal))
             {
-                return "planned: the layout of INSERT columns and values";
+                return "left out: the contents of one row of VALUES and the other INSERT layout options are kept on one line";
             }
 
             if (path.StartsWith("caseExpressions.", StringComparison.Ordinal))
             {
-                return "planned: the layout of CASE expressions";
+                return "left out: the layout of CASE expressions follows the options of the CASE page";
             }
 
             if (path.StartsWith("operators.", StringComparison.Ordinal))
             {
-                return "planned: the alignment of operators (comparison, BETWEEN, IN)";
+                return "left out: BETWEEN and the values of IN are kept on one line";
             }
 
             if (path.StartsWith("controlFlow.", StringComparison.Ordinal))
             {
-                return "planned: the layout of control flow";
+                return "left out: not supported by the formatter";
             }
 
             if (path.StartsWith("joinStatements.", StringComparison.Ordinal) || path.StartsWith("variables.", StringComparison.Ordinal) || path.StartsWith("lists.", StringComparison.Ordinal))
             {
-                return "planned";
+                return "left out: not supported by the formatter";
             }
 
             return "not supported yet";
