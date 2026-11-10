@@ -162,8 +162,8 @@ namespace SqlPrompter.Ssms
 
         private static void RefreshMetadata()
         {
-            MetadataService.Current?.Caches.InvalidateAll();
-            Log.Write("Metadata dropped; it is loaded again on the next completion.");
+            ThreadHelper.ThrowIfNotOnUIThread();
+            RefreshNow.Run();
         }
 
         private sealed class MainWindowOwner : System.Windows.Forms.IWin32Window

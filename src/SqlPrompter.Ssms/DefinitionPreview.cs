@@ -33,6 +33,10 @@ namespace SqlPrompter.Ssms
         private const string ApplicationName = "SQL Prompter";
         private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(2);
         private static readonly Dictionary<string, KeyValuePair<DateTime, string>> Cache = new Dictionary<string, KeyValuePair<DateTime, string>>();
+        private static int generation;
+
+        /// <summary>Forgets every loaded script (the objects changed or the user refreshed the metadata, #423); safe from any thread.</summary>
+        public static void Invalidate() => System.Threading.Interlocked.Increment(ref generation);
 
         public static bool TryGetCached(DefinitionRef reference, out string script)
         {
@@ -96,7 +100,7 @@ namespace SqlPrompter.Ssms
 
             var database = string.IsNullOrEmpty(reference.Database) ? connection.Database : reference.Database;
             target = string.IsNullOrEmpty(database) ? connection : connection.WithDatabase(database);
-            return target.CacheKey + "|" + reference.Schema + "." + reference.Name;
+            return System.Threading.Volatile.Read(ref generation) + "|" + target.CacheKey + "|" + reference.Schema + "." + reference.Name;
         }
     }
 }

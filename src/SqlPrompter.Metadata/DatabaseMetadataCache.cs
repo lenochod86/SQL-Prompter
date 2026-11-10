@@ -39,6 +39,12 @@ namespace SqlPrompter.Metadata
         /// <summary>Current snapshot, or null until it is loaded.</summary>
         public DatabaseSnapshot Current => snapshot;
 
+        /// <summary>
+        /// Raised on a background thread after the objects were loaded or reloaded because they changed (#423), so that what was computed
+        /// from the old snapshot (code analysis, open panels) can be computed again. Not raised when only columns were added.
+        /// </summary>
+        public event EventHandler SnapshotReplaced;
+
         /// <summary>Starts loading objects if not done yet. Returns the task only for tests.</summary>
         public Task EnsureLoaded(IMetadataLoader loader)
         {
@@ -149,6 +155,7 @@ namespace SqlPrompter.Metadata
 
                 log("Metadata of database " + loaded.DatabaseName + " loaded: " + loaded.Objects.Count + " objects in " +
                     (int)(clock() - started).TotalMilliseconds + " ms.");
+                RaiseReplaced();
             }
             catch (Exception ex)
             {
@@ -204,20 +211,38 @@ namespace SqlPrompter.Metadata
                 }
 
                 var loaded = await loader.LoadAsync(CancellationToken.None).ConfigureAwait(false);
+                var replaced = false;
                 lock (gate)
                 {
                     if (generation == expectedGeneration)
                     {
                         // After objects change, columns are loaded again on demand.
                         snapshot = loaded;
+                        replaced = true;
                     }
                 }
 
-                log("Metadata of database " + loaded.DatabaseName + " refreshed after objects changed.");
+                if (replaced)
+                {
+                    log("Metadata of database " + loaded.DatabaseName + " refreshed after objects changed.");
+                    RaiseReplaced();
+                }
             }
             catch (Exception ex)
             {
                 Fail("Checking metadata for changes failed", ex);
+            }
+        }
+
+        private void RaiseReplaced()
+        {
+            try
+            {
+                SnapshotReplaced?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                log("A handler of the metadata change failed: " + ex.GetType().Name + ": " + ex.Message);
             }
         }
 
@@ -261,7 +286,15 @@ namespace SqlPrompter.Metadata
         public event EventHandler LinkedServerLoaded;
 
         public DatabaseMetadataCache Get(ConnectionSettings settings) =>
-            caches.GetOrAdd(settings.CacheKey, _ => new DatabaseMetadataCache(log));
+            caches.GetOrAdd(settings.CacheKey, _ =>
+            {
+                var created = new DatabaseMetadataCache(log);
+                created.SnapshotReplaced += (s, e) => SnapshotReplaced?.Invoke(this, EventArgs.Empty);
+                return created;
+            });
+
+        /// <summary>Raised (on a background thread) when the objects of any database were loaded or reloaded after a change (#423).</summary>
+        public event EventHandler SnapshotReplaced;
 
         public void InvalidateAll()
         {
