@@ -382,6 +382,7 @@ namespace SqlPrompter.Core.Formatting
             private string Layout(List<Token> code, int column)
             {
                 var r = FormatTokens.Prepare(code, style);
+                spaceInIn = style.SpaceAroundInContents;
                 var semicolon = r.Count > 0 && r[r.Count - 1].Kind == TokenKind.Semicolon;
                 if (semicolon)
                 {
@@ -710,6 +711,11 @@ namespace SqlPrompter.Core.Formatting
                     return;
                 }
 
+                if (name == "INSERT" && style.InsertColumnsBreakLength > 0 && LayoutInsertColumns(keyword, body, column, contentColumn, lines))
+                {
+                    return;
+                }
+
                 List<List<R>> items;
                 string[] separators = null;
                 if (isConditions && style.ConditionsOnSeparateLines)
@@ -719,7 +725,7 @@ namespace SqlPrompter.Core.Formatting
                 else if (isList)
                 {
                     // GROUP BY and ORDER BY can stay on the line of their keyword (#305).
-                    items = (name == "GROUP" || name == "ORDER") && !style.GroupOrderBySeparateLines
+                    items = ((name == "GROUP" || name == "ORDER") && !style.GroupOrderBySeparateLines) || (name == "VALUES" && !style.InsertValuesOnNewLines)
                         ? new List<List<R>> { body }
                         : SplitCommas(body);
                 }
@@ -855,6 +861,72 @@ namespace SqlPrompter.Core.Formatting
                 }
 
                 return result;
+            }
+
+            /// <summary>
+            /// INSERT INTO table (columns): the columns one per line under the table when the line is longer than <see cref="FormatStyle.InsertColumnsBreakLength"/> (1 =
+            /// always), the parenthesis at the end of the first line or on its own line (#305). False when the INSERT has no column list worth breaking.
+            /// </summary>
+            private bool LayoutInsertColumns(string keyword, List<R> body, int column, int contentColumn, List<string> lines)
+            {
+                if (body.Count < 4 || body[body.Count - 1].Kind != TokenKind.CloseParen)
+                {
+                    return false;
+                }
+
+                var depth = 0;
+                var open = -1;
+                for (var i = body.Count - 1; i >= 0; i--)
+                {
+                    if (body[i].Kind == TokenKind.CloseParen)
+                    {
+                        depth++;
+                    }
+                    else if (body[i].Kind == TokenKind.OpenParen && --depth == 0)
+                    {
+                        open = i;
+                        break;
+                    }
+                }
+
+                if (open <= 0)
+                {
+                    return false;
+                }
+
+                var table = Flat(body, 0, open);
+                var parenthesis = Flat(body, open, body.Count);
+                if (style.InsertColumnsBreakLength > 1 && keyword.Length + 1 + table.Length + 1 + parenthesis.Length <= style.InsertColumnsBreakLength)
+                {
+                    return false;
+                }
+
+                var items = SplitCommas(body.GetRange(open + 1, body.Count - open - 2));
+                if (items.Count < 2)
+                {
+                    return false;
+                }
+
+                var head = Indent(column) + keyword + Pad(column + keyword.Length, contentColumn) + table;
+                if (style.InsertParenOnNewLine)
+                {
+                    lines.Add(head);
+                    lines.Add(Indent(column) + "(");
+                }
+                else
+                {
+                    lines.Add(head + " (");
+                }
+
+                var itemColumn = column + style.TabWidth;
+                for (var k = 0; k < items.Count; k++)
+                {
+                    var lead = style.CommaBeforeItems ? (k == 0 ? Indent(itemColumn) + "  " : Indent(itemColumn) + ", ") : Indent(itemColumn);
+                    lines.Add(lead + Flat(items[k], 0, items[k].Count) + (!style.CommaBeforeItems && k < items.Count - 1 ? "," : string.Empty));
+                }
+
+                lines.Add(Indent(column) + ")");
+                return true;
             }
 
             private static readonly string[] ComparisonOperators = { "=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>" };
@@ -1127,11 +1199,125 @@ namespace SqlPrompter.Core.Formatting
             }
 
             /// <summary>
+            /// A CASE expression at the top level of the item that is not shorter than <see cref="FormatStyle.CollapseCaseShorterThan"/>: CASE, then a line for every WHEN
+            /// and ELSE one level under it, then END with the rest of the item (#305). Null when the item has none or it stays on one line.
+            /// </summary>
+            private List<string> ExpandCase(List<R> item, int startColumn)
+            {
+                var depth = 0;
+                var start = -1;
+                for (var i = 0; i < item.Count; i++)
+                {
+                    if (item[i].Kind == TokenKind.OpenParen)
+                    {
+                        depth++;
+                    }
+                    else if (item[i].Kind == TokenKind.CloseParen)
+                    {
+                        depth--;
+                    }
+                    else if (depth == 0 && item[i].IsWord("CASE"))
+                    {
+                        start = i;
+                        break;
+                    }
+                }
+
+                if (start < 0)
+                {
+                    return null;
+                }
+
+                var nest = 0;
+                var end = -1;
+                for (var i = start; i < item.Count; i++)
+                {
+                    if (item[i].IsWord("CASE"))
+                    {
+                        nest++;
+                    }
+                    else if (item[i].IsWord("END") && --nest == 0)
+                    {
+                        end = i;
+                        break;
+                    }
+                }
+
+                if (end < 0 || (style.CollapseCaseShorterThan > 0 && Flat(item, start, end + 1).Length < style.CollapseCaseShorterThan))
+                {
+                    return null;
+                }
+
+                var breaks = new List<int>();
+                depth = 0;
+                nest = 0;
+                for (var i = start + 1; i < end; i++)
+                {
+                    if (item[i].Kind == TokenKind.OpenParen)
+                    {
+                        depth++;
+                    }
+                    else if (item[i].Kind == TokenKind.CloseParen)
+                    {
+                        depth--;
+                    }
+                    else if (item[i].IsWord("CASE"))
+                    {
+                        nest++;
+                    }
+                    else if (item[i].IsWord("END"))
+                    {
+                        nest--;
+                    }
+                    else if (depth == 0 && nest == 0 && item[i].IsWord("WHEN", "ELSE"))
+                    {
+                        breaks.Add(i);
+                    }
+                }
+
+                if (breaks.Count == 0)
+                {
+                    return null;
+                }
+
+                var prefix = Flat(item, 0, start);
+                var first = prefix + (prefix.Length > 0 && NeedsSpace(item, start - 1, start) ? " " : string.Empty) + item[start].Text;
+                var expression = Flat(item, start + 1, breaks[0]);
+                var branchColumn = startColumn + style.TabWidth;
+                var lines = new List<string>();
+                if (expression.Length > 0 && !style.CaseExpressionOnNewLine)
+                {
+                    first += " " + expression;
+                }
+
+                lines.Add(first);
+                if (expression.Length > 0 && style.CaseExpressionOnNewLine)
+                {
+                    lines.Add(Indent(branchColumn) + expression);
+                }
+
+                for (var k = 0; k < breaks.Count; k++)
+                {
+                    var to = k + 1 < breaks.Count ? breaks[k + 1] : end;
+                    lines.Add(Indent(branchColumn) + Flat(item, breaks[k], to));
+                }
+
+                lines.Add(Indent(startColumn) + item[end].Text + (end + 1 < item.Count ? (NeedsSpace(item, end, end + 1) ? " " : string.Empty) + Flat(item, end + 1, item.Count) : string.Empty));
+                return lines;
+            }
+
+            /// <summary>
             /// The lines of an item that starts at <paramref name="startColumn"/>: the first one without indentation (the caller puts the keyword
             /// or comma in front), the others complete. A long subquery in parentheses is laid out on its own lines.
             /// </summary>
             private List<string> Expand(List<R> item, int startColumn)
             {
+                var caseLines = ExpandCase(item, startColumn);
+                if (caseLines != null)
+                {
+                    return caseLines;
+                }
+
                 var lines = new List<string>();
                 var from = 0;
                 var current = string.Empty;
@@ -1366,10 +1552,42 @@ namespace SqlPrompter.Core.Formatting
                 }
             }
 
+            [ThreadStatic]
+            private static bool spaceInIn;
+
             private static bool NeedsSpace(List<R> r, int p, int c)
             {
                 var previous = r[p];
                 var current = r[c];
+                if (spaceInIn)
+                {
+                    if (previous.Kind == TokenKind.OpenParen && p > 0 && r[p - 1].IsWord("IN") && current.Kind != TokenKind.CloseParen)
+                    {
+                        return true;
+                    }
+
+                    if (current.Kind == TokenKind.CloseParen && previous.Kind != TokenKind.OpenParen)
+                    {
+                        var depth = 0;
+                        for (var k = c; k >= 0; k--)
+                        {
+                            if (r[k].Kind == TokenKind.CloseParen)
+                            {
+                                depth++;
+                            }
+                            else if (r[k].Kind == TokenKind.OpenParen && --depth == 0)
+                            {
+                                if (k > 0 && r[k - 1].IsWord("IN"))
+                                {
+                                    return true;
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 if (current.Kind == TokenKind.Comma || current.Kind == TokenKind.CloseParen || current.Kind == TokenKind.Semicolon || current.Kind == TokenKind.Dot)
                 {
                     return false;
