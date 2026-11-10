@@ -417,6 +417,7 @@ namespace SqlPrompter.Ssms
             switch (id)
             {
                 case QuickActionCatalog.Format: RefactorCommands.FormatScript(view, !hasSelection); break;
+                case QuickActionCatalog.Unformat: RefactorCommands.UnformatSelection(view); break;
                 case QuickActionCatalog.QualifyNames: RefactorCommands.QualifyNames(view); break;
                 case QuickActionCatalog.ExpandStars: RefactorCommands.ExpandStars(view); break;
                 case QuickActionCatalog.RemoveBrackets: RefactorCommands.Run(view, Refactorings.RemoveBrackets, "square brackets removed"); break;

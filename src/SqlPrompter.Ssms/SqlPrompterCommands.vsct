@@ -332,6 +332,12 @@
           <ButtonText>Format Selection</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidUnformatSelection" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+        <Strings>
+          <ButtonText>Unformat Selection</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidAddNPrefix" priority="0x0210" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
@@ -443,6 +449,7 @@
       <IDSymbol name="cmdidQueryHistoryToolbar" value="0x0131" />
       <IDSymbol name="cmdidFormatDocument" value="0x011A" />
       <IDSymbol name="cmdidFormatSelection" value="0x011B" />
+      <IDSymbol name="cmdidUnformatSelection" value="0x0136" />
       <IDSymbol name="cmdidAddNPrefix" value="0x011C" />
       <IDSymbol name="cmdidAddAs" value="0x011D" />
       <IDSymbol name="cmdidRemoveAs" value="0x011E" />

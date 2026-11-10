@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 45)]
+    [ProvideMenuResource("Menus.ctmenu", 46)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -31,6 +31,7 @@ namespace SqlPrompter.Ssms
         public const int PickerRightId = 0x0123;
         public const int FormatDocumentId = 0x011A;
         public const int FormatSelectionId = 0x011B;
+        public const int UnformatSelectionId = 0x0136;
         public const int AddNPrefixId = 0x011C;
         public const int AddAsId = 0x011D;
         public const int RemoveAsId = 0x011E;
@@ -127,6 +128,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.QualifyNames(ActiveEditor.GetView()), new CommandID(CommandSet, QualifyNamesId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), true), new CommandID(CommandSet, FormatDocumentId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), false), new CommandID(CommandSet, FormatSelectionId)));
+                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.UnformatSelection(ActiveEditor.GetView()), new CommandID(CommandSet, UnformatSelectionId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddNPrefix, "N prefix added to strings"), new CommandID(CommandSet, AddNPrefixId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddAs, "AS added to aliases"), new CommandID(CommandSet, AddAsId)));
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.RemoveAs, "AS removed from aliases"), new CommandID(CommandSet, RemoveAsId)));
