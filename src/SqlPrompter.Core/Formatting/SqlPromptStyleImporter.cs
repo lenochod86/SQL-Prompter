@@ -165,6 +165,13 @@ namespace SqlPrompter.Core.Formatting
                 applied.Add("alignAliases = " + alignAliases.Value);
             }
 
+            var alignComparisons = Flag("operators.comparison.align");
+            if (alignComparisons != null)
+            {
+                style.AlignComparisons = alignComparisons.Value;
+                applied.Add("alignComparisons = " + alignComparisons.Value);
+            }
+
             var onNewLine = Flag("joinStatements.on.placeOnNewLine");
             if (onNewLine != null)
             {
