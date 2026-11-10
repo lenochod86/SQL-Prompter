@@ -188,6 +188,7 @@ Wanted, but not a priority, so it comes last.
 - [x] Formatting actions: `N` prefix for strings, semicolons, removing brackets, adding or removing `AS`, casing, qualification and expanding `*` (#57); verified in SSMS 22.11 (menu clicks)
 - [x] Formatting the document (verified in SSMS 22.11) or the selection (#57, selection not verified)
 - [x] Upper case while typing (#57): option *Case keywords while typing*, off by default; verified in SSMS 22.11
+- [x] Unformat Selection (#424): puts the selection on one line (quick action and SQL Prompter menu, no default key); a `--` comment becomes `/* ... */`, strings and quoted identifiers stay as they are, `GO` lines stay and every batch becomes one line; verified in SSMS 22.11 (menu click, one Ctrl+Z restores)
 
 ### Phase 9: GUI enhancements (M to L) (#83)
 

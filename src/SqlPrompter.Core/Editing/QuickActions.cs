@@ -37,6 +37,7 @@ namespace SqlPrompter.Core.Editing
         public const string AddNPrefix = "addNPrefix";
         public const string AddAs = "addAs";
         public const string RemoveAs = "removeAs";
+        public const string Unformat = "unformat";
         public const string AddCommas = "addCommas";
         public const string AddQuotesAndCommas = "addQuotesAndCommas";
 
@@ -61,6 +62,7 @@ namespace SqlPrompter.Core.Editing
             };
             if (hasSelection)
             {
+                list.Insert(1, new QuickAction(Unformat, "Unformat Selection", "Puts the selection on one line."));
                 list.Add(new QuickAction(AddCommas, "Add Commas To Selected Lines", "Puts a comma at the end of every line but the last."));
                 list.Add(new QuickAction(AddQuotesAndCommas, "Add Quotes And Commas To Selected Lines", "Turns the lines into a list of quoted strings."));
             }
