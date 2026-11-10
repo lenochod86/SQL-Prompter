@@ -45,6 +45,9 @@ namespace SqlPrompter.Metadata
         /// </summary>
         public event EventHandler SnapshotReplaced;
 
+        /// <summary>Raised (as well as SnapshotReplaced) only when the objects of a loaded snapshot were reloaded because they had changed (#423).</summary>
+        public event EventHandler ObjectsChanged;
+
         /// <summary>Starts loading objects if not done yet. Returns the task only for tests.</summary>
         public Task EnsureLoaded(IMetadataLoader loader)
         {
@@ -226,6 +229,7 @@ namespace SqlPrompter.Metadata
                 {
                     log("Metadata of database " + loaded.DatabaseName + " refreshed after objects changed.");
                     RaiseReplaced();
+                    try { ObjectsChanged?.Invoke(this, EventArgs.Empty); } catch (Exception ex) { log("A handler of the metadata change failed: " + ex.Message); }
                 }
             }
             catch (Exception ex)
@@ -290,11 +294,15 @@ namespace SqlPrompter.Metadata
             {
                 var created = new DatabaseMetadataCache(log);
                 created.SnapshotReplaced += (s, e) => SnapshotReplaced?.Invoke(this, EventArgs.Empty);
+                created.ObjectsChanged += (s, e) => ObjectsChanged?.Invoke(this, EventArgs.Empty);
                 return created;
             });
 
         /// <summary>Raised (on a background thread) when the objects of any database were loaded or reloaded after a change (#423).</summary>
         public event EventHandler SnapshotReplaced;
+
+        /// <summary>As SnapshotReplaced, but only after a reload caused by a change (#423).</summary>
+        public event EventHandler ObjectsChanged;
 
         public void InvalidateAll()
         {

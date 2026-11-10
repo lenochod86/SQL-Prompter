@@ -20,6 +20,7 @@ namespace SqlPrompter.Ssms
             }
 
             service.Caches.InvalidateAll();
+            RefreshSsmsIntelliSense();
             DefinitionPreview.Invalidate();
             Log.Write("Metadata dropped; reloading it.");
             var cache = service.CacheForActiveWindow(out _);
@@ -43,6 +44,29 @@ namespace SqlPrompter.Ssms
 #pragma warning restore VSSDK007
             };
             MetadataService.SnapshotReplaced += done;
+        }
+
+        /// <summary>
+        /// SSMS has its own IntelliSense cache (red squiggles such as "expects parameter ... which was not supplied", its quick info); only its
+        /// command Edit.RefreshLocalCache (Ctrl+Shift+R) reloads it (#423). Safe from any thread; failures are only logged.
+        /// </summary>
+        public static void RefreshSsmsIntelliSense()
+        {
+#pragma warning disable VSSDK007 // fire and forget on purpose
+            ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                try
+                {
+                    ((EnvDTE.DTE)Package.GetGlobalService(typeof(EnvDTE.DTE))).ExecuteCommand("Edit.RefreshLocalCache");
+                    Log.Write("SSMS IntelliSense cache refreshed.");
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Refreshing the SSMS IntelliSense cache failed: " + ex.Message);
+                }
+            }).Task.FileAndForget("sqlprompter/refresh-intellisense");
+#pragma warning restore VSSDK007
         }
 
         private static void SetStatus(string text)
