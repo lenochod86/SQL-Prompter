@@ -109,6 +109,7 @@ namespace SqlPrompter.Ssms
         private readonly ListBox list = new ListBox { BorderThickness = new Thickness(0) };
         private readonly List<Entry> entries;
         private Func<string, List<Entry>> search;
+        private int initialIndex;
         private Action chosen;
         private bool closing;
         private readonly CtrlTapDetector closeTap = new CtrlTapDetector();
@@ -147,6 +148,12 @@ namespace SqlPrompter.Ssms
             Loaded += (s, e) =>
             {
                 filter.Focus();
+                if (initialIndex > 0 && initialIndex < list.Items.Count && filter.Text.Length == 0)
+                {
+                    list.SelectedIndex = initialIndex;
+                    list.ScrollIntoView(list.SelectedItem);
+                }
+
                 StartOutsideClickWatch();
             };
             Closing += (s, e) =>
@@ -288,7 +295,9 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            Open(new QuickActionsPopup(view, entries, "Script outline: type to filter; Enter jumps to the item, Esc closes"));
+            var outline = new QuickActionsPopup(view, entries, "Script outline: type to filter; Enter jumps to the item, Esc closes");
+            outline.initialIndex = Math.Max(0, SqlPrompter.Core.Navigation.ScriptOutline.IndexAt(items, view.Caret.Position.BufferPosition.Position));
+            Open(outline);
         }
 
         /// <summary>Quick open (#223): objects of the current database by a part of the name; Enter opens the definition, Shift+Enter inserts the name.</summary>
