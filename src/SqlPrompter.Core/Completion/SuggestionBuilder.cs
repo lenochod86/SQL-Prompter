@@ -265,8 +265,20 @@ namespace SqlPrompter.Core.Completion
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
+                    if (context.OnlyExpectedKeywords)
+                    {
+                        // Only these words fit (ALTER DATABASE Db |): no fragments or snippets.
+                        return KeywordSuggestions(context, 0).ToList();
+                    }
+
                     return StatementFragments.Build(context, metadata, options, script).Concat(KeywordSuggestions(context, 0)).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
+                    if (context.DatabaseName)
+                    {
+                        // Only the databases: no snippets (#447).
+                        return ObjectSuggestions(context, metadata, script, options).ToList();
+                    }
+
                     return context.Module != ModuleKind.None
                         ? ObjectSuggestions(context, metadata, script, options).Concat(context.ModuleAction == ModuleAction.Drop ? KeywordSuggestions(context, 1) : Enumerable.Empty<Suggestion>()).ToList()
                         : ObjectSuggestions(context, metadata, script, options).Concat(SnippetSuggestions(context, options)).ToList();
@@ -614,11 +626,42 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
+        private static readonly HashSet<string> SystemDatabases = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "master", "model", "msdb", "tempdb" };
+
+        /// <summary>The databases of the server where a database name goes (#447): user databases first, the system ones after them, then CURRENT where it is accepted.</summary>
+        private static IEnumerable<Suggestion> DatabaseNameSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        {
+            if (metadata != null)
+            {
+                foreach (var database in metadata.Databases.ToArray())
+                {
+                    var system = SystemDatabases.Contains(database);
+                    yield return new Suggestion(SuggestionKind.Database, database, SqlIdentifier.Quote(database, context.QuoteIdentifiers), database, system ? "system" : null, "database", system ? 1 : 0);
+                }
+            }
+
+            if (context.CurrentDatabaseAllowed)
+            {
+                var current = Keywords.ApplyCase("CURRENT", context.TypedPrefix);
+                yield return new Suggestion(SuggestionKind.Keyword, current, current, current, null, "the database the connection is in", 2);
+            }
+        }
+
         private static IEnumerable<Suggestion> ObjectSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             if (context.Module != ModuleKind.None)
             {
                 foreach (var suggestion in ModuleSuggestions(context, metadata))
+                {
+                    yield return suggestion;
+                }
+
+                yield break;
+            }
+
+            if (context.DatabaseName)
+            {
+                foreach (var suggestion in DatabaseNameSuggestions(context, metadata))
                 {
                     yield return suggestion;
                 }
