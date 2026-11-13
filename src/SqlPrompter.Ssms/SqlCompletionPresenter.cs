@@ -1126,6 +1126,10 @@ namespace SqlPrompter.Ssms
             {
                 Item = entry;
                 var item = entry.CompletionItem;
+                // Rows live as long as the presenter, so the icon theme is set again each time (#488: a theme switch in an open tab).
+                var back = BackgroundColor;
+                ImageThemingUtilities.SetImageBackgroundColor(icon, back);
+                ImageThemingUtilities.SetImageBackgroundColor(keyIcon, back);
                 Root.Visibility = Visibility.Visible;
                 if (item.Properties.TryGetProperty(SqlCompletionSource.PickerHeaderKey, out string heading))
                 {
