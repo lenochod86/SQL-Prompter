@@ -32,8 +32,26 @@ namespace SqlPrompter.Ssms
             }
         }
 
-        private static List<(int FirstColumn, int LastColumn)> ReadBlocks()
+        /// <summary>How many cells are selected in the focused grid; -1 when it cannot be told (the focus is not in a grid).</summary>
+        public static long SelectedCellCount()
         {
+            try
+            {
+                var blocks = ReadBlocks(out var cells);
+                return blocks == null ? -1 : cells;
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Reading the selection of the results grid failed: " + ex.GetType().Name + ": " + ex.Message);
+                return -1;
+            }
+        }
+
+        private static List<(int FirstColumn, int LastColumn)> ReadBlocks() => ReadBlocks(out _);
+
+        private static List<(int FirstColumn, int LastColumn)> ReadBlocks(out long cells)
+        {
+            cells = 0;
             var focused = GetFocus();
             var control = focused == IntPtr.Zero ? null : Control.FromChildHandle(focused);
             for (; control != null; control = control.Parent)
@@ -60,7 +78,9 @@ namespace SqlPrompter.Ssms
                     var blockType = block.GetType();
                     var x = (int)blockType.GetProperty("X").GetValue(block);
                     var width = (int)blockType.GetProperty("Width").GetValue(block);
+                    var height = Convert.ToInt64(blockType.GetProperty("Height").GetValue(block));
                     blocks.Add((x, x + Math.Max(1, width) - 1));
+                    cells += Math.Max(1, width) * Math.Max(1, height);
                 }
 
                 return blocks;
