@@ -500,24 +500,7 @@ namespace SqlPrompter.Core.Analysis
                 return;
             }
 
-            var parts = new List<string>();
-            var k = open - 1;
-            while (k >= s.StatementStart && tokens[k].IsNamePart)
-            {
-                parts.Insert(0, tokens[k].IdentifierValue);
-                if (k - 1 >= s.StatementStart && tokens[k - 1].Kind == TokenKind.Dot)
-                {
-                    k -= 2;
-                }
-                else
-                {
-                    k--;
-                    break;
-                }
-            }
-
-            if (parts.Count == 0 || parts.Count > 3 || k < s.StatementStart ||
-                !(tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= s.StatementStart && tokens[k - 1].IsWord("INSERT"))))
+            if (!TryInsertTable(tokens, s.StatementStart, open, out var parts))
             {
                 return;
             }
@@ -531,7 +514,7 @@ namespace SqlPrompter.Core.Analysis
                 }
             }
 
-            target.InsertTail = new TableSource(TableSourceKind.Object, parts, null, 0);
+            target.InsertTail = InsertTableSource(parts);
             target.InsertTailColumns = columns;
         }
 
@@ -924,6 +907,47 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>
+        /// The table of <c>INSERT [INTO] table (</c> before the opening parenthesis at <paramref name="open"/>: a name of up to three parts, a temporary
+        /// table (<c>#t</c>) or a table variable (<c>@t</c>, #449).
+        /// </summary>
+        private static bool TryInsertTable(List<Token> tokens, int statementStart, int open, out List<string> parts)
+        {
+            parts = new List<string>();
+            var k = open - 1;
+            if (k >= statementStart && tokens[k].Kind == TokenKind.Variable)
+            {
+                parts.Add(tokens[k].Text);
+                k--;
+            }
+            else
+            {
+                while (k >= statementStart && tokens[k].IsNamePart)
+                {
+                    parts.Insert(0, tokens[k].IdentifierValue);
+                    if (k - 1 >= statementStart && tokens[k - 1].Kind == TokenKind.Dot)
+                    {
+                        k -= 2;
+                    }
+                    else
+                    {
+                        k--;
+                        break;
+                    }
+                }
+            }
+
+            return parts.Count > 0 && parts.Count <= 3 && k >= statementStart &&
+                (tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= statementStart && tokens[k - 1].IsWord("INSERT")));
+        }
+
+        private static TableSource InsertTableSource(List<string> parts)
+        {
+            var name = parts.Count == 1 ? parts[0] : string.Empty;
+            var kind = name.StartsWith("@", StringComparison.Ordinal) ? TableSourceKind.Variable : name.StartsWith("#", StringComparison.Ordinal) ? TableSourceKind.TempTable : TableSourceKind.Object;
+            return new TableSource(kind, parts, null, 0);
+        }
+
+        /// <summary>
         /// "INSERT INTO table (|" or "INSERT INTO table (a, |": the columns of the table. Null when the caret is somewhere else.
         /// </summary>
         private static CaretContext TryInsertColumns(List<Token> tokens, int statementStart, int anchorIndex, Func<ContextKind, CaretContext> make)
@@ -945,35 +969,13 @@ namespace SqlPrompter.Core.Analysis
                 open = j;
             }
 
-            var parts = new List<string>();
-            var k = open - 1;
-            while (k >= statementStart && tokens[k].IsNamePart)
-            {
-                parts.Insert(0, tokens[k].IdentifierValue);
-                if (k - 1 >= statementStart && tokens[k - 1].Kind == TokenKind.Dot)
-                {
-                    k -= 2;
-                }
-                else
-                {
-                    k--;
-                    break;
-                }
-            }
-
-            if (parts.Count == 0 || parts.Count > 3 || k < statementStart)
-            {
-                return null;
-            }
-
-            var isInsert = tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= statementStart && tokens[k - 1].IsWord("INSERT"));
-            if (!isInsert)
+            if (!TryInsertTable(tokens, statementStart, open, out var parts))
             {
                 return null;
             }
 
             var context = make(ContextKind.InsertColumns);
-            context.Sources = new[] { new TableSource(TableSourceKind.Object, parts, null, 0) };
+            context.Sources = new[] { InsertTableSource(parts) };
             context.FirstInsertColumn = tokens[anchorIndex].Kind == TokenKind.OpenParen;
             return context;
         }
