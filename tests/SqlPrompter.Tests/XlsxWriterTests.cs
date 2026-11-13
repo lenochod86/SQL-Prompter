@@ -306,14 +306,16 @@ namespace SqlPrompter.Tests
                 File.SetLastWriteTime(old, now.AddDays(-2));
                 File.SetLastWriteTime(locked, now.AddDays(-2));
                 File.SetLastWriteTime(other, now.AddDays(-2));
+                // Only Windows refuses to delete a file that another program has open; elsewhere it is deleted like the old one.
+                var windows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
                 using (new FileStream(locked, FileMode.Open, FileAccess.Read, FileShare.None))
                 {
-                    Assert.Equal(1, GridExcel.Cleanup(folder, now));
+                    Assert.Equal(windows ? 1 : 2, GridExcel.Cleanup(folder, now));
                 }
 
                 Assert.False(File.Exists(old));
                 Assert.True(File.Exists(recent));
-                Assert.True(File.Exists(locked));
+                Assert.Equal(windows, File.Exists(locked));
                 Assert.True(File.Exists(other));
                 Assert.Equal(0, GridExcel.Cleanup(Path.Combine(folder, "missing"), now));
             }
