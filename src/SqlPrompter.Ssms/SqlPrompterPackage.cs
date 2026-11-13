@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 49)]
+    [ProvideMenuResource("Menus.ctmenu", 50)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -57,7 +57,6 @@ namespace SqlPrompter.Ssms
         public const int FixCodeIssuesId = 0x0124;
         public const int PreviewAsSelectId = 0x0125;
         public const int DryRunId = 0x0126;
-        public const int ScriptOutlineId = 0x012C;
         public const int QuickOpenId = 0x012D;
         public const int FindInCodeId = 0x012E;
         public const int ShowDependenciesId = 0x012F;
@@ -115,7 +114,6 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), text => SqlPrompter.Core.Editing.CodeFixes.Apply(text, SettingsService.Current.Analysis, MetadataService.Current?.MetadataForScript(text)), "code analysis issues fixed"), new CommandID(CommandSet, FixCodeIssuesId)));
                 commands.AddCommand(new MenuCommand((s, e) => PreviewStatement.AsSelect(ActiveEditor.GetView()), new CommandID(CommandSet, PreviewAsSelectId)));
                 commands.AddCommand(new MenuCommand((s, e) => PreviewStatement.DryRun(ActiveEditor.GetView()), new CommandID(CommandSet, DryRunId)));
-                commands.AddCommand(new MenuCommand((s, e) => { var view = ActiveEditor.GetView(); if (view != null) { QuickActionsPopup.ShowOutline(view); } }, new CommandID(CommandSet, ScriptOutlineId)));
                 commands.AddCommand(new MenuCommand((s, e) => { var view = ActiveEditor.GetView(); if (view != null) { QuickActionsPopup.ShowObjects(view); } }, new CommandID(CommandSet, QuickOpenId)));
                 commands.AddCommand(new MenuCommand((s, e) => FindInCode.Run(ActiveEditor.GetView()), new CommandID(CommandSet, FindInCodeId)));
                 commands.AddCommand(new MenuCommand((s, e) => ShowDependencies.Run(ActiveEditor.GetView()), new CommandID(CommandSet, ShowDependenciesId)));
