@@ -931,10 +931,12 @@ namespace SqlPrompter.Ssms
         {
             text = SqlPrompter.Core.Editing.TabExpander.Expand(text, EditorTabSize.Current());
             var palette = EditorColors.ByKind();
-            var colors = new Color?[]
+            var colors = new Color?[palette.Length];
+            for (var c = 1; c < palette.Length; c++)
             {
-                null, palette[1], palette[2], palette[3], palette[4], null, palette[6], palette[7],
-            };
+                colors[c] = palette[c];
+            }
+
             var kinds = SqlPrompter.Core.Snippets.SnippetHighlighter.Classify(text);
             block.Inlines.Clear();
             var i = 0;
