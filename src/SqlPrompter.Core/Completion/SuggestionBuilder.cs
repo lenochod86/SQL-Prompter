@@ -1023,9 +1023,10 @@ var asKeyword = options.Kw("AS");
                 return new SourceColumns(source, scripted.Columns, owner);
             }
 
-            if (source.Kind == TableSourceKind.Object && source.NameParts.Count == 4 && options.RemoteColumns != null)
+            if (source.Kind == TableSourceKind.Object && options.RemoteColumns != null && (source.NameParts.Count == 4 || Readiness.IsOtherDatabase(source, metadata)))
             {
-                // server.database.schema.table: on a linked server, loaded when the table is used.
+                // server.database.schema.table: on a linked server, loaded when the table is used; database.schema.table of another database
+                // of the server: from the snapshot of that database, loaded when one of its tables is used (#443).
                 var remote = options.RemoteColumns(source);
                 return remote == null ? null : new SourceColumns(source, remote, string.Join(".", source.NameParts));
             }

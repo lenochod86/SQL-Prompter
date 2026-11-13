@@ -68,6 +68,11 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
+        /// <summary>True for a three-part name (database.schema.table) of a database other than the one of the metadata (#443).</summary>
+        public static bool IsOtherDatabase(TableSource source, IDatabaseMetadata metadata) =>
+            source.Kind == TableSourceKind.Object && source.NameParts.Count == 3 && !string.IsNullOrEmpty(source.Database) &&
+            (metadata == null || !string.Equals(source.Database, metadata.DatabaseName, StringComparison.OrdinalIgnoreCase));
+
         /// <summary>Finds the object in the metadata for a table source, or null.</summary>
         public static DbObject Resolve(TableSource source, IDatabaseMetadata metadata)
         {

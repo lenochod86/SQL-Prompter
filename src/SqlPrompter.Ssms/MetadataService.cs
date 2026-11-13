@@ -23,6 +23,8 @@ namespace SqlPrompter.Ssms
             {
                 DefinitionPreview.Invalidate();
                 SnapshotReplaced?.Invoke(null, e);
+                // A list that waits for the objects of another database (#443) is made again.
+                LinkedServerLoaded?.Invoke(this, e);
             };
         }
 
@@ -149,9 +151,10 @@ namespace SqlPrompter.Ssms
             }
 
             var linked = Caches.GetLinkedServers(settings);
+            var other = new OtherDatabases(Caches, settings, CreateLoader);
             return source => source.NameParts.Count == 4
                 ? linked.StatusOfColumns(source.NameParts[0], source.NameParts[1], source.NameParts[2], source.NameParts[3])
-                : SqlPrompter.Metadata.LinkedLoadStatus.Done;
+                : source.NameParts.Count == 3 ? other.ColumnStatus(source) : SqlPrompter.Metadata.LinkedLoadStatus.Done;
         }
 
         private System.Func<SqlPrompter.Core.Analysis.TableSource, System.Collections.Generic.IReadOnlyList<SqlPrompter.Core.Model.DbColumn>> LinkedColumns(out System.Func<SqlPrompter.Core.Analysis.TableSource, SqlPrompter.Metadata.LinkedLoadStatus> status)
@@ -166,9 +169,21 @@ namespace SqlPrompter.Ssms
 
             var linked = Caches.GetLinkedServers(settings);
             var loader = CreateLoader(settings);
+            var other = new OtherDatabases(Caches, settings, CreateLoader);
             return source => source.NameParts.Count == 4
                 ? linked.GetColumns(source.NameParts[0], source.NameParts[1], source.NameParts[2], source.NameParts[3], loader)
-                : null;
+                : source.NameParts.Count == 3 ? other.Columns(source) : null;
+        }
+
+        /// <summary>
+        /// The other databases of the active window's server (three-part names, #443) for the active window's connection, or null without a connection.
+        /// Safe to use off the UI thread; it never waits, it starts the loading of a database in the background.
+        /// </summary>
+        public OtherDatabases OtherDatabases()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var settings = SsmsConnection.GetActive();
+            return settings == null || !settings.CanConnect ? null : new OtherDatabases(Caches, settings, CreateLoader);
         }
 
         private IMetadataLoader CreateLoader(ConnectionSettings settings) =>
@@ -201,6 +216,81 @@ namespace SqlPrompter.Ssms
                     Log.Error("Preloading metadata failed", ex);
                 }
             };
+        }
+    }
+
+    /// <summary>
+    /// The metadata of databases of the connection's server other than the one of the window: the snapshot of a database is loaded the first time one of its
+    /// objects is used (the same way as for the window's own database) and its tables give their columns, definitions and tooltips (#443).
+    /// </summary>
+    internal sealed class OtherDatabases
+    {
+        private readonly MetadataCacheManager caches;
+        private readonly ConnectionSettings settings;
+        private readonly System.Func<ConnectionSettings, IMetadataLoader> createLoader;
+
+        public OtherDatabases(MetadataCacheManager caches, ConnectionSettings settings, System.Func<ConnectionSettings, IMetadataLoader> createLoader)
+        {
+            this.caches = caches;
+            this.settings = settings;
+            this.createLoader = createLoader;
+        }
+
+        private DatabaseMetadataCache Cache(string database, out IMetadataLoader loader)
+        {
+            var other = settings.WithDatabase(database);
+            var cache = caches.Get(other);
+            loader = createLoader(other);
+            if (cache.Current == null)
+            {
+                _ = cache.EnsureLoaded(loader);
+            }
+
+            return cache;
+        }
+
+        /// <summary>The loaded objects of the database, or null while they load (the loading starts) or after a failure.</summary>
+        public DatabaseSnapshot Snapshot(string database) => string.IsNullOrEmpty(database) ? null : Cache(database, out _).Current;
+
+        public SqlPrompter.Metadata.LinkedLoadStatus Status(string database) => string.IsNullOrEmpty(database) ? SqlPrompter.Metadata.LinkedLoadStatus.Done : Cache(database, out _).Status;
+
+        /// <summary>The columns of a table of another database (database.schema.table), or null while they load.</summary>
+        public System.Collections.Generic.IReadOnlyList<SqlPrompter.Core.Model.DbColumn> Columns(SqlPrompter.Core.Analysis.TableSource source)
+        {
+            var cache = Cache(source.Database, out var loader);
+            var snapshot = cache.Current;
+            if (snapshot == null)
+            {
+                return null;
+            }
+
+            var found = SqlPrompter.Core.Completion.Readiness.Resolve(source, snapshot);
+            if (found == null)
+            {
+                return null;
+            }
+
+            var columns = snapshot.GetColumns(found);
+            if (columns == null)
+            {
+                _ = cache.RequestColumns(new[] { found }, loader);
+            }
+
+            return columns;
+        }
+
+        /// <summary>Where the load of the columns of a table of another database stands: its database first, then (for system objects) the columns.</summary>
+        public SqlPrompter.Metadata.LinkedLoadStatus ColumnStatus(SqlPrompter.Core.Analysis.TableSource source)
+        {
+            var cache = Cache(source.Database, out _);
+            var snapshot = cache.Current;
+            if (snapshot == null)
+            {
+                return cache.Status;
+            }
+
+            var found = SqlPrompter.Core.Completion.Readiness.Resolve(source, snapshot);
+            return found == null || snapshot.GetColumns(found) != null ? SqlPrompter.Metadata.LinkedLoadStatus.Done : SqlPrompter.Metadata.LinkedLoadStatus.Loading;
         }
     }
 }
