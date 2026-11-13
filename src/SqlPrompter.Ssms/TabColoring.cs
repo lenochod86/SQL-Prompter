@@ -37,6 +37,7 @@ namespace SqlPrompter.Ssms
         private static void Update()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            WarmUpMetadata();
             try
             {
                 var window = Application.Current?.MainWindow;
@@ -91,6 +92,20 @@ namespace SqlPrompter.Ssms
             catch (Exception ex)
             {
                 Log.Error("Coloring the tab failed", ex);
+            }
+        }
+
+        /// <summary>The database of the active window may have been switched (the drop-down, USE): start loading its metadata at once, not at the first completion (#470).</summary>
+        private static void WarmUpMetadata()
+        {
+            try
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                MetadataService.Current?.CacheForActiveWindow(out _);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Starting the metadata load of the active window failed", ex);
             }
         }
 

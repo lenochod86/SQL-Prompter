@@ -18,6 +18,7 @@ namespace SqlPrompter.Ssms
         {
             Current = this;
             Caches.LinkedServerLoaded += (s, e) => LinkedServerLoaded?.Invoke(this, e);
+            Caches.LoadFailed += (s, e) => LinkedServerLoaded?.Invoke(this, e);
             Caches.ObjectsChanged += (s, e) => RefreshNow.RefreshSsmsIntelliSense();
             Caches.SnapshotReplaced += (s, e) =>
             {
