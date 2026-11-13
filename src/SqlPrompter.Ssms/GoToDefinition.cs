@@ -132,6 +132,7 @@ namespace SqlPrompter.Ssms
 
             if (SsmsConnection.OpenNewWindow(database, definition.Script))
             {
+                TabSessionService.Current?.NameDefinitionTab(definition.Schema, definition.Name);
                 SetStatus("SQL Prompter: opened " + definition.Schema + "." + definition.Name + ".");
                 if (line > 1)
                 {
