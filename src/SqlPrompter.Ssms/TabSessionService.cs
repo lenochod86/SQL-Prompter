@@ -38,6 +38,7 @@ namespace SqlPrompter.Ssms
         private readonly TabShutdownGuard shutdown = new TabShutdownGuard();
         private DispatcherTimer shutdownTimer;
         private CommandEvents commandEvents;
+        private SaveAsNamer saveAsNamer;
         private string lastSummary;
         private readonly ClosedTabs closedTabs = new ClosedTabs();
         private bool sawTabs;
@@ -56,6 +57,7 @@ namespace SqlPrompter.Ssms
         {
             this.dte = dte;
             Current = this;
+            saveAsNamer = SaveAsNamer.Start(() => { ThreadHelper.ThrowIfNotOnUIThread(); try { return dte.ActiveDocument?.FullName; } catch { return null; } }, NameOf);
         }
 
         /// <summary>SSMS is shutting down or a shutdown has begun: the closing of the windows is not the user's doing.</summary>
@@ -95,6 +97,45 @@ namespace SqlPrompter.Ssms
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The active window was opened for the definition of an object (F12, quick open, find in code, dependencies, #437): its tab is named <c>schema.object1.sql</c>
+        /// (<c>DefinitionTabName</c>), the lowest number the open tabs of this object do not have. The name is kept like a name from <c>Rename Query Tab</c>, so it comes back with
+        /// the tab after a restart.
+        /// </summary>
+        public void NameDefinitionTab(string schema, string objectName)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var document = dte.ActiveDocument;
+                if (document == null || !IsQuery(document))
+                {
+                    return;
+                }
+
+                var open = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (Document known in dte.Documents.Cast<Document>().ToList())
+                {
+                    if (known.Windows.Count > 0 && !IsClosedWindow(known) && !string.Equals(known.FullName, document.FullName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        open.Add(known.FullName);
+                    }
+                }
+
+                var taken = names.Where(pair => open.Contains(pair.Key)).Select(pair => pair.Value).ToList();
+                var tabName = SqlPrompter.Core.Navigation.DefinitionTabName.Next(schema, objectName, taken);
+                names[document.FullName] = tabName;
+                if (!TabCaption.Apply(document.FullName, tabName))
+                {
+                    names.Remove(document.FullName);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Naming the tab of a definition failed", ex);
+            }
         }
 
         /// <summary>The name the user gave the tab of the document, or null.</summary>
