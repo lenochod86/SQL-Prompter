@@ -448,6 +448,8 @@ namespace SqlPrompter.Ssms
                 case QuickActionCatalog.AddNPrefix: RefactorCommands.Run(view, AliasRefactorings.AddNPrefix, "N prefix added to strings"); break;
                 case QuickActionCatalog.AddAs: RefactorCommands.Run(view, AliasRefactorings.AddAs, "AS added to aliases"); break;
                 case QuickActionCatalog.RemoveAs: RefactorCommands.Run(view, AliasRefactorings.RemoveAs, "AS removed from aliases"); break;
+                case QuickActionCatalog.NextBatch: ScriptJump.Run(view, true, true); break;
+                case QuickActionCatalog.PreviousBatch: ScriptJump.Run(view, true, false); break;
                 case QuickActionCatalog.AddCommas: LineCommands.Run(view, LineTools.AddCommas, "commas"); break;
                 case QuickActionCatalog.AddQuotesAndCommas: LineCommands.Run(view, LineTools.AddQuotesAndCommas, "quotes and commas"); break;
             }

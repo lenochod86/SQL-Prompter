@@ -147,6 +147,13 @@ namespace SqlPrompter.Core.Analysis
             var statementEnd = tokens.Count;
             for (var b = 0; b < bounds.Count; b++)
             {
+                // FROM |<newline>END (or a following statement): the next statement starts right at the caret, but the caret still completes the name of the previous one.
+                if (bounds[b] == nameStart && word == null && b > 0 && nameStart > 0 && tokens[nameStart - 1].Kind != TokenKind.Semicolon &&
+                    ObjectNameAnchor(tokens, nameStart - 1, bounds[b - 1]) != null)
+                {
+                    continue;
+                }
+
                 if (bounds[b] <= nameStart)
                 {
                     statementStart = bounds[b];
