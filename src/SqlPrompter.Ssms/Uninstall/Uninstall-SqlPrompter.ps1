@@ -1,6 +1,4 @@
-# Removes the SQL Prompter extension from SSMS 22. Started by "Uninstall SQL Prompter.cmd" (double-click) or by the
-# SQL Prompter > Uninstall SQL Prompter... command (which passes the process id of the SSMS it closes).
-param([int]$WaitForPid = 0, [string]$InstallerDir = "")
+# Removes the SQL Prompter extension from SSMS 22. Started by "Uninstall SQL Prompter.cmd" (double-click).
 Add-Type -AssemblyName System.Windows.Forms
 $title = "Uninstall SQL Prompter"
 $extensionId = "SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6"
@@ -8,25 +6,15 @@ function Show($text, $buttons = "OK", $icon = "Information") {
     [System.Windows.Forms.MessageBox]::Show($text, $title, $buttons, $icon).ToString()
 }
 
-if ($WaitForPid -gt 0) {
-    $p = Get-Process -Id $WaitForPid -ErrorAction SilentlyContinue
-    if ($p -and -not $p.WaitForExit(600000)) {
-        Show "SSMS is still open, so SQL Prompter was not removed. Close SSMS and run the uninstall again." "OK" "Warning" | Out-Null
-        return
-    }
-}
 while (Get-Process SSMS -ErrorAction SilentlyContinue) {
     $r = Show "SSMS is running. Save your work and close SSMS, then click OK to continue.`n`nClick Cancel to stop without removing anything." "OKCancel" "Warning"
     if ($r -ne "OK") { return }
 }
 
 $installers = @()
-if ($InstallerDir) { $installers += Join-Path $InstallerDir "VSIXInstaller.exe" }
-else {
-    foreach ($pf in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
-        if (-not $pf) { continue }
-        $installers += Get-ChildItem (Join-Path $pf "Microsoft SQL Server Management Studio 22\*\Common7\IDE\VSIXInstaller.exe") -ErrorAction SilentlyContinue | ForEach-Object FullName
-    }
+foreach ($pf in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+    if (-not $pf) { continue }
+    $installers += Get-ChildItem (Join-Path $pf "Microsoft SQL Server Management Studio 22\*\Common7\IDE\VSIXInstaller.exe") -ErrorAction SilentlyContinue | ForEach-Object FullName
 }
 $installers = @($installers | Where-Object { Test-Path $_ })
 if ($installers.Count -eq 0) {

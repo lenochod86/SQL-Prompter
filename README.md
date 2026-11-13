@@ -34,7 +34,7 @@ The VSIX is created in `src\SqlPrompter.Ssms\bin\Release\net48\SqlPrompter.Ssms.
    ```
 3. Double-click `SqlPrompter.Ssms.vsix`.
 
-Uninstall: **SQL Prompter → Uninstall SQL Prompter...** (closes SSMS, removes the extension and asks whether to delete your settings, snippets, history and log). With SSMS closed you can instead double-click `Uninstall SQL Prompter.cmd` in the extension folder (`%LOCALAPPDATA%MicrosoftSSMS.0_*xtensions<random name>NINSTALL`; SEARCH FOR THE FILE NAME THERE). BY HAND: `VSIXINSTALLER.EXE /UNINSTALL:SQLPROMPTER.0D66644A-DD92-4B87-AE9D-5D20A2DF11C6`.
+Uninstall: close SSMS and double-click `Uninstall SQL Prompter.cmd` in the extension folder (`%LOCALAPPDATA%\Microsoft\SSMS\22.0_*\Extensions\<random name>\Uninstall`; search for the file name there). It removes the extension and asks whether to delete your settings, snippets, history and log too (they are kept by default). By hand: `VSIXInstaller.exe /uninstall:SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6`.
 
 If SSMS reports after removing an extension that a package (e.g. `PrototypePackage`) did not load, it still holds the old registration. Run `SSMS.exe /updateconfiguration` from the `Common7\IDE` folder while SSMS is closed.
 

@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 51)]
+    [ProvideMenuResource("Menus.ctmenu", 52)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -23,7 +23,6 @@ namespace SqlPrompter.Ssms
         public static readonly Guid CommandSet = new Guid("15e19ce9-b3c9-47dd-97f9-49fe13869730");
         public const int RefreshMetadataId = 0x0100;
         public const int OpenLogId = 0x0101;
-        public const int UninstallId = 0x0138;
         public const int SettingsId = 0x011F;
         public const int FormattingStylesId = 0x0120;
         public const int EditEnvironmentsId = 0x0134;
@@ -92,7 +91,6 @@ namespace SqlPrompter.Ssms
             {
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
-                commands.AddCommand(new MenuCommand((s, e) => Uninstall(), new CommandID(CommandSet, UninstallId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenSettings(), new CommandID(CommandSet, SettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => FormattingStylesWindow.Open(), new CommandID(CommandSet, FormattingStylesId)));
                 FormattingStylesMenu.Register(commands, CommandSet);
@@ -688,45 +686,6 @@ namespace SqlPrompter.Ssms
             catch (Exception ex)
             {
                 Log.Error("Switching the suggestion list failed", ex);
-            }
-        }
-
-        private void Uninstall()
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            try
-            {
-                var result = VsShellUtilities.ShowMessageBox(
-                    ServiceProvider.GlobalProvider,
-                    "SSMS will close (you are asked to save open scripts) and SQL Prompter will be removed. Your settings, snippets and history are kept unless you choose to delete them afterwards.\n\nContinue?",
-                    "Uninstall SQL Prompter", Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_QUERY,
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_YESNO,
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_SECOND);
-                if (result != 6)
-                {
-                    return;
-                }
-
-                var source = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(SqlPrompterPackage).Assembly.Location), "Uninstall", "Uninstall-SqlPrompter.ps1");
-                var work = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "SqlPrompterUninstall");
-                System.IO.Directory.CreateDirectory(work);
-                var script = System.IO.Path.Combine(work, "Uninstall-SqlPrompter.ps1");
-                System.IO.File.Copy(source, script, true);
-                var process = System.Diagnostics.Process.GetCurrentProcess();
-                var ideDir = System.IO.Path.GetDirectoryName(process.MainModule.FileName);
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + script + "\" -WaitForPid " + process.Id + " -InstallerDir \"" + ideDir + "\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                });
-                (GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.Quit();
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Starting the uninstall failed", ex);
-                ShowMessage("Starting the uninstall failed: " + ex.Message + "\nRun Uninstall SQL Prompter.cmd from the extension folder instead (see the README).");
             }
         }
 
