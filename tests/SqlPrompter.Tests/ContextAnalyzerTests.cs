@@ -266,6 +266,7 @@ namespace SqlPrompter.Tests
         [InlineData("SELECT * FROM dbo.Users |")]
         [InlineData("SELECT * FROM dbo.Users u |")]
         [InlineData("SELECT * FROM dbo.Users u W|")]
+        [InlineData("SELECT * FROM dbo.Users AS ce\nwhe|")]
         [InlineData("SELECT * FROM (SELECT 1 AS x) d |")]
         public void AfterTableSourceOffersKeywordsWithSoftSelection(string sql)
         {
@@ -273,6 +274,14 @@ namespace SqlPrompter.Tests
 
             Assert.Equal(ContextKind.Keyword, context.Kind);
             Assert.Contains("WHERE", context.PreferredKeywords);
+            Assert.True(context.SoftSelection);
+        }
+
+        [Fact]
+        public void AfterJoinConditionTheNextClauseIsSoftlySelectedToo()
+        {
+            var context = Analyze("SELECT * FROM dbo.Users AS ce\nJOIN dbo.T t ON t.a = ce.a\nWHE|");
+
             Assert.True(context.SoftSelection);
         }
 

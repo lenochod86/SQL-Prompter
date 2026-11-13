@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Editor.Commanding.Commands;
 using Microsoft.VisualStudio.Utilities;
+using SqlPrompter.Core.Completion;
 using SqlPrompter.Core.Snippets;
 
 namespace SqlPrompter.Ssms
@@ -15,7 +16,7 @@ namespace SqlPrompter.Ssms
     /// <summary>
     /// Space after a complete snippet prefix where the editor selects only softly (a place where an alias may be typed, e.g. after a FROM
     /// clause): the editor then does not commit on typed characters, so the snippet would stay unexpanded. When the typed word is exactly
-    /// the prefix of a snippet in the list, Space expands it, as it does elsewhere.
+    /// the prefix of a snippet in the list, Space expands it, as it does elsewhere; a keyword (or the start of one) is inserted the same way (#442).
     /// </summary>
     [Export(typeof(ICommandHandler))]
     [Name("SqlPrompter.SpaceSnippet")]
@@ -49,17 +50,32 @@ namespace SqlPrompter.Ssms
 
                 var buffer = args.SubjectBuffer;
                 var typed = session.ApplicableToSpan.GetText(buffer.CurrentSnapshot);
-                var snippet = session.GetComputedItems(CancellationToken.None).Items
+                var items = session.GetComputedItems(CancellationToken.None).Items;
+                var snippet = items
                     .Where(i => string.Equals(i.InsertText, typed, StringComparison.OrdinalIgnoreCase) || string.Equals(i.DisplayText, typed, StringComparison.OrdinalIgnoreCase))
                     .Select(i => i.Properties.TryGetProperty(SqlCompletionSource.SnippetKey, out Snippet s) ? s : null)
                     .FirstOrDefault(s => s != null);
-                if (snippet == null || !SnippetInserter.TryInsert(session, buffer, snippet))
+                if (snippet != null && SnippetInserter.TryInsert(session, buffer, snippet))
+                {
+                    session.Dismiss();
+                    return true;
+                }
+
+                // A keyword (WHERE, JOIN, ...) after a table source: it is inserted in the casing of the list and the space is typed as usual,
+                // so that the list for the next position opens. An alias that is not a keyword stays as typed.
+                var keyword = items.FirstOrDefault(i => i.Properties.TryGetProperty(SqlCompletionSource.KindKey, out SuggestionKind kind) &&
+                                                        kind == SuggestionKind.Keyword &&
+                                                        SoftSpaceCommit.Commits(typed, i.InsertText));
+                if (keyword == null)
                 {
                     return false;
                 }
 
+                var span = session.ApplicableToSpan.GetSpan(buffer.CurrentSnapshot);
+                buffer.Replace(span, keyword.InsertText);
+                args.TextView.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, span.Start.Position + keyword.InsertText.Length));
                 session.Dismiss();
-                return true;
+                return false;
             }
             catch (Exception ex)
             {
