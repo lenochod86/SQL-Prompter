@@ -36,10 +36,6 @@ namespace SqlPrompter.Ssms
                 Set(dte, "SQLPrompter.PickerLeft", "SQL Query Editor::Ctrl+Left Arrow");
                 Set(dte, "SQLPrompter.PickerRight", "SQL Query Editor::Ctrl+Right Arrow");
                 Set(dte, "SQLPrompter.FormatDocument", "SQL Query Editor::Ctrl+K, Y");
-                Set(dte, "SQLPrompter.NextStatement", "SQL Query Editor::Ctrl+Alt+Down Arrow");
-                Set(dte, "SQLPrompter.PreviousStatement", "SQL Query Editor::Ctrl+Alt+Up Arrow");
-                Set(dte, "SQLPrompter.NextBatch", "SQL Query Editor::Ctrl+Alt+PgDn");
-                Set(dte, "SQLPrompter.PreviousBatch", "SQL Query Editor::Ctrl+Alt+PgUp");
                 // Ctrl+Shift+T is Go To File in SSMS; the first of these that nothing uses becomes the key.
                 Set(dte, "SQLPrompter.ReopenClosedQueryTab", "Global::Ctrl+Shift+T", "Global::Ctrl+Alt+T", "Global::Ctrl+Shift+Alt+T");
             }

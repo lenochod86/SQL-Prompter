@@ -263,19 +263,6 @@ namespace SqlPrompter.Core.Navigation
             return string.Join(".", parts);
         }
 
-        /// <summary>
-        /// The offset to jump to from <paramref name="offset"/> (#224): the start of the next (or previous) statement or block, or of the next
-        /// (or previous) batch; -1 when there is none.
-        /// </summary>
-        public static int JumpTarget(IReadOnlyList<OutlineItem> items, int offset, bool batches, bool forward)
-        {
-            var starts = items.Where(i => batches ? i.Kind == "Batch" : i.Kind == "Statement" || i.Kind == "Block")
-                .Select(i => i.Offset).Distinct().OrderBy(o => o).ToList();
-            return forward
-                ? starts.Where(o => o > offset).DefaultIfEmpty(-1).First()
-                : starts.Where(o => o < offset).DefaultIfEmpty(-1).Last();
-        }
-
         /// <summary>The index of the item that holds the position: the last one that starts at or before it, or -1.</summary>
         public static int IndexAt(IReadOnlyList<OutlineItem> items, int offset)
         {

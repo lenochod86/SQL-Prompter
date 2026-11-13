@@ -21,6 +21,11 @@ namespace SqlPrompter.Tests
         [InlineData("TRUNCATE TABLE |")]
         [InlineData("SELECT * FROM a CROSS APPLY |")]
         [InlineData("SELECT 1\nSELECT * FROM |")]
+        [InlineData("CREATE PROCEDURE dbo.P @a int AS\nBEGIN\n    SELECT *\n    FROM |\nEND")]
+        [InlineData("CREATE PROCEDURE dbo.P @a int AS\nBEGIN\n    SELECT *\n    FROM |")]
+        [InlineData("SELECT * FROM |\nSELECT 2;")]
+        [InlineData("CREATE PROCEDURE dbo.P AS\nSELECT * FROM |")]
+        [InlineData("CREATE PROCEDURE dbo.P\n@a int\nAS\nBEGIN\nSELECT * FROM |")]
         public void ObjectNamePositions(string sql)
         {
             var context = Analyze(sql);

@@ -72,23 +72,6 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
-        public void JumpGoesToTheNextAndPreviousStatementAndBatch()
-        {
-            var sql = "SELECT 1;\nSELECT 2;\nGO\nSELECT 3;";
-            var items = ScriptOutline.Build(sql);
-            var second = sql.IndexOf("SELECT 2");
-            var third = sql.IndexOf("SELECT 3");
-
-            Assert.Equal(second, ScriptOutline.JumpTarget(items, 3, false, true));
-            Assert.Equal(0, ScriptOutline.JumpTarget(items, 3, false, false));
-            Assert.Equal(0, ScriptOutline.JumpTarget(items, second, false, false));
-            Assert.Equal(-1, ScriptOutline.JumpTarget(items, third, false, true));
-            Assert.Equal(third, ScriptOutline.JumpTarget(items, 3, true, true));
-            Assert.Equal(third, ScriptOutline.JumpTarget(items, third + 2, true, false));
-            Assert.Equal(0, ScriptOutline.JumpTarget(items, third, true, false));
-        }
-
-        [Fact]
         public void TheItemAtThePositionIsTheLastOneThatStartedBeforeIt()
         {
             var sql = "SELECT 1;\nSELECT 2;";
