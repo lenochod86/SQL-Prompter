@@ -1,6 +1,6 @@
 # SQL Prompter
 
-Custom IntelliSense for the SQL editor in SQL Server Management Studio 22. The design and the prototype results are in [docs/architecture.md](docs/architecture.md), the plan in [docs/roadmap.md](docs/roadmap.md).
+Custom IntelliSense for the SQL editor in SQL Server Management Studio 22. The design and the prototype results are in [docs/architecture.md](docs/architecture.md), the plan in the GitHub issues.
 
 **Status:** MVP. Runs in SSMS 22.11; unit tests pass.
 

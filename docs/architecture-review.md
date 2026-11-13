@@ -125,7 +125,7 @@ Small issues that can be done one after another without breaking the current VSI
 
 ## Decision requested
 
-Approve the recommendation (keep the in-process VSIX; do steps 1 to 4) or choose another direction. The decision is recorded in `docs/roadmap.md` (Decisions).
+Approve the recommendation (keep the in-process VSIX; do steps 1 to 4) or choose another direction. The decision is recorded in `docs/decisions.md`.
 
 [faq]: https://learn.microsoft.com/en-sg/ssms/faq
 [redgate]: https://productsupport.red-gate.com/hc/en-us/community/posts/33887404886301-ssms22-sql-prompt-11-crash-after-latest-ssms22-update-10-02-2026?page=2

@@ -2,7 +2,7 @@
 
 An extension with custom IntelliSense for SQL Server Management Studio 22.
 
-**Status:** the prototype answered all three questions in SSMS 22.11 (see [Prototype](#prototype)). The MVP runs in SSMS 22.11 (see [MVP](#mvp)). Next steps are in [roadmap.md](roadmap.md).
+**Status:** the prototype answered all three questions in SSMS 22.11 (see [Prototype](#prototype)). The MVP runs in SSMS 22.11 (see [MVP](#mvp)). What comes next is planned in the GitHub issues.
 
 ## Summary
 

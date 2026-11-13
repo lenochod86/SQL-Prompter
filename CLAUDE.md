@@ -13,17 +13,17 @@ These instructions apply in every environment: locally on Windows, in the cloud 
 ## Documents
 
 - `docs/architecture.md`: architecture, decisions and verified facts about SSMS. Read it before designing or changing the architecture.
-- `docs/roadmap.md`: phases with checkboxes and the user's decisions. Pick the next work from it.
+- `docs/decisions.md`: the user's earlier decisions. Work is planned only from the GitHub issues (there is no roadmap file).
 - `README.md`: build, installation and manual testing in SSMS.
 
 ## Current state
 
-MVP 0.2.x runs in SSMS 22.11. What is done and what comes next is in `docs/roadmap.md`; phase 0 is next.
+MVP 0.2.x runs in SSMS 22.11. What is done and what comes next is in the GitHub issues (labels `phase-N` give the area).
 
 ## At the start of a session
 
 1. Run `git status` and `git fetch`, and check the current branch. Never overwrite or delete uncommitted changes; ask first.
-2. Read `docs/roadmap.md` and the open issues.
+2. Read the open issues.
    - Work only on issues assigned to `claude-lenochod86`. Do not start an issue assigned to the user or to nobody; if one seems to be next, ask the user (and comment on the issue) instead.
    - Work through those issues in ascending order of their number, unless the user says otherwise.
    - If an issue has sub-issues, finish all of them before sending the pull request, unless the user agrees on something else.
@@ -37,9 +37,9 @@ Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator w
 
 ### Workflow for every piece of work
 
-1. **Issue.** Every separate piece of work (a roadmap item or group of items, a bug, a research task) has a GitHub issue. Create it before writing code if it does not exist yet.
+1. **Issue.** Every separate piece of work (a feature or group of features, a bug, a research task) has a GitHub issue. Create it before writing code if it does not exist yet.
    - Title: short and descriptive, without the phase number (e.g. "Configurable commit keys for suggestions").
-   - Body: goal, scope, acceptance criteria and a link to the item in `docs/roadmap.md`.
+   - Body: goal, scope and acceptance criteria.
    - Labels: the kind (`enhancement`, `bug`, `documentation`, `research`) and the phase (`phase-0`, `phase-1`, …). Create a label if it is missing.
    - Use `gh` (on Windows `C:\Program Files\GitHub CLI\gh.exe` if it is not on PATH) or the GitHub tools of the environment.
 2. **Branch** from the current `main`, named `<issue-number>-<short-description>`, lowercase with hyphens, e.g. `12-commit-keys`. One issue per branch.
@@ -117,6 +117,6 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
 ## How to work
 
 - If you do not know something, or it is the user's decision, ask. Do not make up SSMS or SQL Prompt behavior or the user's wishes.
-- Do not mark anything about SSMS as verified until it has run in SSMS 22. Tick a checkbox in `docs/roadmap.md` only after verification, on the issue's branch.
+- Do not mark anything about SSMS as verified until it has run in SSMS 22.
 - Report results precisely: what passed, what failed (with output) and what was not tested.
-- Record the user's decisions in `docs/roadmap.md` (Decisions section) and verified SSMS facts in `docs/architecture.md`.
+- Record the user's decisions as a comment on the issue they belong to and verified SSMS facts in `docs/architecture.md`.
