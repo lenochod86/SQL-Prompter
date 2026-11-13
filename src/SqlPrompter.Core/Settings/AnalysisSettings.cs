@@ -73,6 +73,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "implicitConversion")]
         public bool ImplicitConversion { get; set; }
 
+        /// <summary>alias.column where the alias is a temporary table or table variable of the script whose columns are all known and the column is not one of them (#452).</summary>
+        [DataMember(Name = "unknownColumn")]
+        public bool UnknownColumn { get; set; }
+
         public AnalysisSettings Clone() => (AnalysisSettings)MemberwiseClone();
 
         [OnDeserializing]
@@ -98,6 +102,7 @@ namespace SqlPrompter.Core.Settings
             OldStyleJoin = true;
             AmbiguousColumn = true;
             ImplicitConversion = true;
+            UnknownColumn = true;
         }
     }
 }

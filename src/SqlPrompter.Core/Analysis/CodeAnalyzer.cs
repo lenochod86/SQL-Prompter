@@ -24,6 +24,7 @@ namespace SqlPrompter.Core.Analysis
         OldStyleJoin,
         AmbiguousColumn,
         ImplicitConversion,
+        UnknownColumn,
     }
 
     public enum CodeIssueSeverity

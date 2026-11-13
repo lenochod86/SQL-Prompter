@@ -74,6 +74,9 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>Columns declared explicitly (CREATE TABLE, DECLARE … TABLE), otherwise null.</summary>
         internal IReadOnlyList<DbColumn> Declared { get; set; }
 
+        /// <summary>The columns were changed in a way the model does not follow (ALTER TABLE of a SELECT INTO table, dynamic SQL that names the table): they are not complete.</summary>
+        internal bool Altered { get; set; }
+
         /// <summary>Column names of a CTE, WITH name (a, b) AS (…), otherwise null.</summary>
         internal IReadOnlyList<string> ColumnNames { get; set; }
 
@@ -197,6 +200,12 @@ namespace SqlPrompter.Core.Analysis
 
         private ScriptColumns ResolveTable(ScriptTable table, IDatabaseMetadata metadata, int depth)
         {
+            var resolved = ResolveTableColumns(table, metadata, depth);
+            return table.Altered && resolved.IsComplete ? new ScriptColumns(resolved.Columns, resolved.MissingColumns, false) : resolved;
+        }
+
+        private ScriptColumns ResolveTableColumns(ScriptTable table, IDatabaseMetadata metadata, int depth)
+        {
             if (table.Declared != null)
             {
                 return new ScriptColumns(table.Declared, Array.Empty<DbObject>(), true);
@@ -291,6 +300,12 @@ namespace SqlPrompter.Core.Analysis
             List<TableSource> sources = null;
             foreach (var item in items)
             {
+                if (item.Unparsed)
+                {
+                    complete = false;
+                    continue;
+                }
+
                 if (!item.IsStar)
                 {
                     columns.Add(new DbColumn(item.Name, string.Empty, true));
@@ -350,6 +365,9 @@ namespace SqlPrompter.Core.Analysis
             public string Name;
             public bool IsStar;
             public string Qualifier;
+
+            /// <summary>The item could not be read: it may have a name the model does not know, so the list is not complete.</summary>
+            public bool Unparsed;
         }
 
         private static readonly HashSet<string> ListEnd = new HashSet<string>(StringComparer.Ordinal)
@@ -430,6 +448,10 @@ namespace SqlPrompter.Core.Analysis
                 {
                     items.Add(new QueryItem { IsStar = true, Qualifier = tokens[b - 3].IdentifierValue });
                 }
+                else
+                {
+                    items.Add(new QueryItem { Unparsed = true });
+                }
 
                 return;
             }
@@ -437,11 +459,7 @@ namespace SqlPrompter.Core.Analysis
             // alias = expression
             if (n >= 3 && tokens[a + 1].Kind == TokenKind.Operator && tokens[a + 1].Text == "=")
             {
-                if (tokens[a].IsNamePart)
-                {
-                    items.Add(new QueryItem { Name = tokens[a].IdentifierValue });
-                }
-
+                items.Add(tokens[a].IsNamePart ? new QueryItem { Name = tokens[a].IdentifierValue } : new QueryItem { Unparsed = true });
                 return;
             }
 
@@ -463,7 +481,10 @@ namespace SqlPrompter.Core.Analysis
             if (n >= 2 && last.IsIdentifier && ContextAnalyzer.IsOperand(tokens[b - 2]))
             {
                 items.Add(new QueryItem { Name = last.IdentifierValue });
+                return;
             }
+
+            items.Add(new QueryItem { Unparsed = true });
         }
 
         private bool IsDottedName(int a, int b)
@@ -526,6 +547,15 @@ namespace SqlPrompter.Core.Analysis
                 {
                     unique.RemoveAll(v => string.Equals(v.Name, variable.Name, StringComparison.OrdinalIgnoreCase));
                     unique.Add(variable);
+                }
+
+                // Dynamic SQL that names a temporary table or a table variable may change it: its columns are not complete then.
+                foreach (var table in tables.Where(t => t.Kind != ScriptTableKind.Cte))
+                {
+                    if (tokens.Any(t => t.Kind == TokenKind.String && t.Text.IndexOf(table.Name, StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        table.Altered = true;
+                    }
                 }
 
                 return new ScriptModel(text, tokens, tables, unique);
@@ -699,6 +729,12 @@ namespace SqlPrompter.Core.Analysis
                 if (tokens[i].IsWord("TABLE"))
                 {
                     i++;
+                    if (i + 1 < end && tokens[create].IsWord("ALTER") && tokens[i].Kind == TokenKind.Word && tokens[i].Text.StartsWith("#", StringComparison.Ordinal))
+                    {
+                        AlterTable(tokens[i], i + 1, end);
+                        return;
+                    }
+
                     if (i + 1 < end && tokens[i].Kind == TokenKind.Word && tokens[i].Text.StartsWith("#", StringComparison.Ordinal) &&
                         tokens[i + 1].Kind == TokenKind.OpenParen)
                     {
@@ -719,6 +755,49 @@ namespace SqlPrompter.Core.Analysis
                 if (tokens[i].IsWord("PROC") || tokens[i].IsWord("PROCEDURE") || tokens[i].IsWord("FUNCTION"))
                 {
                     ParseParameters(i + 1, end);
+                }
+            }
+
+            /// <summary>ALTER TABLE #t ADD columns / DROP COLUMN names: followed for a table created with CREATE TABLE; any other table is marked as changed.</summary>
+            private void AlterTable(Token name, int i, int end)
+            {
+                var table = tables.LastOrDefault(t => t.Kind == ScriptTableKind.TempTable && string.Equals(t.Name, name.Text, StringComparison.OrdinalIgnoreCase));
+                if (table == null || i >= end)
+                {
+                    return;
+                }
+
+                if (tokens[i].IsWord("ADD") && !(i + 1 < end && tokens[i + 1].IsWord("CONSTRAINT")))
+                {
+                    var added = ParseColumnDefinitions(i + 1, end);
+                    if (table.Declared == null)
+                    {
+                        table.Altered = true;
+                    }
+                    else
+                    {
+                        table.Declared = table.Declared.Concat(added).ToList();
+                    }
+                }
+                else if (tokens[i].IsWord("DROP") && i + 1 < end && tokens[i + 1].IsWord("COLUMN"))
+                {
+                    var dropped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    for (var k = i + 2; k < end; k++)
+                    {
+                        if (tokens[k].IsNamePart && (tokens[k - 1].IsWord("COLUMN") || tokens[k - 1].Kind == TokenKind.Comma) && !tokens[k].IsWord("IF"))
+                        {
+                            dropped.Add(tokens[k].IdentifierValue);
+                        }
+                    }
+
+                    if (table.Declared == null)
+                    {
+                        table.Altered = true;
+                    }
+                    else
+                    {
+                        table.Declared = table.Declared.Where(c => !dropped.Contains(c.Name)).ToList();
+                    }
                 }
             }
 
