@@ -313,8 +313,17 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.WarnOpenTransaction, v => work.Behavior.WarnOpenTransaction = v);
 
             var editor = Add("Editor helpers");
-            editor.Check("Auto-close quotes, brackets and parentheses", "Typing ' [ or ( also inserts the closing character; typing it again steps over it, and Backspace between an empty pair removes both. Nothing is closed inside strings, comments and bracketed names.",
-                () => work.Behavior.AutoClose, v => work.Behavior.AutoClose = v);
+            editor.Heading("Auto-close");
+            editor.Help("The closing character is inserted when you type the opening one; typing the closing one steps over it, and Backspace between an empty pair removes both. Nothing is closed inside strings, comments and bracketed names.");
+            editor.Check("Single quote", "Typing ' also inserts the closing '; typing it again steps over it, and Backspace between an empty pair removes both.",
+                () => work.Behavior.AutoCloseQuote, v => work.Behavior.AutoCloseQuote = v);
+            editor.Check("Parenthesis", "Typing ( also inserts the closing ); typing it again steps over it, and Backspace between an empty pair removes both.",
+                () => work.Behavior.AutoCloseParenthesis, v => work.Behavior.AutoCloseParenthesis = v);
+            editor.Check("Square bracket", "Typing [ also inserts the closing ]; typing it again steps over it, and Backspace between an empty pair removes both.",
+                () => work.Behavior.AutoCloseBracket, v => work.Behavior.AutoCloseBracket = v);
+            editor.Check("Block comment", "Typing /* also inserts */ (with a space in front of it) after the caret; typing */ steps over the inserted closing, and Backspace right after /* removes both.",
+                () => work.Behavior.AutoCloseBlockComment, v => work.Behavior.AutoCloseBlockComment = v);
+            editor.Heading("Other helpers");
             editor.Check("Quick actions on a tap of Ctrl", "Pressing and releasing the Ctrl key on its own opens a popup at the left of the editor with the actions of the SQL Prompter menu and the snippets that fit (type to filter, Enter runs, Esc closes). Ctrl together with another key or the mouse does not open it.",
                 () => work.Behavior.QuickActionsOnCtrl, v => work.Behavior.QuickActionsOnCtrl = v);
             editor.Check("Highlight matching names", "Highlights the other places of the script where the name under the caret appears (compared by name, ignoring case and brackets).",
