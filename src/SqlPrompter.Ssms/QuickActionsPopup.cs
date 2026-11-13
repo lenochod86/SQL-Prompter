@@ -384,6 +384,21 @@ namespace SqlPrompter.Ssms
         private static List<Entry> BuildEntries(IWpfTextView view, bool hasSelection)
         {
             var result = new List<Entry>();
+
+            // On a BEGIN or END the jump to the other end comes first (#224).
+            var match = hasSelection ? null : SqlPrompter.Core.Navigation.BlockMatcher.Find(view.TextSnapshot.GetText(), view.Caret.Position.BufferPosition.Position);
+            if (match != null)
+            {
+                result.Add(new Entry("Go To " + match.Name, "Moves the caret to the " + (match.TargetIsEnd ? "end" : "beginning") + " of this block (line " + match.Line + ").", () =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    var position = new SnapshotPoint(view.TextSnapshot, Math.Min(match.Target, view.TextSnapshot.Length));
+                    view.Selection.Clear();
+                    view.Caret.MoveTo(position);
+                    view.ViewScroller.EnsureSpanVisible(new SnapshotSpan(position, 0), Microsoft.VisualStudio.Text.Editor.EnsureSpanVisibleOptions.ShowStart);
+                }));
+            }
+
             foreach (var action in QuickActionCatalog.Actions(hasSelection))
             {
                 var id = action.Id;
@@ -448,8 +463,6 @@ namespace SqlPrompter.Ssms
                 case QuickActionCatalog.AddNPrefix: RefactorCommands.Run(view, AliasRefactorings.AddNPrefix, "N prefix added to strings"); break;
                 case QuickActionCatalog.AddAs: RefactorCommands.Run(view, AliasRefactorings.AddAs, "AS added to aliases"); break;
                 case QuickActionCatalog.RemoveAs: RefactorCommands.Run(view, AliasRefactorings.RemoveAs, "AS removed from aliases"); break;
-                case QuickActionCatalog.NextBatch: ScriptJump.Run(view, true, true); break;
-                case QuickActionCatalog.PreviousBatch: ScriptJump.Run(view, true, false); break;
                 case QuickActionCatalog.AddCommas: LineCommands.Run(view, LineTools.AddCommas, "commas"); break;
                 case QuickActionCatalog.AddQuotesAndCommas: LineCommands.Run(view, LineTools.AddQuotesAndCommas, "quotes and commas"); break;
             }

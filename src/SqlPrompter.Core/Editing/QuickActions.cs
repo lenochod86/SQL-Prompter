@@ -40,8 +40,6 @@ namespace SqlPrompter.Core.Editing
         public const string Unformat = "unformat";
         public const string AddCommas = "addCommas";
         public const string AddQuotesAndCommas = "addQuotesAndCommas";
-        public const string NextBatch = "nextBatch";
-        public const string PreviousBatch = "previousBatch";
 
         /// <summary>The actions for the selection, or for the whole script when nothing is selected.</summary>
         public static IReadOnlyList<QuickAction> Actions(bool hasSelection)
@@ -61,8 +59,6 @@ namespace SqlPrompter.Core.Editing
                 new QuickAction(AddNPrefix, "Add N Prefix To Strings", "Turns 'text' into N'text' in " + scope + "."),
                 new QuickAction(AddAs, "Add AS To Aliases", "Writes AS before every alias in " + scope + "."),
                 new QuickAction(RemoveAs, "Remove AS From Aliases", "Drops AS before the aliases in " + scope + "."),
-                new QuickAction(NextBatch, "Go To Next Batch", "Moves the caret to the start of the next batch of the script (after GO)."),
-                new QuickAction(PreviousBatch, "Go To Previous Batch", "Moves the caret to the start of the previous batch of the script (before GO)."),
             };
             if (hasSelection)
             {
