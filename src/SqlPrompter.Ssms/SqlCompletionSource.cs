@@ -258,7 +258,7 @@ namespace SqlPrompter.Ssms
                 remoteColumns = source =>
                 {
                     var columns = inner(source);
-                    if (columns == null && source.NameParts.Count == 4)
+                    if (columns == null && (source.NameParts.Count == 4 || Readiness.IsOtherDatabase(source, prepared.Metadata)))
                     {
                         var status = prepared.ColumnStatus(source);
                         if (!status.IsDone && (columnsStatus == null || status.IsLoading))

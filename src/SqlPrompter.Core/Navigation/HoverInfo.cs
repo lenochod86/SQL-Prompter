@@ -12,8 +12,9 @@ namespace SqlPrompter.Core.Navigation
     /// <summary>The text of the tooltip that appears when the mouse rests on a name (#220).</summary>
     public sealed class HoverText
     {
-        public HoverText(int start, int length, string text, string descriptionSchema = null, string descriptionObject = null, string descriptionColumn = null, int linesInSsms = 0)
+        public HoverText(int start, int length, string text, string descriptionSchema = null, string descriptionObject = null, string descriptionColumn = null, int linesInSsms = 0, string database = null)
         {
+            Database = database;
             LinesInSsms = linesInSsms;
             Start = start;
             Length = length;
@@ -24,6 +25,9 @@ namespace SqlPrompter.Core.Navigation
         }
 
         /// <summary>The database object (and column) whose description from the database can be added to the tooltip (#206); null when it is not an object of the database.</summary>
+        /// <summary>The database of the object when it is not the one of the window (a three-part name, #443); null for the window's own database.</summary>
+        public string Database { get; }
+
         public string DescriptionSchema { get; }
 
         public string DescriptionObject { get; }
@@ -48,7 +52,8 @@ namespace SqlPrompter.Core.Navigation
     /// </summary>
     public static class HoverInfo
     {
-        public static HoverText At(string batch, int offset, IDatabaseMetadata metadata)
+        /// <param name="otherDatabase">The loaded metadata of another database of the server (null while it loads), for names such as <c>Db.dbo.Table</c> and aliases of them (#443).</param>
+        public static HoverText At(string batch, int offset, IDatabaseMetadata metadata, Func<string, IDatabaseMetadata> otherDatabase = null)
         {
             if (string.IsNullOrEmpty(batch) || metadata == null)
             {
@@ -95,6 +100,17 @@ namespace SqlPrompter.Core.Navigation
             var names = parts.Select(p => p.IdentifierValue).ToList();
             var sources = ContextAnalyzer.SourcesAt(batch, parts[0].Start);
             var script = ScriptModel.Build(batch, parts[0].Start);
+            var database = ForeignDatabaseOf(names, sources, metadata);
+            if (database != null)
+            {
+                // A table of another database: the tooltip comes from the metadata of that database, and says nothing while it loads.
+                metadata = otherDatabase?.Invoke(database);
+                if (metadata == null)
+                {
+                    return null;
+                }
+            }
+
             var text = Describe(names, sources, metadata, script, out var descriptionSchema, out var descriptionObject, out var descriptionColumn);
             var linesInSsms = 0;
             if (text != null && descriptionObject != null && descriptionColumn == null)
@@ -109,7 +125,25 @@ namespace SqlPrompter.Core.Navigation
                 }
             }
 
-            return text == null ? null : new HoverText(token.Start, (token.End - token.Start), text, descriptionSchema, descriptionObject, descriptionColumn, linesInSsms);
+            return text == null ? null : new HoverText(token.Start, (token.End - token.Start), text, descriptionSchema, descriptionObject, descriptionColumn, linesInSsms, database);
+        }
+
+        /// <summary>The database of the object a name stands for when it is not the one of the window: <c>Db.dbo.T</c>, <c>x.Col</c> or <c>x</c> for an alias of such a table.</summary>
+        private static string ForeignDatabaseOf(IReadOnlyList<string> names, IReadOnlyList<TableSource> sources, IDatabaseMetadata metadata)
+        {
+            if (names.Count == 3)
+            {
+                return string.Equals(names[0], metadata.DatabaseName, StringComparison.OrdinalIgnoreCase) ? null : names[0];
+            }
+
+            if (names.Count > 2)
+            {
+                return null;
+            }
+
+            var qualifier = names[names.Count - (names.Count == 2 ? 2 : 1)];
+            var source = sources.FirstOrDefault(s => string.Equals(s.ReferenceName, qualifier, StringComparison.OrdinalIgnoreCase));
+            return source != null && Readiness.IsOtherDatabase(source, metadata) ? source.Database : null;
         }
 
         private static string Describe(IReadOnlyList<string> names, IReadOnlyList<TableSource> sources, IDatabaseMetadata metadata, ScriptModel script,

@@ -22,6 +22,7 @@ namespace SqlPrompter.Metadata
         private Task loading;
         private int generation;
         private DateTime lastFailure = DateTime.MinValue;
+        private string lastError;
         private DateTime lastVersionCheck = DateTime.MinValue;
 
         public DatabaseMetadataCache(Action<string> log = null, Func<DateTime> clock = null)
@@ -38,6 +39,24 @@ namespace SqlPrompter.Metadata
 
         /// <summary>Current snapshot, or null until it is loaded.</summary>
         public DatabaseSnapshot Current => snapshot;
+
+        /// <summary>Where the load of the objects stands: done, loading, or failed with the reason (for a database other than the one of the window, #443).</summary>
+        public LinkedLoadStatus Status
+        {
+            get
+            {
+                lock (gate)
+                {
+                    if (snapshot != null)
+                    {
+                        return LinkedLoadStatus.Done;
+                    }
+
+                    var busy = loading != null && !loading.IsCompleted;
+                    return !busy && lastError != null ? LinkedLoadStatus.Failed(lastError) : LinkedLoadStatus.Loading;
+                }
+            }
+        }
 
         /// <summary>
         /// Raised on a background thread after the objects were loaded or reloaded because they changed (#423), so that what was computed
@@ -134,6 +153,7 @@ namespace SqlPrompter.Metadata
                 snapshot = null;
                 loading = null;
                 lastFailure = DateTime.MinValue;
+                lastError = null;
                 lastVersionCheck = DateTime.MinValue;
                 loadingColumns.Clear();
             }
@@ -153,6 +173,7 @@ namespace SqlPrompter.Metadata
                     }
 
                     snapshot = loaded;
+                    lastError = null;
                     lastVersionCheck = clock();
                 }
 
@@ -255,6 +276,7 @@ namespace SqlPrompter.Metadata
             lock (gate)
             {
                 lastFailure = clock();
+                lastError = ex.Message;
             }
 
             log(message + ": " + ex.GetType().Name + ": " + ex.Message);
