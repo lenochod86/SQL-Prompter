@@ -274,7 +274,8 @@ namespace SqlPrompter.Ssms
 
             options = SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(remoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor);
             var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, options).Select(s => ToItem(s, prepared)).ToList();
-            waitingForLinked = (prepared.LinkedStatus != null && prepared.LinkedStatus.IsLoading) || (columnsStatus != null && columnsStatus.IsLoading);
+            // A failed load is waited for as well: the retry (after the delay) may succeed and then the list is made again (#470).
+            waitingForLinked = (prepared.LinkedStatus != null && !prepared.LinkedStatus.IsDone) || (columnsStatus != null && columnsStatus.IsLoading);
             if (prepared.LinkedStatus != null && !prepared.LinkedStatus.IsDone)
             {
                 items.Insert(0, LoadingItem(prepared.LinkedWhat, prepared.LinkedStatus, prepared.Context.TypedPrefix));
@@ -295,7 +296,7 @@ namespace SqlPrompter.Ssms
             var typed = typedPrefix ?? string.Empty;
             var item = new CompletionItem(text, this, Icon(failed ? KnownMonikers.StatusWarning : KnownMonikers.Refresh, failed ? "Failed" : "Loading"), Filters, string.Empty, string.Empty, "\u0001", typed, ImmutableArray<ImageElement>.Empty);
             item.Properties.AddProperty(LoadingKey, true);
-            item.Properties.AddProperty(DescriptionKey, failed ? "The linked server could not be read. The list asks again after a minute." : "The list updates itself when the linked server has answered; typing is never blocked.");
+            item.Properties.AddProperty(DescriptionKey, failed ? "The metadata could not be read. The list asks again after a minute." : "The list updates itself when the metadata has arrived; typing is never blocked.");
             return item;
         }
 
@@ -427,6 +428,17 @@ namespace SqlPrompter.Ssms
                 linkedWhat = linkedDatabase == null ? "databases of " + linkedServer : "objects of " + linkedServer + "." + linkedDatabase;
                 cache = null;
                 loader = null;
+            }
+
+            if (metadata == null && cache != null && linkedStatus == null)
+            {
+                // The objects of the window's database are not loaded yet (or failed): the list says so instead of looking like the database has no tables (#470).
+                var status = cache.Status;
+                if (!status.IsDone)
+                {
+                    linkedStatus = status;
+                    linkedWhat = "objects of " + (usedDatabase ?? SsmsConnection.GetActive()?.Database ?? "the database");
+                }
             }
 
             prepared = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart))

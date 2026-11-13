@@ -719,7 +719,8 @@ namespace SqlPrompter.Ssms
                 return false;
             }
 
-            if (!fresh.Items.Select(i => i.InsertText).SequenceEqual(suggestions.Items.Select(i => i.InsertText)))
+            // The display text counts too: the row that says "Loading..." is replaced by the one that says why the load failed (#470).
+            if (!fresh.Items.Select(i => i.InsertText + "\u0000" + i.DisplayText).SequenceEqual(suggestions.Items.Select(i => i.InsertText + "\u0000" + i.DisplayText)))
             {
                 suggestions = fresh;
                 selected = 0;
