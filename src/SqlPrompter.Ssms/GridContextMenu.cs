@@ -76,6 +76,23 @@ namespace SqlPrompter.Ssms
             SqlPrompterPackage.CopyGridAsInListId, SqlPrompterPackage.CopyGridAsValuesId, SqlPrompterPackage.CopyGridAsJsonId, SqlPrompterPackage.CopyGridAsCsvId, SqlPrompterPackage.CopyGridAsMarkdownId,
         };
 
+        /// <summary>The item Open in Excel right below the submenu Copy as (#445).</summary>
+        private static void AddOpenInExcel(EnvDTE.DTE dte, CommandBar bar, int position)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            for (var i = 1; i <= bar.Controls.Count; i++)
+            {
+                if (string.Equals(bar.Controls[i].Caption, "Open in Excel", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            position = Math.Max(1, Math.Min(position, bar.Controls.Count + 1));
+            dte.Commands.Item("{" + SqlPrompterPackage.CommandSet.ToString() + "}", SqlPrompterPackage.OpenGridInExcelId).AddControl(bar, position);
+            Log.Write("Grid menu: added Open in Excel at position " + position + ".");
+        }
+
         /// <summary>The submenu Copy as with the formats of #211.</summary>
         private static void AddCopyAs(EnvDTE.DTE dte, CommandBar bar, int position)
         {
@@ -84,6 +101,8 @@ namespace SqlPrompter.Ssms
             {
                 if (string.Equals(bar.Controls[i].Caption, "Copy as", StringComparison.OrdinalIgnoreCase))
                 {
+                    // The submenu stays in the menu from an earlier start; the item below it is added all the same.
+                    AddOpenInExcel(dte, bar, i + 1);
                     return;
                 }
             }
@@ -98,6 +117,7 @@ namespace SqlPrompter.Ssms
             }
 
             Log.Write("Grid menu: added the submenu Copy as at position " + position + ".");
+            AddOpenInExcel(dte, bar, position + 1);
         }
     }
 }

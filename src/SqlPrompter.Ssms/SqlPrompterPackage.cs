@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 46)]
+    [ProvideMenuResource("Menus.ctmenu", 47)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -63,6 +63,7 @@ namespace SqlPrompter.Ssms
         public const int ShowDependenciesId = 0x012F;
         public const int ReopenClosedTabId = 0x0130;
         public const int RenameQueryTabId = 0x0132;
+        public const int OpenGridInExcelId = 0x0137;
         public const int CopyGridAsInListId = 0x0127;
         public const int CopyGridAsValuesId = 0x0128;
         public const int CopyGridAsJsonId = 0x0129;
@@ -85,6 +86,7 @@ namespace SqlPrompter.Ssms
             HideSsmsTabColor.Register();
             DefaultKeyBindings.Apply();
             GridContextMenu.Install();
+            GridCommands.CleanTemporaryExcelFiles();
             ToolbarVisibility.ShowOnce();
             if (await GetServiceAsync(typeof(IMenuCommandService)) is OleMenuCommandService commands)
             {
@@ -123,6 +125,7 @@ namespace SqlPrompter.Ssms
                 var copyAsInList = new OleMenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsInList(t), "an IN list"), new CommandID(CommandSet, CopyGridAsInListId));
                 copyAsInList.BeforeQueryStatus += (s, e) => copyAsInList.Enabled = !GridSelectionReader.SelectionSpansSeveralColumns();
                 commands.AddCommand(copyAsInList);
+                commands.AddCommand(new MenuCommand((s, e) => GridCommands.OpenInExcel(), new CommandID(CommandSet, OpenGridInExcelId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsValues(t), "VALUES"), new CommandID(CommandSet, CopyGridAsValuesId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsJson(t), "JSON"), new CommandID(CommandSet, CopyGridAsJsonId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsCsv(t), "CSV"), new CommandID(CommandSet, CopyGridAsCsvId)));

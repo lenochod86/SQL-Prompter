@@ -254,6 +254,12 @@
           <ButtonText>Script As Temp Table</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenGridInExcel" priority="0x0104" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
+        <Strings>
+          <ButtonText>Open in Excel</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidScriptOutline" priority="0x0118" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
         <Strings>
@@ -476,6 +482,7 @@
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />
+      <IDSymbol name="cmdidOpenGridInExcel" value="0x0137" />
       <IDSymbol name="cmdidAddQuotesAndCommas" value="0x0110" />
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidLocateInObjectExplorer" value="0x0133" />
