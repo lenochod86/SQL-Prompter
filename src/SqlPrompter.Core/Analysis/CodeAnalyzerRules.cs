@@ -64,6 +64,11 @@ namespace SqlPrompter.Core.Analysis
             }
 
             FindWithMetadata(script, tokens, settings, metadata, issues);
+
+            if (settings.UnknownColumn)
+            {
+                FindUnknownTempColumns(script, tokens, metadata, issues);
+            }
         }
 
         private static int Matching(List<Token> tokens, int open)
