@@ -246,6 +246,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
 
+        /// <summary>The keywords that belong together with the one at the caret (BEGIN and END, TRY and CATCH, ...) are highlighted.</summary>
+        [DataMember(Name = "highlightBlockKeywords")]
+        public bool HighlightBlockKeywords { get; set; }
+
         /// <summary>Every executed query is written to the history on this machine.</summary>
         [DataMember(Name = "keepHistory")]
         public bool KeepHistory { get; set; }
@@ -336,6 +340,7 @@ namespace SqlPrompter.Core.Settings
             AutoClose = true;
             SuggestAfterComma = true;
             HighlightMatches = true;
+            HighlightBlockKeywords = true;
             PickerTableOrder = false;
             ShowColumnPickerHint = true;
             OwnTypingList = false;

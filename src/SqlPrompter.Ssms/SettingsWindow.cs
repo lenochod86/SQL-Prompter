@@ -319,6 +319,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.QuickActionsOnCtrl, v => work.Behavior.QuickActionsOnCtrl = v);
             editor.Check("Highlight matching names", "Highlights the other places of the script where the name under the caret appears (compared by name, ignoring case and brackets).",
                 () => work.Behavior.HighlightMatches, v => work.Behavior.HighlightMatches = v);
+            editor.Check("Highlight matching keywords of a block", "Highlights the keywords that belong together with the keyword at the caret: BEGIN and END, BEGIN TRY / END TRY with BEGIN CATCH / END CATCH, BEGIN TRAN with COMMIT or ROLLBACK, CASE with WHEN, THEN, ELSE and END, IF with ELSE, WHILE with its block. Nothing is highlighted across a GO line or in unbalanced code.",
+                () => work.Behavior.HighlightBlockKeywords, v => work.Behavior.HighlightBlockKeywords = v);
 
             var files = Add("Import / Export", "Move the settings to another computer or take over the settings of SQL Prompt.");
             files.Button("Export settings...", () => SettingsFiles.Export(this), "Saves the settings file (SQL Prompter .json). Unsaved changes in this window are not included; press Apply first.");
