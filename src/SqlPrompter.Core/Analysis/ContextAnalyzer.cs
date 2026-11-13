@@ -228,6 +228,32 @@ namespace SqlPrompter.Core.Analysis
                 return module;
             }
 
+            // ALTER DATABASE |, DROP DATABASE [IF EXISTS] |, USE |, BACKUP DATABASE |, DBCC CHECKDB (|: the databases of the server only (#447).
+            if (qualifier.Count == 0 && TryDatabaseName(tokens, statementStart, anchorIndex, out var currentAllowed))
+            {
+                var databases = Make(ContextKind.ObjectName);
+                databases.DatabaseName = true;
+                databases.CurrentDatabaseAllowed = currentAllowed;
+                return databases;
+            }
+
+            // ALTER DATABASE Db |: what can follow the name; DROP DATABASE Db |: nothing.
+            if (qualifier.Count == 0 && anchorIndex == statementStart + 2 && tokens[statementStart + 1].IsWord("DATABASE") && anchor.IsNamePart)
+            {
+                if (tokens[statementStart].IsWord("ALTER"))
+                {
+                    var afterName = Make(ContextKind.Keyword);
+                    afterName.PreferredKeywords = new[] { "SET", "MODIFY", "ADD", "REMOVE", "COLLATE" };
+                    afterName.OnlyExpectedKeywords = true;
+                    return afterName;
+                }
+
+                if (tokens[statementStart].IsWord("DROP"))
+                {
+                    return Make(ContextKind.Name);
+                }
+            }
+
             // 1. Object name after FROM, JOIN, UPDATE, INTO …
             var objectKeywords = ObjectNameAnchor(tokens, anchorIndex, statementStart);
             if (afterIfExists && objectKeywords != null)
@@ -904,6 +930,45 @@ namespace SqlPrompter.Core.Analysis
                 default:
                     return null;
             }
+        }
+
+        private static readonly HashSet<string> DbccDatabaseCommands = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "CHECKDB", "CHECKALLOC", "CHECKCATALOG", "SHRINKDATABASE", "CHECKFILEGROUP",
+        };
+
+        /// <summary>The caret is where the name of a database of the server goes (#447); <paramref name="currentAllowed"/> when CURRENT can stand in its place.</summary>
+        private static bool TryDatabaseName(List<Token> tokens, int statementStart, int anchorIndex, out bool currentAllowed)
+        {
+            currentAllowed = false;
+            var head = tokens[statementStart];
+            var second = statementStart + 1 < tokens.Count ? tokens[statementStart + 1] : null;
+            var anchor = tokens[anchorIndex];
+            if (anchorIndex == statementStart)
+            {
+                return head.IsWord("USE");
+            }
+
+            if (second != null && second.IsWord("DATABASE") && anchorIndex == statementStart + 1)
+            {
+                currentAllowed = head.IsWord("ALTER");
+                return head.IsWord("ALTER") || head.IsWord("DROP") || head.IsWord("BACKUP") || head.IsWord("RESTORE");
+            }
+
+            // DROP DATABASE a, |
+            if (head.IsWord("DROP") && second != null && second.IsWord("DATABASE") && anchor.Kind == TokenKind.Comma)
+            {
+                return true;
+            }
+
+            // DROP DATABASE IF EXISTS |
+            if (head.IsWord("DROP") && second != null && second.IsWord("DATABASE") && anchor.IsWord("EXISTS") && anchorIndex == statementStart + 3 &&
+                tokens[statementStart + 2].IsWord("IF"))
+            {
+                return true;
+            }
+
+            return head.IsWord("DBCC") && second != null && DbccDatabaseCommands.Contains(second.Upper ?? string.Empty) && anchorIndex == statementStart + 2 && anchor.Kind == TokenKind.OpenParen;
         }
 
         /// <summary>
