@@ -18,12 +18,14 @@ namespace SqlPrompter.Core.Completion
             "NULL", "END", "ASC", "DESC", "GO", "TRUE", "FALSE", "CURRENT_TIMESTAMP", "CURRENT_USER", "SESSION_USER", "SYSTEM_USER", "USER",
         };
 
+        private static readonly HashSet<string> JoinModifiers = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase) { "LEFT", "RIGHT", "FULL", "INNER", "CROSS", "OUTER" };
+
         /// <param name="text">The text of the batch.</param>
         /// <param name="caret">The caret, right after the typed space.</param>
         /// <param name="context">The context at the caret (<see cref="ContextAnalyzer"/>).</param>
         public static bool ShouldOpen(string text, int caret, CaretContext context)
         {
-            if (text == null || context == null || caret <= 0 || caret > text.Length || context.Kind != ContextKind.Expression || context.TypedPrefix.Length > 0 || context.Qualifier.Count > 0)
+            if (text == null || context == null || caret <= 0 || caret > text.Length || (context.Kind != ContextKind.Expression && context.Kind != ContextKind.Keyword) || context.TypedPrefix.Length > 0 || context.Qualifier.Count > 0)
             {
                 return false;
             }
@@ -69,7 +71,18 @@ namespace SqlPrompter.Core.Completion
 
             if (previous.Kind == TokenKind.Word)
             {
+                // The keyword context (after a table source) is only for the words that start a join: LEFT |, INNER |.
+                if (context.Kind == ContextKind.Keyword)
+                {
+                    return JoinModifiers.Contains(previous.Text);
+                }
+
                 return Keywords.IsReserved(previous.Text) && !NotExpecting.Contains(previous.Text);
+            }
+
+            if (context.Kind == ContextKind.Keyword)
+            {
+                return false;
             }
 
             // After an operator that continues an expression (a = |, a + |); not after * (SELECT * |).

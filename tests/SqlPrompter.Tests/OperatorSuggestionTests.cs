@@ -34,6 +34,17 @@ namespace SqlPrompter.Tests
             });
         }
 
+        [Theory]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS |", "NULL,NOT NULL")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS N|", "NULL,NOT NULL")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS NOT |", "NULL")]
+        [InlineData("SELECT * FROM dbo.Users u ORDER |", "BY")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name NOT |", "IN,LIKE,BETWEEN")]
+        public void AfterTheFirstWordsOnlyTheNextWordIsOffered(string sql, string expected)
+        {
+            Assert.Equal(expected.Split(new[] { "," }, System.StringSplitOptions.None).OrderBy(x => x), Items(sql).Select(i => i.DisplayText).OrderBy(x => x));
+        }
+
         private static IReadOnlyList<Suggestion> Items(string sql)
         {
             var caret = sql.IndexOf('|');

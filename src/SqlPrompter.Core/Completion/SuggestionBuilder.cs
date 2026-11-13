@@ -274,6 +274,12 @@ namespace SqlPrompter.Core.Completion
                     return InsertColumnSuggestions(context, metadata, options).ToList();
                 case ContextKind.Expression:
                 {
+                    if (context.OnlyExpectedKeywords && context.Qualifier.Count == 0)
+                    {
+                        // Only these words fit (IS |, ORDER |): no columns, functions or snippets.
+                        return KeywordSuggestions(context, 0, true).ToList();
+                    }
+
                     var all = StatementFragments.Build(context, metadata, options)
                         .Concat(SelectListSuggestions.Leading(context))
                         .Concat(ExpressionSuggestions(context, metadata, script, options));

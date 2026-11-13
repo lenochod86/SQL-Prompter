@@ -28,6 +28,13 @@ namespace SqlPrompter.Tests
         [InlineData("SELECT * FROM dbo.T t WHERE t.A + |")]
         [InlineData("SELECT CASE WHEN |")]
         [InlineData("SELECT * FROM dbo.T t WHERE NOT |")]
+        [InlineData("SELECT * FROM dbo.T t WHERE t.A IS |")]
+        [InlineData("SELECT * FROM dbo.T t WHERE t.A IS NOT |")]
+        [InlineData("SELECT * FROM dbo.T t WHERE t.A NOT |")]
+        [InlineData("SELECT * FROM dbo.T t ORDER |")]
+        [InlineData("SELECT * FROM dbo.T t GROUP |")]
+        [InlineData("SELECT * FROM dbo.T t LEFT |")]
+        [InlineData("SELECT * FROM dbo.T t INNER |")]
         public void ASpaceAfterAKeywordOpensTheList(string sql) => Assert.True(Opens(sql), sql);
 
         [Theory]

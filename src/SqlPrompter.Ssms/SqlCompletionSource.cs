@@ -744,6 +744,14 @@ namespace SqlPrompter.Ssms
                 return CloseWithoutInserting;
             }
 
+            // IS + Space, ORDER + Space: the first words of a multi-word keyword are typed, not completed; the list for the next position follows (#444).
+            if (typedChar == ' ' && item.Properties.TryGetProperty(SqlCompletionSource.KindKey, out SqlPrompter.Core.Completion.SuggestionKind itemKind) &&
+                itemKind == SqlPrompter.Core.Completion.SuggestionKind.Keyword &&
+                SqlPrompter.Core.Completion.MultiWordKeywords.IsLeadingWords(applicable.GetText(buffer.CurrentSnapshot), item.InsertText))
+            {
+                return CloseWithoutInserting;
+            }
+
             // Enter and Tab arrive as '\n' and '\t'; they always insert.
             if (typedChar == '\n' || typedChar == '\r' || typedChar == '\t' || typedChar == '\0' || Keys.Commits(typedChar))
             {
