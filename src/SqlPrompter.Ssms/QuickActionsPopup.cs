@@ -356,11 +356,21 @@ namespace SqlPrompter.Ssms
             var y = Math.Max(0, line.Bottom - view.ViewportTop + 2);
             var device = view.VisualElement.PointToScreen(new Point(0, y));
             var source = PresentationSource.FromVisual(view.VisualElement);
-            var dip = source?.CompositionTarget != null ? source.CompositionTarget.TransformFromDevice.Transform(device) : device;
-            var area = SystemParameters.WorkArea;
-            Left = Math.Max(area.Left, Math.Min(dip.X, area.Right - Width));
-            Top = dip.Y + Height > area.Bottom ? Math.Max(area.Top, dip.Y - Height - line.Height - 4) : dip.Y;
+            var scale = source?.CompositionTarget != null ? source.CompositionTarget.TransformToDevice.M11 : 1.0;
+
+            // The monitor that contains the caret decides, not the primary one (#451). Everything is computed in device pixels.
+            var area = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)device.X, (int)device.Y)).WorkingArea;
+            PopupPlacement.Place(device.X, device.Y, line.Height * scale, 4 * scale, Width * scale, Height * scale, area.Left, area.Top, area.Right, area.Bottom, out var left, out var top);
+            var dip = source?.CompositionTarget != null ? source.CompositionTarget.TransformFromDevice.Transform(new Point(left, top)) : new Point(left, top);
+            Left = dip.X;
+            Top = dip.Y;
+
+            // Left and Top in DIPs are converted with the DPI of the monitor the window starts on, so the exact position is set in pixels once the window exists.
+            SourceInitialized += (s, e) => SetWindowPos(new System.Windows.Interop.WindowInteropHelper(this).Handle, IntPtr.Zero, (int)Math.Round(left), (int)Math.Round(top), 0, 0, 0x0001 | 0x0004 | 0x0010);
         }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 
         private static List<Entry> BuildEntries(IWpfTextView view, bool hasSelection)
         {
