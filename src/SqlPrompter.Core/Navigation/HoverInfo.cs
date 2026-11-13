@@ -77,6 +77,16 @@ namespace SqlPrompter.Core.Navigation
             }
 
             var token = tokens[index];
+            if (token.Kind == TokenKind.Variable || token.Kind == TokenKind.Number || token.Kind == TokenKind.String)
+            {
+                // The name of a parameter in a call of a procedure (EXEC proc @p = 1), or a literal value that goes to one by position (#453).
+                var parameter = ExecParameter(tokens, token, metadata, otherDatabase);
+                if (parameter != null)
+                {
+                    return parameter;
+                }
+            }
+
             if (token.Kind == TokenKind.Variable)
             {
                 var declaration = Declaration(tokens, batch, token);
@@ -127,6 +137,152 @@ namespace SqlPrompter.Core.Navigation
 
             return text == null ? null : new HoverText(token.Start, (token.End - token.Start), text, descriptionSchema, descriptionObject, descriptionColumn, linesInSsms, database);
         }
+
+        /// <summary>
+        /// The tooltip of a parameter in <c>EXEC [@r =] proc @p = value, ...</c>: the name left of the equals sign, or a literal given by position
+        /// before any named one. Null elsewhere (a variable on the right side keeps the tooltip of the variable).
+        /// </summary>
+        private static HoverText ExecParameter(IReadOnlyList<Token> all, Token token, IDatabaseMetadata metadata, Func<string, IDatabaseMetadata> otherDatabase)
+        {
+            var code = all.Where(t => t.Kind != TokenKind.Comment).ToList();
+            var at = code.IndexOf(token);
+            if (at < 0)
+            {
+                return null;
+            }
+
+            var bounds = StatementSplitter.Split(code);
+            var start = 0;
+            var end = code.Count;
+            for (var b = 0; b < bounds.Count; b++)
+            {
+                if (bounds[b] <= at)
+                {
+                    start = bounds[b];
+                    end = b + 1 < bounds.Count ? bounds[b + 1] : code.Count;
+                }
+            }
+
+            if (!(code[start].IsWord("EXEC") || code[start].IsWord("EXECUTE")))
+            {
+                return null;
+            }
+
+            var i = start + 1;
+            if (i + 1 < end && code[i].Kind == TokenKind.Variable && code[i + 1].Kind == TokenKind.Operator && code[i + 1].Text == "=")
+            {
+                i += 2;
+            }
+
+            var name = new List<string>();
+            while (i < end && code[i].IsNamePart && name.Count < 4)
+            {
+                name.Add(code[i].IdentifierValue);
+                if (i + 1 < end && code[i + 1].Kind == TokenKind.Dot)
+                {
+                    i += 2;
+                }
+                else
+                {
+                    i++;
+                    break;
+                }
+            }
+
+            if (name.Count == 0 || name.Count > 3 || at < i)
+            {
+                return null;
+            }
+
+            // The arguments split at the commas of the top level: which one the token is in and whether it starts it.
+            var depth = 0;
+            var position = 0;
+            var named = false;
+            var segmentStart = i;
+            for (var k = i; k <= at; k++)
+            {
+                if (code[k].Kind == TokenKind.OpenParen)
+                {
+                    depth++;
+                }
+                else if (code[k].Kind == TokenKind.CloseParen)
+                {
+                    depth--;
+                }
+                else if (depth == 0 && code[k].Kind == TokenKind.Comma)
+                {
+                    named |= IsNamedArgument(code, segmentStart, end);
+                    position++;
+                    segmentStart = k + 1;
+                }
+            }
+
+            if (segmentStart != at || depth != 0)
+            {
+                return null;
+            }
+
+            var isNamed = IsNamedArgument(code, at, end);
+            if (token.Kind == TokenKind.Variable && !isNamed)
+            {
+                return null;
+            }
+
+            if (token.Kind != TokenKind.Variable && (isNamed || named))
+            {
+                return null;
+            }
+
+            var procedureMetadata = metadata;
+            if (name.Count == 3 && !string.Equals(name[0], metadata.DatabaseName, StringComparison.OrdinalIgnoreCase))
+            {
+                procedureMetadata = otherDatabase?.Invoke(name[0]);
+                if (procedureMetadata == null)
+                {
+                    return null;
+                }
+            }
+
+            var procedureName = name[name.Count - 1];
+            var schema = name.Count >= 2 ? name[name.Count - 2] : null;
+            var candidates = procedureMetadata.Procedures.Where(p => string.Equals(p.Name, procedureName, StringComparison.OrdinalIgnoreCase) &&
+                (schema == null || string.Equals(p.Schema, schema, StringComparison.OrdinalIgnoreCase))).ToList();
+            var procedure = candidates.FirstOrDefault(p => string.Equals(p.Schema, procedureMetadata.DefaultSchema, StringComparison.OrdinalIgnoreCase)) ?? candidates.FirstOrDefault();
+            if (procedure == null)
+            {
+                return null;
+            }
+
+            DbParameter parameter;
+            var number = 0;
+            if (isNamed)
+            {
+                number = procedure.Parameters.ToList().FindIndex(p => string.Equals(p.Name, token.Text, StringComparison.OrdinalIgnoreCase)) + 1;
+                parameter = number > 0 ? procedure.Parameters[number - 1] : null;
+            }
+            else
+            {
+                number = position + 1;
+                parameter = number <= procedure.Parameters.Count ? procedure.Parameters[number - 1] : null;
+            }
+
+            if (parameter == null)
+            {
+                return new HoverText(token.Start, token.End - token.Start,
+                    (isNamed ? "No parameter " + token.Text : "No parameter " + number) + " in " + procedure + "\n(" + procedure.Parameters.Count + " parameters)",
+                    database: procedureMetadata == metadata ? null : name[0]);
+            }
+
+            var details = parameter.TypeName + ", parameter " + number + " of " + procedure.Parameters.Count +
+                (parameter.IsOutput ? ", OUTPUT" : string.Empty) +
+                (parameter.HasDefault ? ", default = " + (parameter.DefaultText ?? "default") : ", required");
+            return new HoverText(token.Start, token.End - token.Start, "parameter " + parameter.Name + " of " + procedure + "\n" + details,
+                database: procedureMetadata == metadata ? null : name[0]);
+        }
+
+        /// <summary>The argument that starts at <paramref name="from"/> is <c>@name = value</c>.</summary>
+        private static bool IsNamedArgument(List<Token> code, int from, int end) =>
+            from + 1 < end && code[from].Kind == TokenKind.Variable && code[from + 1].Kind == TokenKind.Operator && code[from + 1].Text == "=";
 
         /// <summary>The database of the object a name stands for when it is not the one of the window: <c>Db.dbo.T</c>, <c>x.Col</c> or <c>x</c> for an alias of such a table.</summary>
         private static string ForeignDatabaseOf(IReadOnlyList<string> names, IReadOnlyList<TableSource> sources, IDatabaseMetadata metadata)
