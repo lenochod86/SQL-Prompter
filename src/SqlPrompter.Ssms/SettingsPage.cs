@@ -364,11 +364,11 @@ namespace SqlPrompter.Ssms
                 Reload();
             }
 
-            Control Buttons(Action<bool> all)
+            Control Buttons(Action<bool> all, string enableText = "Enable all", string disableText = "Disable all")
             {
                 var row = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
-                var enable = new Button { Text = "Enable all", AutoSize = true, Margin = new Padding(0, 0, 6, 0) };
-                var disable = new Button { Text = "Disable all", AutoSize = true, Margin = new Padding(0) };
+                var enable = new Button { Text = enableText, AutoSize = true, Margin = new Padding(0, 0, 6, 0) };
+                var disable = new Button { Text = disableText, AutoSize = true, Margin = new Padding(0) };
                 enable.Click += (s, e) => all(true);
                 disable.Click += (s, e) => all(false);
                 if (enabledWhen != null)
@@ -386,7 +386,8 @@ namespace SqlPrompter.Ssms
             var filter = new TextBox { Width = 320 };
             filterRow.Controls.Add(filter);
             flow.Controls.Add(filterRow);
-            flow.Controls.Add(Buttons(on => SetAll(rules, on)));
+            flow.Controls.Add(new Label { Text = "All rules:", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 10, 0, 0) });
+            flow.Controls.Add(Buttons(on => SetAll(rules, on), "Enable all rules", "Disable all rules"));
 
             foreach (var category in rules.Select(r => r.Category).Distinct())
             {
