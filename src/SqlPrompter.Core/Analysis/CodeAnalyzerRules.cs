@@ -90,7 +90,7 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>For every token whether it is in a condition (after WHERE, ON, HAVING ...), the same notion as for the comparison with NULL.</summary>
-        private static bool[] ConditionMap(List<Token> tokens)
+        internal static bool[] ConditionMap(List<Token> tokens)
         {
             var result = new bool[tokens.Count];
             var saved = new Stack<bool>();

@@ -23,7 +23,7 @@ namespace SqlPrompter.Core.Analysis
 
         private static void FindWithMetadata(string script, List<Token> tokens, AnalysisSettings settings, IDatabaseMetadata metadata, List<CodeIssue> issues)
         {
-            if (metadata == null || (!settings.AmbiguousColumn && !settings.ImplicitConversion))
+            if (metadata == null || (!settings.AmbiguousColumn && !settings.ImplicitConversion && !settings.IsOn(CodeIssueKind.MI003)))
             {
                 return;
             }
@@ -41,9 +41,9 @@ namespace SqlPrompter.Core.Analysis
                     continue;
                 }
 
-                if (settings.AmbiguousColumn && sources.Count > 1)
+                if ((settings.AmbiguousColumn || settings.IsOn(CodeIssueKind.MI003)) && sources.Count > 1)
                 {
-                    FindAmbiguous(tokens, i, end, sources, issues);
+                    FindAmbiguous(tokens, i, end, sources, issues, settings.AmbiguousColumn, settings.IsOn(CodeIssueKind.MI003));
                 }
 
                 if (settings.ImplicitConversion)
@@ -179,7 +179,7 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>An unqualified name of a column that two or more tables of the query have: SQL Server refuses it.</summary>
-        private static void FindAmbiguous(List<Token> tokens, int select, int end, List<ResolvedSource> sources, List<CodeIssue> issues)
+        private static void FindAmbiguous(List<Token> tokens, int select, int end, List<ResolvedSource> sources, List<CodeIssue> issues, bool ambiguous = true, bool unqualified = false)
         {
             var aliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var depth = 0;
@@ -244,8 +244,15 @@ namespace SqlPrompter.Core.Analysis
                 }
 
                 var owners = sources.Where(s => s.Columns.Any(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))).ToList();
-                if (owners.Count < 2 || IsSourceNameOrAlias(tokens, j, sources))
+                if (owners.Count == 0 || IsSourceNameOrAlias(tokens, j, sources) || (owners.Count < 2 && !unqualified) || (owners.Count >= 2 && !ambiguous))
                 {
+                    continue;
+                }
+
+                if (owners.Count == 1)
+                {
+                    issues.Add(new CodeIssue(CodeIssueKind.MI003, CodeIssueSeverity.Hint, t.Start, t.End - t.Start, "The column " + name + " is not qualified; write " + owners[0].Source.Reference + "." + name + ".",
+                        new CodeFix(t.Start, 0, owners[0].Source.Reference + ".")));
                     continue;
                 }
 
