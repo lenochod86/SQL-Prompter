@@ -416,6 +416,12 @@
           <ButtonText>Open Log</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidUninstall" priority="0x0200" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+        <Strings>
+          <ButtonText>Uninstall SQL Prompter...</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
   <Symbols>
@@ -492,6 +498,7 @@
       <IDSymbol name="cmdidFormattingStyles" value="0x0120" />
       <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
       <IDSymbol name="cmdidOpenLog" value="0x0101" />
+      <IDSymbol name="cmdidUninstall" value="0x0138" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>
