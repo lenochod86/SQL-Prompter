@@ -28,6 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Shipped inside the extension folder; also used by the Uninstall SQL Prompter command. -->
+    <Content Include="Uninstall/Uninstall SQL Prompter.cmd" IncludeInVSIX="true" />
+    <Content Include="Uninstall/Uninstall-SqlPrompter.ps1" IncludeInVSIX="true" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Design" />
     <Reference Include="System.Windows.Forms" />
