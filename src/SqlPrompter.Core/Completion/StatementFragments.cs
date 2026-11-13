@@ -16,7 +16,7 @@ namespace SqlPrompter.Core.Completion
         /// <summary>The group of these items: above the keywords (group -1), so that the fragments are not mixed with them alphabetically.</summary>
         private const int Group = -10;
 
-        public static IEnumerable<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        public static IEnumerable<Suggestion> Build(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options, ScriptModel script = null)
         {
             if (metadata == null)
             {
@@ -25,7 +25,7 @@ namespace SqlPrompter.Core.Completion
 
             if (context.InsertTail != null)
             {
-                foreach (var item in InsertTail(context, metadata, options))
+                foreach (var item in InsertTail(context, metadata, options, script))
                 {
                     yield return item;
                 }
@@ -49,10 +49,11 @@ namespace SqlPrompter.Core.Completion
         }
 
         /// <summary>After <c>INSERT INTO t (a, b) |</c>: <c>VALUES (...)</c> with a value by type for each listed column, and <c>SELECT a, b FROM</c>.</summary>
-        private static IEnumerable<Suggestion> InsertTail(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        private static IEnumerable<Suggestion> InsertTail(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options, ScriptModel script)
         {
-            var table = Readiness.Resolve(context.InsertTail, metadata);
-            var all = table == null ? null : metadata.GetColumns(table);
+            var resolved = SuggestionBuilder.ResolveColumns(context.InsertTail, metadata, script ?? ScriptModel.Empty, options);
+            var table = resolved?.Owner;
+            var all = resolved?.Columns;
             if (all == null || context.InsertTailColumns.Count == 0)
             {
                 yield break;

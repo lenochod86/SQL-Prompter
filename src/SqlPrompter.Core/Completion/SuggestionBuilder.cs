@@ -265,13 +265,13 @@ namespace SqlPrompter.Core.Completion
             switch (context.Kind)
             {
                 case ContextKind.Keyword:
-                    return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0)).Concat(SnippetSuggestions(context, options)).ToList();
+                    return StatementFragments.Build(context, metadata, options, script).Concat(KeywordSuggestions(context, 0)).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.ObjectName:
                     return context.Module != ModuleKind.None
                         ? ObjectSuggestions(context, metadata, script, options).Concat(context.ModuleAction == ModuleAction.Drop ? KeywordSuggestions(context, 1) : Enumerable.Empty<Suggestion>()).ToList()
                         : ObjectSuggestions(context, metadata, script, options).Concat(SnippetSuggestions(context, options)).ToList();
                 case ContextKind.InsertColumns:
-                    return InsertColumnSuggestions(context, metadata, options).ToList();
+                    return InsertColumnSuggestions(context, metadata, script, options).ToList();
                 case ContextKind.Expression:
                 {
                     if (context.OnlyExpectedKeywords && context.Qualifier.Count == 0)
@@ -280,7 +280,7 @@ namespace SqlPrompter.Core.Completion
                         return KeywordSuggestions(context, 0, true).ToList();
                     }
 
-                    var all = StatementFragments.Build(context, metadata, options)
+                    var all = StatementFragments.Build(context, metadata, options, script)
                         .Concat(SelectListSuggestions.Leading(context))
                         .Concat(ExpressionSuggestions(context, metadata, script, options));
                     var columns = SelectListSuggestions.ColumnFilter(context);
@@ -300,7 +300,7 @@ namespace SqlPrompter.Core.Completion
                 case ContextKind.DataType:
                     return ColumnTypeSuggestions(context, metadata).Concat(SizedTypeSuggestions(context)).Concat(DataTypeSuggestions(context, 0)).ToList();
                 case ContextKind.Fallback:
-                    return StatementFragments.Build(context, metadata, options).Concat(KeywordSuggestions(context, 0))
+                    return StatementFragments.Build(context, metadata, options, script).Concat(KeywordSuggestions(context, 0))
                         .Concat(SnippetSuggestions(context, options))
                         .Concat(FunctionSuggestions(context, 2))
                         .Concat(DataTypeSuggestions(context, 3))
@@ -510,14 +510,40 @@ namespace SqlPrompter.Core.Completion
             }
         }
 
-        private static IEnumerable<Suggestion> ScriptTableSuggestions(CaretContext context, ScriptModel script, SuggestionOptions options)
+        private static IEnumerable<Suggestion> ScriptTableSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
             var quote = context.QuoteIdentifiers;
             foreach (var table in script.Tables.GroupBy(t => t.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()))
             {
                 var insert = table.Kind == ScriptTableKind.Cte ? SqlIdentifier.Quote(table.Name, quote) : table.Name;
                 insert += AliasText(context, options, table.Name);
-                yield return new Suggestion(SuggestionKind.ScriptTable, table.Name, insert, table.Name, null, table.Description, 0);
+                var plain = new Suggestion(SuggestionKind.ScriptTable, table.Name, insert, table.Name, null, table.Description, 0);
+
+                // The target of an INSERT: a temporary table or table variable brings its column list, like a table of the database (#449).
+                // Only when all of its columns are known.
+                var known = context.InsertTarget && table.Kind != ScriptTableKind.Cte ? script.Resolve(table, metadata) : null;
+                var columns = known != null && known.IsComplete ? InsertBuilder.InsertableColumns(known.Columns) : null;
+                if (columns == null || columns.Count == 0 || options.Inserts.ColumnsMode == InsertColumnsMode.AfterParenthesis)
+                {
+                    yield return plain;
+                    continue;
+                }
+
+                var withColumns = new Suggestion(
+                    SuggestionKind.ScriptTable,
+                    options.Inserts.ColumnsMode == InsertColumnsMode.Item ? table.Name + " (columns)" : table.Name,
+                    InsertBuilder.TableWithColumns(table.Name, columns, options.Inserts, options.Editor, quote),
+                    table.Name,
+                    null,
+                    table.Description + " with its column list",
+                    0,
+                    isBlock: true);
+                if (options.Inserts.ColumnsMode == InsertColumnsMode.Item)
+                {
+                    yield return plain;
+                }
+
+                yield return withColumns;
             }
         }
 
@@ -612,7 +638,7 @@ namespace SqlPrompter.Core.Completion
 
             if (context.Qualifier.Count == 0)
             {
-                foreach (var suggestion in ScriptTableSuggestions(context, script, options))
+                foreach (var suggestion in ScriptTableSuggestions(context, metadata, script, options))
                 {
                     yield return suggestion;
                 }
@@ -784,13 +810,16 @@ namespace SqlPrompter.Core.Completion
         }
 
         /// <summary>The columns an INSERT can supply, after "INSERT INTO table (", and an item that inserts all of them.</summary>
-        private static IEnumerable<Suggestion> InsertColumnSuggestions(CaretContext context, IDatabaseMetadata metadata, SuggestionOptions options)
+        private static IEnumerable<Suggestion> InsertColumnSuggestions(CaretContext context, IDatabaseMetadata metadata, ScriptModel script, SuggestionOptions options)
         {
+            // A table of the database, or a temporary table or table variable of the script (#449).
             var source = context.Sources.FirstOrDefault();
-            var dbObject = source == null ? null : Readiness.Resolve(source, metadata);
-            var columns = dbObject == null ? null : context.IndexColumns
-                ? metadata.GetColumns(dbObject)?.Where(c => !context.ExcludedColumns.Contains(c.Name, StringComparer.OrdinalIgnoreCase)).ToList()
-                : InsertBuilder.InsertableColumns(metadata.GetColumns(dbObject));
+            var resolved = source == null ? null : ResolveColumns(source, metadata, script ?? ScriptModel.Empty, options);
+            var dbObject = resolved?.Object;
+            var tableName = resolved?.Owner;
+            var columns = resolved == null ? null : context.IndexColumns
+                ? resolved.Columns.Where(c => !context.ExcludedColumns.Contains(c.Name, StringComparer.OrdinalIgnoreCase)).ToList()
+                : InsertBuilder.InsertableColumns(resolved.Columns);
             if (columns == null || columns.Count == 0)
             {
                 yield break;
@@ -804,12 +833,12 @@ namespace SqlPrompter.Core.Completion
                     InsertBuilder.ColumnsAfterParenthesis(columns, options.Inserts, options.Editor, context.QuoteIdentifiers),
                     "all columns",
                     null,
-                    "all insertable columns of " + dbObject + " (not identity, computed or rowversion)",
+                    "all insertable columns of " + tableName + " (not identity, computed or rowversion)",
                     -1,
                     isBlock: true);
             }
 
-            if (context.KeyColumnsOfReference)
+            if (context.KeyColumnsOfReference && dbObject != null)
             {
                 // REFERENCES t (|: the primary key first (all of its columns as one item when there are several).
                 var key = metadata.GetPrimaryKey(dbObject);
@@ -830,7 +859,7 @@ namespace SqlPrompter.Core.Completion
 
             foreach (var column in columns)
             {
-                yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, context.QuoteIdentifiers), null, dbObject.Name, 0, KeyKind.None);
+                yield return ColumnSuggestion(column, SqlIdentifier.Quote(column.Name, context.QuoteIdentifiers), null, source.ObjectName, 0, KeyKind.None);
             }
         }
 

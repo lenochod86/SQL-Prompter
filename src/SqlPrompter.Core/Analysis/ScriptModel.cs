@@ -831,15 +831,24 @@ namespace SqlPrompter.Core.Analysis
                 }
 
                 var nullable = true;
-                for (var i = typeEnd; i + 1 < b; i++)
+                var identity = false;
+                for (var i = typeEnd; i < b; i++)
                 {
-                    if (tokens[i].IsWord("NOT") && tokens[i + 1].IsWord("NULL"))
+                    if (i + 1 < b && tokens[i].IsWord("NOT") && tokens[i + 1].IsWord("NULL"))
                     {
                         nullable = false;
                     }
+
+                    if (tokens[i].IsWord("IDENTITY"))
+                    {
+                        identity = true;
+                    }
                 }
 
-                columns.Add(new DbColumn(tokens[a].IdentifierValue, type, nullable));
+                // name AS expression is a computed column; a rowversion column cannot be inserted either.
+                var computed = a + 1 < b && tokens[a + 1].IsWord("AS");
+                var rowVersion = type.Equals("timestamp", StringComparison.OrdinalIgnoreCase) || type.Equals("rowversion", StringComparison.OrdinalIgnoreCase);
+                columns.Add(new DbColumn(tokens[a].IdentifierValue, type, nullable, isIdentity: identity, isComputed: computed, isRowVersion: rowVersion));
             }
 
             /// <summary>Returns the index after a data type starting at i: name, optional schema, optional (length).</summary>
