@@ -195,9 +195,47 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "rankByUsage")]
         public bool RankByUsage { get; set; }
 
-        /// <summary>Typing <c>'</c> or <c>[</c> also inserts the closing character.</summary>
-        [DataMember(Name = "autoClose")]
-        public bool AutoClose { get; set; }
+        /// <summary>Typing <c>'</c> also inserts the closing quote (#440).</summary>
+        [DataMember(Name = "autoCloseQuote")]
+        public bool AutoCloseQuote { get; set; }
+
+        /// <summary>Typing <c>(</c> also inserts the closing parenthesis.</summary>
+        [DataMember(Name = "autoCloseParenthesis")]
+        public bool AutoCloseParenthesis { get; set; }
+
+        /// <summary>Typing <c>[</c> also inserts the closing bracket.</summary>
+        [DataMember(Name = "autoCloseBracket")]
+        public bool AutoCloseBracket { get; set; }
+
+        /// <summary>Typing <c>/*</c> also inserts <c> */</c>.</summary>
+        [DataMember(Name = "autoCloseBlockComment")]
+        public bool AutoCloseBlockComment { get; set; }
+
+        /// <summary>
+        /// The single switch of the settings files from before there was one per pair: it is read once (on = the quote, the parenthesis and the bracket on, off = all
+        /// three off; the block comment pair did not exist and keeps its default) and never written again. A value of a pair in the same file wins (it is read later).
+        /// </summary>
+        [DataMember(Name = "autoClose", EmitDefaultValue = false)]
+        private bool? LegacyAutoClose
+        {
+            get => null;
+            set
+            {
+                if (value.HasValue)
+                {
+                    AutoCloseQuote = value.Value;
+                    AutoCloseParenthesis = value.Value;
+                    AutoCloseBracket = value.Value;
+                }
+            }
+        }
+
+        /// <summary>The pairs that are closed automatically.</summary>
+        public SqlPrompter.Core.Editing.AutoClosePairs AutoClosePairs =>
+            (AutoCloseQuote ? SqlPrompter.Core.Editing.AutoClosePairs.Quote : 0) |
+            (AutoCloseParenthesis ? SqlPrompter.Core.Editing.AutoClosePairs.Parenthesis : 0) |
+            (AutoCloseBracket ? SqlPrompter.Core.Editing.AutoClosePairs.Bracket : 0) |
+            (AutoCloseBlockComment ? SqlPrompter.Core.Editing.AutoClosePairs.BlockComment : 0);
 
         /// <summary>The list opens by itself after a comma (and the space after it) where the next item is a name or an expression.</summary>
         [DataMember(Name = "suggestAfterComma")]
@@ -337,7 +375,10 @@ namespace SqlPrompter.Core.Settings
             KeywordCase = KeywordCase.FollowStyle;
             LooseMatching = true;
             RankByUsage = true;
-            AutoClose = true;
+            AutoCloseQuote = true;
+            AutoCloseParenthesis = true;
+            AutoCloseBracket = true;
+            AutoCloseBlockComment = true;
             SuggestAfterComma = true;
             HighlightMatches = true;
             HighlightBlockKeywords = true;
