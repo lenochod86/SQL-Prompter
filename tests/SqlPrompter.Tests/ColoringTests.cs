@@ -131,6 +131,19 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void TheWholeTabIsFilledByDefaultAndTheChoiceSurvivesCloneAndJson()
+        {
+            Assert.True(new ColorSettings().FillWholeTab);
+            Assert.False(new ColorSettings { FillWholeTab = false }.Clone().FillWholeTab);
+
+            // A settings file from before the choice existed gets the whole tab; an explicit accent bar is kept.
+            Assert.True(SettingsJson.Deserialize("{ \"coloring\": { \"enabled\": true } }").Coloring.FillWholeTab);
+            Assert.False(SettingsJson.Deserialize("{ \"coloring\": { \"fillTab\": false } }").Coloring.FillWholeTab);
+            var written = SettingsJson.Serialize(new SqlPrompter.Core.Settings.PrompterSettings { Coloring = { FillWholeTab = false } });
+            Assert.False(SettingsJson.Deserialize(written).Coloring.FillWholeTab);
+        }
+
+        [Fact]
         public void TheColoredPartsDefaultToTabAndWindowStatusBarAndSurviveCloneAndJson()
         {
             var defaults = new ColorSettings();

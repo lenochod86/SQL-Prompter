@@ -53,17 +53,19 @@ namespace SqlPrompter.Ssms
 
                 // The tab (accent bar, tint and the frame that comes with it) of every query window follows the connection of that window, so two
                 // tab groups side by side each show their own color (#393). Windows that are not query windows get nothing.
-                var documents = new List<object>();
+                var documents = new List<TabPair>();
                 foreach (Window w in Application.Current.Windows)
                 {
                     CollectDocumentViews(w, documents);
                 }
 
-                foreach (var document in documents)
+                foreach (var pair in documents)
                 {
                     try
                     {
-                        Apply(document, coloring.Enabled && coloring.ColorTab ? WantedBrush(EditorOf(document), coloring) : null);
+                        var wanted = coloring.Enabled && coloring.ColorTab ? WantedBrush(EditorOf(pair.Document), coloring) : null;
+                        Apply(pair.Document, wanted);
+                        ApplyFill(pair.Tab, wanted != null && coloring.FillWholeTab ? wanted : null);
                     }
                     catch (Exception ex)
                     {
@@ -113,6 +115,56 @@ namespace SqlPrompter.Ssms
             var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(color.R, color.G, color.B));
             brush.Freeze();
             return brush;
+        }
+
+        /// <summary>
+        /// The whole tab in the color (#438): the Background and the Foreground of the <c>DocumentTabItem</c> are set as local values, which win over the
+        /// triggers of the shell style (selected, hovered, active), so the tab is filled also when it is not in front, like SSMS fills the tab with the color of
+        /// the Connect dialog. The text is black or white by the luminance of the color. A null brush gives the style its say again.
+        /// </summary>
+        private static void ApplyFill(FrameworkElement tab, Brush wanted)
+        {
+            if (!(tab is System.Windows.Controls.Control control))
+            {
+                return;
+            }
+
+            if (wanted == null)
+            {
+                if (Filled.TryGetValue(control, out _))
+                {
+                    control.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
+                    control.ClearValue(System.Windows.Controls.Control.ForegroundProperty);
+                    Filled.Remove(control);
+                }
+
+                return;
+            }
+
+            var color = ((SolidColorBrush)wanted).Color;
+            var text = (0.299 * color.R + 0.587 * color.G + 0.114 * color.B) < 140 ? Brushes.White : Brushes.Black;
+            if (!(control.Background is SolidColorBrush current && current.Color == color))
+            {
+                control.Background = wanted;
+            }
+
+            if (!ReferenceEquals(control.Foreground, text))
+            {
+                control.Foreground = text;
+            }
+
+            if (!Filled.TryGetValue(control, out _))
+            {
+                Filled.Add(control, new object());
+            }
+        }
+
+        private static readonly ConditionalWeakTable<object, object> Filled = new ConditionalWeakTable<object, object>();
+
+        private sealed class TabPair
+        {
+            public FrameworkElement Tab;
+            public object Document;
         }
 
         private static void Apply(object document, Brush wanted)
@@ -221,7 +273,7 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>The <c>DocumentView</c> of every tab in the visual tree (every tab group, and floating windows when their window is passed), not only the active one.</summary>
-        private static void CollectDocumentViews(DependencyObject root, List<object> found)
+        private static void CollectDocumentViews(DependencyObject root, List<TabPair> found)
         {
             if (root == null)
             {
@@ -230,9 +282,9 @@ namespace SqlPrompter.Ssms
 
             if (root.GetType().Name == "DocumentTabItem" && root is FrameworkElement tab && tab.DataContext?.GetType().Name == "DocumentView")
             {
-                if (!found.Contains(tab.DataContext))
+                if (!found.Exists(p => ReferenceEquals(p.Document, tab.DataContext)))
                 {
-                    found.Add(tab.DataContext);
+                    found.Add(new TabPair { Tab = tab, Document = tab.DataContext });
                 }
 
                 return;
