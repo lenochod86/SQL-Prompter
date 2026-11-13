@@ -119,7 +119,10 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => ShowDependencies.Run(ActiveEditor.GetView()), new CommandID(CommandSet, ShowDependenciesId)));
                 commands.AddCommand(new MenuCommand((s, e) => tabSession?.ReopenClosedTab(), new CommandID(CommandSet, ReopenClosedTabId)));
                 commands.AddCommand(new MenuCommand((s, e) => tabSession?.RenameActiveTab(), new CommandID(CommandSet, RenameQueryTabId)));
-                commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsInList(t), "an IN list"), new CommandID(CommandSet, CopyGridAsInListId)));
+                // An IN list holds the values of one column: the command is off while the selection of the grid covers several (#446). Decided every time a menu opens.
+                var copyAsInList = new OleMenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsInList(t), "an IN list"), new CommandID(CommandSet, CopyGridAsInListId));
+                copyAsInList.BeforeQueryStatus += (s, e) => copyAsInList.Enabled = !GridSelectionReader.SelectionSpansSeveralColumns();
+                commands.AddCommand(copyAsInList);
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsValues(t), "VALUES"), new CommandID(CommandSet, CopyGridAsValuesId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsJson(t), "JSON"), new CommandID(CommandSet, CopyGridAsJsonId)));
                 commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsCsv(t), "CSV"), new CommandID(CommandSet, CopyGridAsCsvId)));
