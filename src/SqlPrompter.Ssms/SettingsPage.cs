@@ -25,6 +25,8 @@ namespace SqlPrompter.Ssms
         private Func<string> previewText;
         private Func<string> previewHeading;
         private Label previewTitle;
+        private Func<string> previewNote;
+        private Label previewNoteLabel;
 
         public SettingsPage(string title, string intro = null)
         {
@@ -87,12 +89,20 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>A colored preview under the options; it is drawn again after every change (<paramref name="render"/> returns the text to show).</summary>
-        public void Preview(string heading, Func<string> render, Control headerExtra = null, Func<string> title = null)
+        public void Preview(string heading, Func<string> render, Control headerExtra = null, Func<string> title = null, Func<string> note = null)
         {
             previewText = render;
+            previewNote = note;
             previewBox = new FormatPreview { Dock = DockStyle.Fill };
             var panel = new Panel { Dock = DockStyle.Bottom, Height = 250, Padding = new Padding(14, 4, 14, 10) };
             panel.Controls.Add(previewBox);
+            if (note != null)
+            {
+                // A line under the preview that says why options seem to have no effect (a short statement kept on one line); empty text hides it.
+                previewNoteLabel = new Label { Dock = DockStyle.Bottom, AutoSize = false, Height = 34, ForeColor = SystemColors.GrayText, Visible = false, Padding = new Padding(0, 4, 0, 0) };
+                panel.Controls.Add(previewNoteLabel);
+            }
+
             var header = new Panel { Dock = DockStyle.Top, Height = 26 };
             previewTitle = new Label { Text = heading, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font(Font, FontStyle.Bold) };
             previewHeading = title;
@@ -118,6 +128,13 @@ namespace SqlPrompter.Ssms
             try
             {
                 previewBox.ShowText(previewText());
+                if (previewNoteLabel != null)
+                {
+                    var noteText = previewNote() ?? string.Empty;
+                    previewNoteLabel.Text = noteText;
+                    previewNoteLabel.Visible = noteText.Length > 0;
+                }
+
                 if (previewHeading != null)
                 {
                     previewTitle.Text = previewHeading();

@@ -11,11 +11,12 @@ namespace SqlPrompter.Core.Formatting
     /// <summary>The result of formatting: the new text and what happened to the statements.</summary>
     public sealed class FormatResult
     {
-        internal FormatResult(string text, int formatted, int kept)
+        internal FormatResult(string text, int formatted, int kept, int collapsed = 0)
         {
             Text = text;
             Formatted = formatted;
             Kept = kept;
+            Collapsed = collapsed;
         }
 
         public string Text { get; }
@@ -25,6 +26,12 @@ namespace SqlPrompter.Core.Formatting
 
         /// <summary>Statements left as they were (only the case of words changed) because they contain comments inside, or because the formatted text was not the same script.</summary>
         public int Kept { get; }
+
+        /// <summary>
+        /// Statements of <see cref="Formatted"/> that the style keeps on one line because they are shorter than <c>CollapseStatementsShorterThan</c> (#441): the options that
+        /// break a statement over lines do not apply to them (the spacing and the case of words do).
+        /// </summary>
+        public int Collapsed { get; }
     }
 
     /// <summary>
@@ -65,6 +72,8 @@ namespace SqlPrompter.Core.Formatting
             private readonly string nl;
             private int formatted;
             private int kept;
+            private int collapsed;
+            private bool collapsedNow;
 
             public Engine(string text, FormatStyle style, string newLine)
             {
@@ -186,7 +195,7 @@ namespace SqlPrompter.Core.Formatting
                 // Comments after the last statement.
                 var tail = statements[statements.Count - 1];
                 _ = tail;
-                return new FormatResult(output.ToString(), formatted, kept);
+                return new FormatResult(output.ToString(), formatted, kept, collapsed);
             }
 
             private static int LastEnd(Statement s) => s.Trailing.Count > 0 ? s.Trailing[s.Trailing.Count - 1].End : s.Body[s.Body.Count - 1].End;
@@ -318,6 +327,7 @@ namespace SqlPrompter.Core.Formatting
                 {
                     try
                     {
+                        collapsedNow = false;
                         layout = Layout(codeTokens, column);
                     }
                     catch (Exception)
@@ -332,6 +342,11 @@ namespace SqlPrompter.Core.Formatting
                     if (FormatTokens.Equivalent(codeTokens, check))
                     {
                         formatted++;
+                        if (collapsedNow)
+                        {
+                            collapsed++;
+                        }
+
                         if (codeTokens[0].IsWord("ELSE") && codeTokens.Count == 1 && next != null && next.Body[0].IsWord("IF") && next.Leading.Count == 0)
                         {
                             consumed = true;
@@ -431,6 +446,7 @@ namespace SqlPrompter.Core.Formatting
                 var flat = Flat(r, 0, r.Count);
                 if (style.CollapseStatementsShorterThan > 0 && flat.Length < style.CollapseStatementsShorterThan)
                 {
+                    collapsedNow = true;
                     return new List<string> { Indent(column) + flat };
                 }
 
