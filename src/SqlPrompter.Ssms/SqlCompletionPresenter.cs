@@ -929,6 +929,7 @@ namespace SqlPrompter.Ssms
         /// <summary>The script colored as SQL (keywords, strings, comments, variables) for the light or the dark theme.</summary>
         internal static void FillColored(TextBlock block, string text)
         {
+            text = SqlPrompter.Core.Editing.TabExpander.Expand(text, EditorTabSize.Current());
             var palette = EditorColors.ByKind();
             var colors = new Color?[]
             {

@@ -204,10 +204,12 @@ namespace SqlPrompter.Ssms
 
         public void TextViewCreated(IWpfTextView textView)
         {
+            EditorTabSize.Watch(textView);
             textView.GotAggregateFocus += (sender, args) =>
             {
                 try
                 {
+                    EditorTabSize.Remember(textView);
                     ThreadHelper.ThrowIfNotOnUIThread();
                     Metadata.CacheForActiveWindow(out _);
                 }
