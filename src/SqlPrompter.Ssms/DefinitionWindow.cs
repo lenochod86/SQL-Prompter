@@ -18,13 +18,13 @@ namespace SqlPrompter.Ssms
         private readonly ObjectSummary summary;
         private readonly TabControl tabs = new TabControl { Margin = new Thickness(0, 0, 0, 8) };
 
-        private DefinitionWindow(string title, string script, ObjectSummary summary, bool startOnSummary)
+        private DefinitionWindow(string title, string script, ObjectSummary summary, bool startOnSummary, Size? size)
         {
             this.script = script;
             this.summary = summary;
             Title = title;
-            Width = 720;
-            Height = 520;
+            Width = Math.Max(720, size?.Width ?? 0);
+            Height = Math.Max(520, size?.Height ?? 0);
             ShowInTaskbar = false;
             Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
             SnippetUi.Theme(this);
@@ -67,9 +67,9 @@ namespace SqlPrompter.Ssms
             SourceInitialized += (s, e) => System.Windows.Forms.Integration.ElementHost.EnableModelessKeyboardInterop(this);
         }
 
-        public static void Open(string title, string script, ObjectSummary summary, bool startOnSummary)
+        public static void Open(string title, string script, ObjectSummary summary, bool startOnSummary, Size? size = null)
         {
-            var window = new DefinitionWindow(title, script, summary, startOnSummary);
+            var window = new DefinitionWindow(title, script, summary, startOnSummary, size);
             ActiveEditor.SetOwner(window);
             window.Show();
         }
