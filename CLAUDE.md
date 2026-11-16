@@ -50,6 +50,7 @@ Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator w
 4. **Push** the branch (`git push -u origin <branch>`) so the work can be picked up from another environment. Before a push run `pwsh .github/scripts/Verify-Local.ps1` (what CI runs: the tests, the version checks against `origin/main` and, on Windows, the VSIX build with warnings as errors; `-SkipVsix` when `src/SqlPrompter.Ssms` did not change): a red push wastes billed Actions minutes. Push a branch as few times as possible.
 5. **Pull request** to `main` when the work is ready for review.
    - Describe what changed, how to test it in SSMS, and what is verified and what is not.
+   - If the change is visible to the user (a feature, option, key, command or window), update the matching page of `docs/help` in the same pull request and retake the screenshots of any window that changed (the help rules are in `docs/architecture.md`, section "User help").
    - Include `Closes #<number>`.
    - CI runs the tests and the version checks on every push to the pull request, but the Windows VSIX build (it costs twice the billed minutes, the repository is private) only for a pull request with the label `build-vsix`. Add the label `build-vsix` when the work is ready, so that the VSIX of the final commit is built once; it is a required step before a merge.
 6. **Approval.** Merge only after the user explicitly agrees. The user usually tests the VSIX from the branch in SSMS.
