@@ -35,6 +35,8 @@ jobs:
           if ($tag -ne "v$version") {
             throw "The tag $tag does not match the VSIX version $version in source.extension.vsixmanifest."
           }
+          # The runner service runs as another user than the owner of the workspace, so git must be told to trust it.
+          git config --global --add safe.directory '*'
           git fetch --quiet origin main
           git merge-base --is-ancestor $env:GITHUB_SHA origin/main
           if ($LASTEXITCODE -ne 0) {
