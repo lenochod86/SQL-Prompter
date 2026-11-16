@@ -240,7 +240,7 @@ namespace SqlPrompter.Ssms
                 if (manual)
                 {
                     var text = release == null
-                        ? "The latest version could not be found. Check the network connection and try again later."
+                        ? "The latest version could not be found. The network may be unreachable, or the releases of the repository are not public yet. The log has the details."
                         : "SQL Prompter " + current + " is the latest version.";
                     MessageBox.Show(new MainWindowOwner(), text, "SQL Prompter", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }

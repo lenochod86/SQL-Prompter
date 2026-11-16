@@ -77,7 +77,7 @@ namespace SqlPrompter.Ssms
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
-            Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
+            Log.Write("SQL Prompter " + (UpdateService.CurrentVersion()?.ToString() ?? typeof(SqlPrompterPackage).Assembly.GetName().Version.ToString()) + " loaded.");
             SnippetService.Start();
             UsageService.Start();
             HistoryService.Start();
