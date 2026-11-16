@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formatting - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a class="current" href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Formatting</h1>
+<p class="lead">Format a script or a selection with a named style. The same style decides how lists, keywords and joins are laid out when SQL Prompter inserts them.</p>
+
+<h2>Commands</h2>
+<table>
+  <tr><th style="width:240px">Command</th><th>What it does</th></tr>
+  <tr><td>Format Document <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>Y</kbd></td><td>Formats the whole script with the active style.</td></tr>
+  <tr><td>Format Selection</td><td>Formats the selected statements.</td></tr>
+  <tr><td>Unformat Selection</td><td>Turns the selection into a single line: white space between tokens becomes one space, strings, quoted names and block comments are kept, a <code>--</code> comment becomes <code>/* ... */</code>, a <code>GO</code> line stays on its own line.</td></tr>
+  <tr><td>Formatting Styles &gt; Style</td><td>A submenu to switch the active style; <b>Edit Formatting Styles...</b> opens the editor.</td></tr>
+</table>
+<p>The result replaces only the part of the text that differs, so a single <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes it. The status bar says how many statements were formatted and how many were kept as written.</p>
+
+<h2>Styles</h2>
+<figure>
+  <img src="images/formatting-styles.png" alt="The Formatting Styles window" width="900">
+  <figcaption><b>SQL Prompter &gt; Formatting Styles &gt; Edit Formatting Styles...</b> (the style selector and its buttons are above the part shown here). The preview under the options shows a sample for the selected group; <em>Preview the current query</em> shows your own query instead.</figcaption>
+</figure>
+<p>There can be several named styles with one of them active. The bar at the top of the window has the style selector and the buttons <b>New</b>, <b>Duplicate</b>, <b>Rename</b>, <b>Delete</b>, <b>Import...</b> (a SQL Prompt style, <code>.json</code>) and <b>Set as active</b>. The options are a tree of groups, with a search box above it:</p>
+<table>
+  <tr><th style="width:230px">Group</th><th>Options</th></tr>
+  <tr><td>Casing</td><td>Case of keywords, of built-in functions (only when followed by a parenthesis) and of data types.</td></tr>
+  <tr><td>Indentation</td><td>Use tabs; tab width (1-16 characters).</td></tr>
+  <tr><td>Lists</td><td>Commas before items; <code>GROUP BY</code> and <code>ORDER BY</code> items on separate lines; align aliases (the <code>AS</code> of a select list starts in one column); align items across clauses.</td></tr>
+  <tr><td>Conditions</td><td>Conditions of <code>WHERE</code> and <code>HAVING</code> on separate lines; align comparison operators; <code>AND</code> / <code>OR</code> start the line.</td></tr>
+  <tr><td>JOIN</td><td><code>ON</code> on a new line; indent <code>JOIN</code> to the table.</td></tr>
+  <tr><td>Variables</td><td>Equals sign of a long <code>SET @variable = value</code> on a new line.</td></tr>
+  <tr><td>Parentheses</td><td>Subquery parenthesis on a new line; indent the contents of the subquery.</td></tr>
+  <tr><td>CTE</td><td>Parenthesis on a new line; indent contents; <code>AS</code> on a new line.</td></tr>
+  <tr><td>CREATE TABLE and procedures</td><td>Parenthesis on a new line; indent column definitions; align data types; procedure parameters on separate lines.</td></tr>
+  <tr><td>INSERT</td><td>Break the column list when the line is longer than a limit; column parenthesis on a new line; <code>VALUES</code> rows on separate lines.</td></tr>
+  <tr><td>CASE and IN</td><td>Keep <code>CASE</code> shorter than a limit on one line; expression of a simple <code>CASE</code> on a new line; space inside <code>IN</code> parentheses.</td></tr>
+  <tr><td>SELECT</td><td>Line break after <code>DISTINCT</code> and <code>TOP</code>.</td></tr>
+  <tr><td>Short statements</td><td>Keep statements, subqueries and <code>CREATE TABLE</code> shorter than a limit (in characters) on one line; 0 turns it off.</td></tr>
+  <tr><td>Blocks and blank lines</td><td>Indent <code>BEGIN ... END</code>; indent <code>BEGIN</code> and <code>END</code> under their <code>IF</code> / <code>WHILE</code> / <code>ELSE</code>; keep one blank line between statements.</td></tr>
+  <tr><td>While typing</td><td>Case keywords while typing (a reserved word gets the keyword case as soon as you type a space, parenthesis, comma or semicolon after it).</td></tr>
+</table>
+<p>Use the search box to find an option by its words instead of opening the groups. <b>Save</b> stores all styles in the settings file; <b>Cancel</b> drops the changes.</p>
+
+<h2>Importing a SQL Prompt style</h2>
+<p><b>Settings &gt; Formatting &gt; Import a SQL Prompt style...</b> (or <b>Import...</b> in the styles window) reads a style exported from SQL Prompt (<code>.json</code>) and adds it as a new style, which becomes the active one; the other styles are kept. A report lists what was applied and what has no counterpart. Imported options include the case options, indentation, lists, ON placement, <code>GROUP BY</code> / <code>ORDER BY</code>, alignment of aliases and comparison operators, items across clauses, the join table, the <code>SET</code> equals sign, <code>BEGIN</code> / <code>END</code>, parentheses, CTEs, <code>CREATE TABLE</code>, procedure parameters, <code>INSERT</code>, <code>CASE</code> and <code>IN</code>.</p>
+
+<h2>What else uses the style</h2>
+<ul>
+  <li>The case of keywords inserted from the list (<em>Keyword case: Follow the formatting style</em>).</li>
+  <li>The layout of inserted column lists, <code>VALUES</code>, <code>EXEC</code> parameters and the expanded <code>*</code> (see <a href="completion.html">Completion</a>).</li>
+  <li><a href="analysis.html">Fix Code Analysis Issues</a> and the other refactorings that rewrite text.</li>
+</ul>
+</main>
+</body>
+</html>

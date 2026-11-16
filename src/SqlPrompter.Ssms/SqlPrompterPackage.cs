@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 53)]
+    [ProvideMenuResource("Menus.ctmenu", 54)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -24,6 +24,7 @@ namespace SqlPrompter.Ssms
         public const int RefreshMetadataId = 0x0100;
         public const int OpenLogId = 0x0101;
         public const int CheckForUpdatesId = 0x0138;
+        public const int HelpId = 0x0139;
         public const int SettingsId = 0x011F;
         public const int FormattingStylesId = 0x0120;
         public const int EditEnvironmentsId = 0x0134;
@@ -94,6 +95,7 @@ namespace SqlPrompter.Ssms
                 commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
                 commands.AddCommand(new MenuCommand((s, e) => UpdateService.CheckNow(), new CommandID(CommandSet, CheckForUpdatesId)));
+                commands.AddCommand(new MenuCommand((s, e) => HelpLauncher.Open(), new CommandID(CommandSet, HelpId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenSettings(), new CommandID(CommandSet, SettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => FormattingStylesWindow.Open(), new CommandID(CommandSet, FormattingStylesId)));
                 FormattingStylesMenu.Register(commands, CommandSet);
@@ -691,6 +693,7 @@ namespace SqlPrompter.Ssms
                 Log.Error("Switching the suggestion list failed", ex);
             }
         }
+
 
         private void OpenLog()
         {

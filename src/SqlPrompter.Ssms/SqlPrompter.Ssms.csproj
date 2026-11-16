@@ -31,6 +31,8 @@
     <!-- Shipped inside the extension folder; also used by the Uninstall SQL Prompter command. -->
     <Content Include="Uninstall/Uninstall SQL Prompter.cmd" IncludeInVSIX="true" />
     <Content Include="Uninstall/Uninstall-SqlPrompter.ps1" IncludeInVSIX="true" />
+    <!-- The user help (docs/help) is shipped in the extension folder under help/; the Help command opens help/index.html. -->
+    <Content Include="../../docs/help/**/*" IncludeInVSIX="true" Link="help/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

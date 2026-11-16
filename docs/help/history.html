@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History and tabs - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a class="current" href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>History and tabs</h1>
+<p class="lead">Every executed query, every query tab with its versions, tabs that come back after a restart and a list of closed tabs. Everything stays on this computer.</p>
+
+<h2>Query history</h2>
+<figure>
+  <img src="images/history.png" alt="The query history tab">
+  <figcaption><b>SQL Prompter &gt; Query History...</b> (or the <b>SQL History</b> toolbar button): the list on the left, the text of the selected entry on the right.</figcaption>
+</figure>
+<p>The history holds two kinds of entries: <b>runs</b> (every executed query: the text, server, database, login and time) and <b>tabs</b> (a query tab with the versions of its text, see below). Each row has two lines: the tab name and the time on the left, the server and database on the right; a colored strip on the left shows the coloring environment of the connection.</p>
+<ul>
+  <li><b>Filter:</b> type words into the box (they are matched against the text, the tab name, the server and the database). <kbd>Enter</kbd> or a double click opens the entry in a new tab.</li>
+  <li><b>Views</b> (the icon buttons above the list): everything, executed queries, pinned runs, favourites, open tabs, closed tabs. The window always opens on <em>everything</em>; the filter combines with the view.</li>
+  <li><b>Buttons and the right-click menu:</b> <em>Open In New Tab</em> (<em>Go To Tab</em> for a tab that is still open), <em>Pin / Unpin</em>, <em>Favourite / Unfavourite</em>, <em>Make A Snippet</em> (the text goes into the <a href="snippets.html">snippet manager</a> as a draft), <em>Delete</em>, and <em>Versions</em> in the menu of a tab.</li>
+  <li><b>Pinned</b> runs are listed first and are never removed; <b>favourites</b> are kept by the cleanup like pinned runs but do not change the order.</li>
+</ul>
+<p>The history opens in a tab of the editor area (it can be docked or floated) or, with <em>Open the query history in: a separate window</em>, in a window that closes when you open something. The files are <code>%APPDATA%\SqlPrompter\history.jsonl</code> and <code>tabhistory.jsonl</code>. <em>Keep history for</em> removes entries older than that number of days when SSMS starts (0 keeps them forever).</p>
+
+<figure>
+  <img src="images/settings-history.png" alt="Settings: History and tabs" width="640">
+  <figcaption>Settings &gt; History and tabs.</figcaption>
+</figure>
+
+<h2>Tabs and their versions</h2>
+<p>With <em>Track query tabs and their versions</em> the history knows which query tabs are open and which were closed, and keeps versions of their text (also of tabs that were never run). Every few seconds (<em>Check tabs every</em>, default 5) the open tabs are checked; a version is stored once the text has stayed the same for one check, and also when a tab is saved or run, when it opens and when SSMS shuts down. Empty tabs are not stored. Beyond <em>Versions kept per tab</em> (default 50) the versions are thinned out: all of the last two hours, then one per hour, then one per day. A closed tab keeps the text of its last check. <em>Versions</em> in the right-click menu opens an older text of a tab.</p>
+
+<h2>Restore tabs at start</h2>
+<p>With <em>Restore query tabs at start</em> the open query tabs, with their text, name and connection, are saved every few seconds to <code>%APPDATA%\SqlPrompter\tabs.json</code> and opened again when SSMS starts. A password is never stored:</p>
+<ul>
+  <li>Windows authentication reconnects by itself.</li>
+  <li>A tab that used a SQL login opens unconnected with a comment naming the server and database, unless <em>Reconnect tabs that used a SQL login</em> is on. Then it is connected again with the live connection of the same server and login, or with the password SSMS itself remembered (<em>Remember Password</em> in the Connect dialog; read from SSMS in memory, never stored by SQL Prompter). If there is none, SSMS opens its Connect dialog with the server and login filled in, once per server and login.</li>
+  <li><em>Offer Remember Password in that Connect dialog</em> (off by default) ticks <em>Remember Password</em> there so SSMS keeps what you type in its own store.</li>
+  <li>The same reconnection also happens for the tab in front when the computer resumes from sleep and the tab stayed disconnected.</li>
+</ul>
+
+<h2>Reopen a closed tab</h2>
+<p><b>SQL Prompter &gt; Reopen Closed Query Tab</b> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> by default: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> is Go To File and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> is Template Explorer in SSMS, so the first free of the three is set) brings back the last closed tab with its text, name and, as in the restore, its connection. The <a href="quick-actions.html">quick actions</a> popup lists the last eight closed tabs (name or first line, server and database) to pick one. <em>Closed tabs to remember</em> (default 20) and <em>Remember a closed tab for</em> (hours, default 24; 0 keeps it until SSMS ends) limit the list; it lives until SSMS ends.</p>
+
+<h2>Rename a query tab</h2>
+<p><b>SQL Prompter &gt; Rename Query Tab...</b> (or a double click on the tab) asks for a name that replaces <code>SQLQuery3.sql</code> in the caption; SSMS still appends the server, database and login. The name survives a restart of SSMS and a reopen of the tab.</p>
+</main>
+</body>
+</html>

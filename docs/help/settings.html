@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a class="current" href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Settings</h1>
+<p class="lead">Every option of <b>SQL Prompter &gt; Settings...</b>, page by page, with its default.</p>
+
+<figure>
+  <img src="images/settings-completion.png" alt="The settings window" width="760">
+  <figcaption>The settings window: the pages on the left, the options on the right. <b>OK</b> saves and closes, <b>Apply</b> saves, <b>Cancel</b> drops the changes.</figcaption>
+</figure>
+<p>Changes apply at once; there is no restart. The file is <code>%APPDATA%\SqlPrompter\settings.json</code>; a member missing from it keeps its default and a broken file is replaced by the defaults (and logged) until the next save. The window follows the theme of SSMS.</p>
+
+<h2 id="completion">Completion</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th style="width:80px">Default</th><th>Effect</th></tr>
+  <tr><td>Enable suggestions</td><td>on</td><td>Off: SQL Prompter stays out of the way and the built-in list of SSMS is shown.</td></tr>
+  <tr><td>Show suggestions after a comma</td><td>on</td><td>The list opens after a comma and the space behind it, except in <code>VALUES</code> lists, lists of literals and <code>DECLARE</code>.</td></tr>
+  <tr><td>Show a hint for expanding *</td><td>on</td><td>The note <em>Tab: expand columns</em> under a <code>*</code> that <kbd>Tab</kbd> can expand.</td></tr>
+  <tr><td>Show a tooltip over names</td><td>on</td><td>Resting the mouse on an alias, table, view, column, variable, function or procedure says what it is.</td></tr>
+  <tr><td>Show descriptions from the database</td><td>on</td><td>Adds the <code>MS_Description</code> properties of the selected object and its columns to the description area.</td></tr>
+  <tr><td>Match initials and loose characters</td><td>on</td><td>Besides prefix and contains, the typed text may pick initials or words of a name, or its characters in order.</td></tr>
+  <tr><td>Rank by usage</td><td>on</td><td>Items you choose more often come first in their group (<code>%APPDATA%\SqlPrompter\usage.json</code>).</td></tr>
+  <tr><td>Keyword case</td><td>follow style</td><td>Case of inserted keywords, functions and data types: follow the formatting style, match what you typed, UPPER, lower.</td></tr>
+  <tr><td>Show the column picker hint</td><td>on</td><td>A line under the list that says <kbd>Ctrl</kbd>+<kbd>Left</kbd> switches to the column picker.</td></tr>
+  <tr><td>Run the list myself while typing (experimental)</td><td>off</td><td>SQL Prompter drives the list that opens while you type, instead of the editor's completion session.</td></tr>
+  <tr><td>Reset usage statistics...</td><td>-</td><td>Forgets which suggestions you chose how often.</td></tr>
+  <tr><td>Rows, Width</td><td>12, 0</td><td>Rows visible at once (4-40); width in pixels (0 = as wide as the longest item).</td></tr>
+  <tr><td>Insert the selected suggestion on: Space, Dot, Comma, Parentheses, Semicolon, Closing bracket</td><td>Space only</td><td>These keys insert the selected item and are then typed as usual. <kbd>Enter</kbd> and <kbd>Tab</kbd> always insert.</td></tr>
+</table>
+
+<h2 id="aliases">Aliases and qualification</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th style="width:80px">Default</th><th>Effect</th></tr>
+  <tr><td>Add aliases to tables</td><td>on</td><td>An alias with a table or view chosen after <code>FROM</code> or <code>JOIN</code>.</td></tr>
+  <tr><td>Include AS</td><td>on</td><td><code>AS oi</code> instead of <code>oi</code>.</td></tr>
+  <tr><td>Capitalise generated aliases</td><td>off</td><td><code>OI</code> instead of <code>oi</code>.</td></tr>
+  <tr><td>Qualify objects with schema</td><td>on</td><td>Tables and views as <code>schema.name</code>.</td></tr>
+  <tr><td>Qualify columns with alias</td><td>on</td><td>Columns as <code>alias.column</code>.</td></tr>
+  <tr><td>Custom aliases</td><td>none</td><td>Table or view and the alias to use for it.</td></tr>
+  <tr><td>Ignored prefixes</td><td>none</td><td>Prefixes dropped from a table name before the alias is generated.</td></tr>
+</table>
+
+<h2 id="inserts">Inserts and joins</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th style="width:80px">Default</th><th>Effect</th></tr>
+  <tr><td>Column list</td><td>with the table</td><td>How <code>INSERT INTO</code> gets its column list: with the table, as an extra item, or after typing <code>(</code>.</td></tr>
+  <tr><td>Layout of the lists</td><td>each on its own line</td><td>Column lists, <code>VALUES</code> and <code>EXEC</code> parameters: one line, each on its own line, or as many as fit the editor.</td></tr>
+  <tr><td>After the column list</td><td>a new line only</td><td>Or <code>VALUES</code> with a placeholder per column.</td></tr>
+  <tr><td>New table on the left</td><td>off</td><td><code>o.IdUser = u.IdUser</code> instead of <code>u.IdUser = o.IdUser</code>.</td></tr>
+  <tr><td>Foreign keys</td><td>on</td><td>Offer the condition of a foreign key.</td></tr>
+  <tr><td>Single columns of multi-column keys</td><td>on</td><td>Besides the whole condition, each column pair.</td></tr>
+  <tr><td>Columns with the same name</td><td>on</td><td>A condition for every column name both tables have.</td></tr>
+  <tr><td>Same name needs the same type</td><td>off</td><td>A name match only when both columns have the same type.</td></tr>
+</table>
+
+<h2 id="snippets">Snippets</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th>Effect</th></tr>
+  <tr><td>Snippet folder</td><td>The personal folder of snippet files; empty uses <code>%APPDATA%\SqlPrompter\Snippets</code>. <em>Browse</em> and <em>Open folder</em> help.</td></tr>
+  <tr><td>Shared snippet folders</td><td>More folders, separated by semicolons; read in addition to the personal folder (a personal snippet with the same prefix wins). Watched for changes.</td></tr>
+  <tr><td>Reset built-in snippets...</td><td>Writes the original built-in snippets (top100, upd, merge, cp, tran ...) into the folder again, also those you deleted or edited.</td></tr>
+  <tr><td>Import snippets...</td><td>Imports <code>.sqlpromptsnippet</code> files and snippet <code>.json</code> files.</td></tr>
+  <tr><td>Edit snippets...</td><td>Opens the snippet manager.</td></tr>
+</table>
+
+<h2 id="analysis">Code analysis</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th>Effect</th></tr>
+  <tr><td>Mark problems in the editor (default on)</td><td>Squiggles: orange for warnings, gray for hints.</td></tr>
+  <tr><td>Filter, Enable all rules, Disable all rules</td><td>Find a rule by words; switch every rule on or off.</td></tr>
+  <tr><td>Each category: Enable all / Disable all, and a check box per rule</td><td>100 rules in seven categories, each with its code, description, severity and default (see <a href="analysis.html">Code analysis</a>).</td></tr>
+</table>
+
+<h2 id="formatting">Formatting</h2>
+<p>Shows the active style. <b>Edit formatting styles...</b> opens the <a href="formatting.html">styles window</a> (the settings are applied first); <b>Import a SQL Prompt style...</b> adds a style exported from SQL Prompt and makes it active.</p>
+
+<h2 id="coloring">Coloring</h2>
+<p>The master switch, the colored parts, the tab color style and the table of rules and environments; see <a href="coloring.html">Coloring and confirmations</a>.</p>
+
+<h2 id="history">History and tabs</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th style="width:80px">Default</th><th>Effect</th></tr>
+  <tr><td>Keep query history</td><td>on</td><td>Every executed query is written to <code>history.jsonl</code>.</td></tr>
+  <tr><td>Open the query history in</td><td>a tab</td><td>A tab of the editor area, or a separate window.</td></tr>
+  <tr><td>Keep history for</td><td>0 days</td><td>Older history is removed when SSMS starts; 0 keeps it forever.</td></tr>
+  <tr><td>Track query tabs and their versions</td><td>on</td><td>Tabs and versions of their text in <code>tabhistory.jsonl</code>. Needs <em>Keep query history</em>.</td></tr>
+  <tr><td>Check tabs every</td><td>5 s</td><td>How often the open tabs are checked for a change (1-300).</td></tr>
+  <tr><td>Versions kept per tab</td><td>50</td><td>The newest are kept; older ones thinned to one per hour, then one per day (2-500).</td></tr>
+  <tr><td>Closed tabs to remember</td><td>20</td><td>How many closed tabs can be reopened (1-200).</td></tr>
+  <tr><td>Remember a closed tab for</td><td>24 h</td><td>0 keeps it until SSMS ends.</td></tr>
+  <tr><td>Restore query tabs at start</td><td>on</td><td>Open tabs are saved to <code>tabs.json</code> and opened again at the next start.</td></tr>
+  <tr><td>Reconnect tabs that used a SQL login</td><td>on</td><td>With a live connection or a password SSMS remembered; otherwise SSMS opens its Connect dialog once per server and login.</td></tr>
+  <tr><td>Offer Remember Password in that Connect dialog</td><td>off</td><td>Ticks <em>Remember Password</em> there. SQL Prompter never stores a password.</td></tr>
+</table>
+
+<h2 id="warnings">Warnings</h2>
+<p>Three confirmations, all on by default: <em>Warn about DELETE without WHERE</em>, <em>Warn about UPDATE without WHERE</em>, <em>Warn about an open transaction</em>. See <a href="coloring.html#confirmations">Coloring and confirmations</a>; the per-rule <em>Ask before changes</em> is in the Coloring table.</p>
+
+<h2 id="editor">Editor helpers</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th style="width:80px">Default</th><th>Effect</th></tr>
+  <tr><td>Auto-close: Single quote, Parenthesis, Square bracket, Block comment</td><td>on</td><td>Each pair separately.</td></tr>
+  <tr><td>Quick actions on a tap of Ctrl</td><td>on</td><td>A tap of <kbd>Ctrl</kbd> on its own opens the <a href="quick-actions.html">quick actions</a>.</td></tr>
+  <tr><td>Highlight matching names</td><td>on</td><td>Other occurrences of the name under the caret.</td></tr>
+  <tr><td>Highlight matching keywords of a block</td><td>on</td><td><code>BEGIN</code> / <code>END</code>, <code>CASE</code> / <code>END</code> and so on.</td></tr>
+</table>
+
+<h2 id="updates">Updates</h2>
+<table>
+  <tr><th style="width:310px">Option</th><th style="width:80px">Default</th><th>Effect</th></tr>
+  <tr><td>Check for a new version</td><td>on</td><td>Once a day, a little after SSMS starts, one anonymous HTTPS request to <code>api.github.com</code> for the latest release of the repository. It sends nothing about you, your computer or your queries; it runs in the background and an error or missing network is ignored. A newer version opens a window; nothing is installed without your click. <b>SQL Prompter &gt; Check for Updates</b> checks at any time, whatever this option says.</td></tr>
+</table>
+<p>The choices you make in that window (a skipped version, a postponed day, the day of the last check) are stored in the settings file.</p>
+
+<h2 id="import-export">Import / Export</h2>
+<table>
+  <tr><th style="width:310px">Button</th><th>Effect</th></tr>
+  <tr><td>Export settings...</td><td>Saves the settings file (<code>.json</code>). Unsaved changes in the window are not included; press <b>Apply</b> first.</td></tr>
+  <tr><td>Import settings...</td><td>Reads a SQL Prompter <code>.json</code> or a SQL Prompt <code>.settings</code> file and applies what this extension supports (a report lists what was and was not applied). Unsaved changes in the window are dropped. From SQL Prompt it takes suggestions on/off, commit keys, alias options and custom aliases (Enter and Tab always insert here).</td></tr>
+</table>
+</main>
+</body>
+</html>

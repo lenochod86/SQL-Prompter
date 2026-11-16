@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick actions and navigation - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a class="current" href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Quick actions and navigation</h1>
+<p class="lead">One popup for every command, and the commands that take you to an object, a line of database code or what depends on it.</p>
+
+<h2>Quick actions popup</h2>
+<figure>
+  <img src="images/quick-actions.png" alt="The quick actions popup" width="800">
+  <figcaption>Press and release <kbd>Ctrl</kbd> on its own: the popup opens under the caret line at the left edge of the editor.</figcaption>
+</figure>
+<ul>
+  <li><b>Open:</b> tap <kbd>Ctrl</kbd> (press and release it without any other key or the mouse in between). <kbd>Ctrl</kbd> used together with another key or the mouse does not open it, so <kbd>Ctrl</kbd>+<kbd>C</kbd>, <kbd>Ctrl</kbd>+<kbd>Space</kbd> and the other shortcuts are not affected. The option <em>Quick actions on a tap of Ctrl</em> turns the tap off.</li>
+  <li><b>Contents:</b> the actions of the SQL Prompter menu that fit the situation (the ones for a selection when there is one, the ones for the whole script otherwise) and the snippets that fit, each with a one-line description. It also has <b>Script Outline</b>.</li>
+  <li><b>Use:</b> type to filter (every typed word must be in the name or the description), <kbd>Up</kbd> / <kbd>Down</kbd> to move, <kbd>Enter</kbd> runs the item, <kbd>Esc</kbd>, a second tap of <kbd>Ctrl</kbd> or a click outside closes it. It opens on the monitor of the caret.</li>
+</ul>
+
+<h3>Script Outline</h3>
+<p>Lists the structure of the script: batches (<code>GO</code>), statements (the first line), variables of <code>DECLARE</code>, temporary tables (created or dropped), CTE names and the header of a procedure, function, view or trigger. Typing filters, <kbd>Enter</kbd> moves the caret to that place and centers the line. Unfinished code gives a shorter outline and never fails.</p>
+
+<h2>Quick Open Object</h2>
+<figure>
+  <img src="images/quick-open.png" alt="Quick open" width="800">
+  <figcaption><b>SQL Prompter &gt; Quick Open Object</b>: <code>ord</code> finds the tables, the view and the procedure.</figcaption>
+</figure>
+<p>Searches the tables, views, functions, synonyms, procedures and triggers of the loaded metadata (system objects are not listed). Matching is as loose as in completion: prefixes, initials, words, characters in order; a dot in the text matches the full <code>schema.name</code>. At most 200 results, ordered by the kind of match and the name. <kbd>Enter</kbd> opens the script of the object in a new window; <kbd>Shift</kbd>+<kbd>Enter</kbd> inserts <code>schema.name</code> at the caret. It uses only the cached metadata, so it opens at once and says in the status bar when the metadata is not loaded yet.</p>
+
+<h2>Find In Database Code</h2>
+<figure>
+  <img src="images/find-in-code.png" alt="Find in database code" width="800">
+  <figcaption><b>SQL Prompter &gt; Find In Database Code</b>: the lines of procedures, functions, views and triggers that contain <code>IdCustomer</code>.</figcaption>
+</figure>
+<p>Searches the text of the procedures, functions, views and triggers of the database (those not shipped by Microsoft) for the selection, or for the word at the caret as a whole word. It runs in the background (60 seconds at most) and reports the counts in the status bar, including modules whose text is encrypted. Each result is a line with its number in the script of the object; <kbd>Enter</kbd> opens the object in a new window and puts the caret on that line.</p>
+
+<h2>Show Dependencies</h2>
+<p>Takes the object at the caret and lists <b>Uses</b> (what the object references) and <b>Used by</b> (what references it), with the kind of each, from <code>sys.sql_expression_dependencies</code>. <kbd>Enter</kbd> opens the script of an object of the same database; for an object of another database the status bar says so.</p>
+
+<h2>Go To Definition and Object Explorer</h2>
+<ul>
+  <li><b>Go To Definition</b> (<kbd>F12</kbd>) reads the dotted name around the caret (up to three parts), resolves an alias, or a table name used as a column qualifier, to its table and opens the script of the object in a new window: a table as <code>CREATE TABLE</code>, a view, function, procedure or trigger as <code>CREATE OR ALTER</code>. Names on a linked server are not followed.</li>
+  <li>The new window is on the same connection and its tab is named after the object, with a number when the name is already open.</li>
+  <li><b>Show In Object Explorer</b> (<kbd>Ctrl</kbd>+<kbd>F12</kbd>) selects the object at the caret in Object Explorer.</li>
+</ul>
+<p>The keys are set once when the extension is first installed, and only when they are free; if a key does not work, bind the command in <b>Tools &gt; Options &gt; Environment &gt; Keyboard</b> (the command names start with <code>SQLPrompter.</code>).</p>
+
+<h2>The same popup in the dark theme</h2>
+<figure>
+  <img src="images/dark-quick-actions.png" alt="Quick actions in the dark theme" width="800">
+</figure>
+</main>
+</body>
+</html>
