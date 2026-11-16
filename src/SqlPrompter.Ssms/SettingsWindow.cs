@@ -312,6 +312,12 @@ namespace SqlPrompter.Ssms
             editor.Check("Highlight matching keywords of a block", "Highlights the keywords that belong together with the keyword at the caret: BEGIN and END, BEGIN TRY / END TRY with BEGIN CATCH / END CATCH, BEGIN TRAN with COMMIT or ROLLBACK, CASE with WHEN, THEN, ELSE and END, IF with ELSE, WHILE with its block. Nothing is highlighted across a GO line or in unbalanced code.",
                 () => work.Behavior.HighlightBlockKeywords, v => work.Behavior.HighlightBlockKeywords = v);
 
+            var updates = Add("Updates", "SQL Prompter can tell you when a new version is released.");
+            updates.Check("Check for a new version", "Once a day, a little after SSMS starts, SQL Prompter asks GitHub (api.github.com) for the latest release of the repository: one anonymous HTTPS request that sends nothing about you, your computer or your queries, " +
+                "made in the background (an error or no network is ignored). When a newer version exists a window offers to install it, remind you tomorrow or skip that version. Nothing is installed without your click. " +
+                "You can check at any time with SQL Prompter > Check for Updates.",
+                () => work.Updates.CheckForUpdates, v => work.Updates.CheckForUpdates = v);
+
             var files = Add("Import / Export", "Move the settings to another computer or take over the settings of SQL Prompt.");
             files.Button("Export settings...", () => SettingsFiles.Export(this), "Saves the settings file (SQL Prompter .json). Unsaved changes in this window are not included; press Apply first.");
             files.Button("Import settings...", () => { if (SettingsFiles.Import(this)) { Imported(); } }, "Reads a SQL Prompter .json or a SQL Prompt .settings file and applies what this extension supports. Unsaved changes in this window are dropped.");

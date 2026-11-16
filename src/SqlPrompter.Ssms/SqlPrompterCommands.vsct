@@ -410,6 +410,12 @@
           <ButtonText>Run And Roll Back (Dry Run)</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCheckForUpdates" priority="0x00F8" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+        <Strings>
+          <ButtonText>Check for Updates</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
         <Strings>
@@ -492,6 +498,7 @@
       <IDSymbol name="cmdidFormattingStyles" value="0x0120" />
       <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
       <IDSymbol name="cmdidOpenLog" value="0x0101" />
+      <IDSymbol name="cmdidCheckForUpdates" value="0x0138" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>
