@@ -45,6 +45,9 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "analysis")]
         public AnalysisSettings Analysis { get; set; }
 
+        [DataMember(Name = "updates")]
+        public UpdateSettings Updates { get; set; }
+
         /// <summary>The active formatting style (what Format Document and the inserted lists use). It is always a copy of the active named style.</summary>
         [DataMember(Name = "formatting")]
         public FormatStyle Formatting { get; set; }
@@ -57,7 +60,7 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "activeFormattingStyle")]
         public string ActiveFormattingStyle { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone(), Analysis = Analysis.Clone(), Formatting = Formatting.Clone(), FormattingStyles = (FormattingStyles ?? new List<NamedFormatStyle>()).Select(s => s.Clone()).ToList(), ActiveFormattingStyle = ActiveFormattingStyle };
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone(), Analysis = Analysis.Clone(), Updates = Updates.Clone(), Formatting = Formatting.Clone(), FormattingStyles = (FormattingStyles ?? new List<NamedFormatStyle>()).Select(s => s.Clone()).ToList(), ActiveFormattingStyle = ActiveFormattingStyle };
 
         public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
             new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins, null, Inserts, new SqlPrompter.Core.Completion.EditorLayout { Style = Formatting });
@@ -86,6 +89,7 @@ namespace SqlPrompter.Core.Settings
             Snippets = Snippets ?? new SnippetSettings();
             Coloring = Coloring ?? new ColorSettings();
             Analysis = Analysis ?? new AnalysisSettings();
+            Updates = Updates ?? new UpdateSettings();
             Formatting = Formatting ?? new FormatStyle();
             EnsureStyles();
         }
@@ -148,6 +152,7 @@ namespace SqlPrompter.Core.Settings
             Snippets = new SnippetSettings();
             Coloring = new ColorSettings();
             Analysis = new AnalysisSettings();
+            Updates = new UpdateSettings();
             Formatting = new FormatStyle();
             // Empty on purpose: a file from before the styles has only 'formatting', which EnsureStyles turns into the first style.
             FormattingStyles = new List<NamedFormatStyle>();
