@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Completion - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a class="current" href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Completion</h1>
+<p class="lead">The suggestion list, its keys, how it filters and what it shows next to the items.</p>
+
+<figure>
+  <img src="images/completion-tables.png" alt="The list after FROM">
+  <figcaption>The list after <code>FROM</code>: tables and views with their schema on the right, the script of the selected object in the description area.</figcaption>
+</figure>
+
+<h2>When the list opens</h2>
+<ul>
+  <li>While you type a name, a keyword or after a dot.</li>
+  <li>After a space that follows <code>FROM</code>, <code>JOIN</code> and the other keywords that expect a table.</li>
+  <li>After a comma and the space behind it (<em>Show suggestions after a comma</em>), except in <code>VALUES</code> lists, lists of literals and <code>DECLARE</code>.</li>
+  <li>On demand with <kbd>Ctrl</kbd>+<kbd>Space</kbd> (<b>SQL Prompter &gt; Show Suggestions</b>). This list is the one SQL Prompter itself drives.</li>
+</ul>
+<p>The list is offered everywhere except inside strings, comments and numbers. In a place where the extension knows the context it offers what fits there; where it does not (for example after <code>EXEC</code>, in <code>VALUES</code>) it offers keywords, functions and data types, and for a new name (an alias after <code>AS</code>, a <code>@variable</code> or <code>#table</code> being declared) it offers nothing.</p>
+
+<h2>What the items are</h2>
+<table>
+  <tr><th style="width:190px">Item</th><th>Notes</th></tr>
+  <tr><td>Schemas, databases</td><td>After <code>FROM</code> and similar places; <code>Db.</code> and <code>Db.schema.</code> list the objects of another database, a linked server name lists its databases (<a href="aliases-joins.html#names">more</a>).</td></tr>
+  <tr><td>Tables, views, synonyms</td><td>Shown as <code>Name</code> with the schema on the right. A synonym takes its columns from the object it points to.</td></tr>
+  <tr><td>Columns</td><td>With the data type and nullability. A key icon marks a primary key, a second one a foreign key. After <code>alias.</code> the columns of that source; elsewhere the columns of all tables in the query, qualified when the name is ambiguous.</td></tr>
+  <tr><td>Functions, procedures</td><td>Table-valued and scalar user functions, procedures after <code>EXEC</code>, including the system procedures.</td></tr>
+  <tr><td>Keywords, built-in functions, data types</td><td>Inserted in the case set by <em>Keyword case</em>.</td></tr>
+  <tr><td>Snippets</td><td>Marked <em>snippet</em>; see <a href="snippets.html">Snippets</a>.</td></tr>
+  <tr><td>Join and ON conditions</td><td>Whole conditions from foreign keys; see <a href="aliases-joins.html#joins">joins</a>.</td></tr>
+</table>
+
+<figure>
+  <img src="images/completion-columns.png" alt="Columns of an alias">
+  <figcaption>Columns of <code>c</code> with types; the key icons mark the primary key <code>IdCustomer</code> and the foreign key <code>IdCity</code>.</figcaption>
+</figure>
+
+<h2>Filtering</h2>
+<p>The typed text filters the list as you type. Matches are ordered: exact, then prefix, then the rest; inside a group by how often you chose the item (below), then alphabetically.</p>
+<ul>
+  <li><b>Prefix and contains:</b> <code>cust</code> finds <code>Customers</code>, <code>mers</code> finds it too.</li>
+  <li><b>Initials and words</b> (<em>Match initials and loose characters</em>): <code>BKT</code> finds <code>BurzaKlientTyp</code>, <code>kt</code> finds <code>Burza_Klient_Typ</code>.</li>
+  <li><b>Characters in order:</b> <code>bzkl</code> finds the same name.</li>
+</ul>
+<p>Exact and prefix matches stay first and loose matches come last, so loose matching never pushes a normal match down. <b>Rank by usage</b> puts items you choose more often first inside their group; the counts are per database and local (<code>%APPDATA%\SqlPrompter\usage.json</code>). <em>Reset usage statistics</em> in the settings forgets them.</p>
+
+<h2>Keys in the list</h2>
+<table>
+  <tr><th style="width:230px">Key</th><th>Action</th></tr>
+  <tr><td><kbd>Tab</kbd>, <kbd>Enter</kbd></td><td>Insert the selected item.</td></tr>
+  <tr><td>Commit keys: <kbd>Space</kbd>, <kbd>.</kbd>, <kbd>,</kbd>, <kbd>(</kbd> <kbd>)</kbd>, <kbd>;</kbd>, <kbd>]</kbd></td><td>Insert the selected item and are then typed as usual. Each is a setting; by default only Space is on. A dot, comma, parenthesis, semicolon, <code>]</code> or operator that is not a commit key only closes the list and is typed, so <code>e.</code> keeps <code>e</code> and opens its columns.</td></tr>
+  <tr><td><kbd>Up</kbd>, <kbd>Down</kbd>, <kbd>PgUp</kbd>, <kbd>PgDn</kbd></td><td>Move the selection.</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Close the list.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Left</kbd> / <kbd>Right</kbd></td><td>Switch to the column picker and back (below). Elsewhere these keys keep their normal meaning.</td></tr>
+</table>
+<div class="note"><b>Soft selection.</b> Where you probably type a name of your own (the alias after a table, a new name) the first item is selected only softly: <kbd>Tab</kbd> inserts it, <kbd>Enter</kbd> keeps what you typed and starts a new line.</div>
+<p>Drag the triangle in the bottom-right corner of the list to resize it; the size is kept. The numbers are also in the settings (<em>Rows</em>, <em>Width</em>).</p>
+
+<h2>Description area</h2>
+<p>Next to the list, the selected item is described: the signature of a function or procedure, the type of a column and, for a table, view, function or procedure, its script (the first 28 lines: a table as <code>CREATE TABLE</code>, the others as <code>CREATE OR ALTER</code>) with the buttons <b>Script</b> and <b>Summary</b>. The script is loaded in the background after a short pause and kept for two minutes.</p>
+<p><em>Show descriptions from the database</em> adds the <code>MS_Description</code> extended properties of the object and its columns when there are any.</p>
+
+<h2>Column picker</h2>
+<p>At the start of an item in a select list, <code>GROUP BY</code> or <code>ORDER BY</code>, <kbd>Ctrl</kbd>+<kbd>Left</kbd> turns the list into a picker: columns grouped by source with check boxes. <kbd>Space</kbd> checks a column, <kbd>Tab</kbd> or <kbd>Enter</kbd> inserts the checked ones (the selected one when none is checked), laid out by the active <a href="formatting.html">formatting style</a>. Typing filters. The bar under the list has <em>Select All</em> and <em>List in table order</em>; in <code>GROUP BY</code> there is also an entry that inserts all non-aggregated columns of the select list. <kbd>Ctrl</kbd>+<kbd>Right</kbd> goes back to all suggestions.</p>
+
+<h2>Expanding *</h2>
+<figure>
+  <img src="images/star-hint.png" alt="Hint Tab: expand columns">
+  <figcaption>With the caret right behind a <code>*</code> the hint says <em>Tab: expand columns</em>.</figcaption>
+</figure>
+<p><kbd>Tab</kbd> right after the <code>*</code> of a select list (or after <code>alias.*</code>) replaces it with the columns, one per line, qualified with the alias (or with the table name when the query has several tables and this table has no alias). Without a result (columns not loaded, <code>*</code> in <code>COUNT(*)</code> or a product) <kbd>Tab</kbd> works as usual. <b>SQL Prompter &gt; Refactor &gt; Expand All Select Stars</b> does it for the whole script.</p>
+
+<h2>Columns without a FROM</h2>
+<p>After <code>SELECT</code> without a <code>FROM</code>, typing the start of a column name offers matching columns of all tables and views (the table in the suffix, at most 2000, nothing before the first character). Choosing one inserts it as <code>alias.Column</code> and adds <code>FROM schema.Table AS alias</code> after the select list.</p>
+
+<h2 id="parameter-info">Parameter info</h2>
+<figure>
+  <img src="images/parameter-info.png" alt="Parameter info over the caret line">
+  <figcaption>Parameter info for <code>EXEC sales.GetOrdersOfCustomer</code>: the current parameter is in bold.</figcaption>
+</figure>
+<p>Typing <code>(</code> or <code>,</code> in a call of a function of the database, or a space after <code>EXEC procedure</code>, shows the signature above the caret line with the current parameter in bold. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> (<b>Parameter Info</b>) shows it on demand. It follows the caret and closes when the caret leaves the call or on <kbd>Esc</kbd>. Functions of the database and procedures are covered; built-in functions are not.</p>
+
+<h2>Tooltip over names</h2>
+<p>Resting the mouse on an alias, table, view, column, variable, function or procedure says what it is: the type, the columns, the parameters, and, when available, the description and a part of the script. It uses the loaded metadata (<em>Show a tooltip over names</em>).</p>
+
+<h2 id="metadata">Metadata and when it refreshes</h2>
+<ul>
+  <li>Metadata, including columns, starts loading when a query window is activated and is kept per database; <code>USE Sales</code> on a line of its own makes completion follow that database from there on, also across <code>GO</code>.</li>
+  <li>After a script that creates, alters or drops objects (or uses <code>sp_rename</code>, <code>SELECT ... INTO</code>) runs, the metadata of the database is refreshed within a few seconds. Other changes are noticed at most 30 seconds later.</li>
+  <li><b>SQL Prompter &gt; Refresh Metadata</b> reloads at once.</li>
+</ul>
+
+<h2>Keyword case</h2>
+<p><em>Keyword case</em> sets the case of inserted keywords, built-in functions and data types: follow the casing options of the active formatting style, match what you typed (upper case, or lower case when you started in lower case), always upper or always lower.</p>
+
+<h2>Turning it off</h2>
+<p><em>Enable suggestions</em> off makes SQL Prompter stay out of the way and the built-in SSMS list is shown. <em>Run the list myself while typing</em> (experimental, off by default) lets SQL Prompter drive the list that opens while you type, the same one as <kbd>Ctrl</kbd>+<kbd>Space</kbd>, instead of the editor's completion session; turn it on if you want one list behavior everywhere.</p>
+</main>
+</body>
+</html>

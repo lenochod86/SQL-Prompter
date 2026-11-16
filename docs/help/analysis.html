@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code analysis and fixes - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a class="current" href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Code analysis and fixes</h1>
+<p class="lead">Squiggles for suspicious code, one-click repairs and the refactoring commands that rewrite a script.</p>
+
+<h2>Squiggles</h2>
+<figure>
+  <img src="images/analysis.png" alt="A squiggle and its tooltip">
+  <figcaption><code>= NULL</code> is underlined; resting the mouse on it shows what is wrong.</figcaption>
+</figure>
+<p>A background check runs a moment after you stop typing and underlines problems with a wavy line: orange for warnings, gray for hints. The tooltip says what is wrong. Rules that need the database (for example an unqualified column or a missing schema) use the loaded metadata and stay quiet while it is not loaded. <em>Mark problems in the editor</em> turns the whole analysis off.</p>
+
+<h2 id="quick-fixes">Quick fixes</h2>
+<figure>
+  <img src="images/analysis-fix.png" alt="The light bulb menu">
+  <figcaption>The light bulb in the margin offers the repair of the issue under the caret and <em>Fix all code analysis issues in the script</em>.</figcaption>
+</figure>
+<p>When the caret is on an issue that has a repair, a light bulb appears in the margin (<kbd>Ctrl</kbd>+<kbd>.</kbd> opens its menu). A repair is made only for the plain shapes it understands; otherwise the issue has only its message. <b>SQL Prompter &gt; Refactor &gt; Fix Code Analysis Issues</b> applies every repair in the script at once. Repairs include <code>= NULL</code> to <code>IS NULL</code>, <code>@@IDENTITY</code> to <code>SCOPE_IDENTITY()</code>, a type without a length, <code>TOP</code> without <code>ORDER BY</code>, <code>NOT IN (subquery)</code>, an old-style join, and, with metadata loaded, missing schemas.</p>
+
+<h2>The rules</h2>
+<figure>
+  <img src="images/settings-analysis.png" alt="Settings: Code analysis" width="640">
+  <figcaption>Settings &gt; Code analysis: a filter box, the switches for all rules and for each category, and one check box per rule with its description, severity and default.</figcaption>
+</figure>
+<p>The catalog has 100 rules in seven categories. Each rule has a code, a severity (warning or hint) and a default (on or off). The settings page lists them with a filter box and <b>Enable all</b> / <b>Disable all</b> for everything and for each category.</p>
+<table>
+  <tr><th style="width:220px">Category (code prefix)</th><th>Examples</th></tr>
+  <tr><td>Best practice (BP, SP)</td><td>BP004 <code>INSERT</code> without a column list; BP005 asterisk in the select list; BP006 <code>TOP</code> without <code>ORDER BY</code>; BP010 <code>@@IDENTITY</code>; BP011 <code>NULL</code> in a comparison; BP017 / BP018 <code>DELETE</code> / <code>UPDATE</code> without <code>WHERE</code>; SP001 <code>JOIN</code> without <code>ON</code>.</td></tr>
+  <tr><td>Deprecated syntax (DEP)</td><td>DEP001 table hint without <code>WITH</code>; <code>GROUP BY ALL</code>; <code>SETUSER</code>; <code>WRITETEXT</code> and its relatives; <code>TAPE</code> backup devices.</td></tr>
+  <tr><td>Execution (EI)</td><td>Mistakes that fail or misbehave when the script runs: <code>FETCH</code>, <code>CLOSE</code> and <code>DEALLOCATE</code> of an undefined or unopened cursor, a non-scalar subquery used as a scalar, a procedure name that starts with <code>sp_</code>, <code>ISNUMERIC()</code>, <code>ORDER BY</code> in a view, a <code>NOT NULL</code> column added without a default.</td></tr>
+  <tr><td>Miscellaneous (MI)</td><td>Unused table variables, temporary tables, variables and parameters; unqualified columns; <code>WAITFOR</code>.</td></tr>
+  <tr><td>Performance (PE)</td><td>Missing schema names; <code>SELECT INTO</code>; index, join, table and query hints; <code>SET NOCOUNT OFF</code>; <code>COUNT</code> instead of <code>EXISTS</code>; cursor options; <code>IN (subquery)</code>.</td></tr>
+  <tr><td>Script (SC)</td><td>TODO / BUG comments, a procedure that grants itself permissions, line endings that are not CR LF.</td></tr>
+  <tr><td>Style (ST)</td><td>Old-style join (<code>FROM a, b</code>), old-style alias with <code>=</code>, <code>!=</code>, tables without an alias, <code>EXEC proc 1, 2</code> without parameter names.</td></tr>
+</table>
+
+<h2 id="refactor-menu">Refactor menu</h2>
+<p>These commands rewrite the whole script (or the selection, where it makes sense); each is one undo step. They are in <b>SQL Prompter &gt; Refactor</b> and in the <a href="quick-actions.html">quick actions</a> popup.</p>
+<table>
+  <tr><th style="width:290px">Command</th><th>What it does</th></tr>
+  <tr><td>Qualify Object Names</td><td>Adds the schema to single-part names (<a href="aliases-joins.html#aliases">details</a>).</td></tr>
+  <tr><td>Expand All Select Stars</td><td>Replaces every <code>*</code> with the columns.</td></tr>
+  <tr><td>Remove Square Brackets</td><td>Removes the brackets that are not needed.</td></tr>
+  <tr><td>Insert Semicolons</td><td>Ends the statements with a semicolon.</td></tr>
+  <tr><td>Remove Unused Variables</td><td>Removes <code>DECLARE</code>s that nothing uses.</td></tr>
+  <tr><td>Add N Prefix To Strings</td><td>Turns <code>'text'</code> into <code>N'text'</code>.</td></tr>
+  <tr><td>Add AS To Aliases / Remove AS From Aliases</td><td>Changes the style of aliases.</td></tr>
+  <tr><td>Add Commas To Selected Lines</td><td>Every selected line with text except the last gets a comma.</td></tr>
+  <tr><td>Add Quotes And Commas To Selected Lines</td><td>Each line becomes <code>'text'</code> (quotes doubled), with a comma except on the last line.</td></tr>
+  <tr><td>Script Summary</td><td>Opens a new window on the same connection with a block comment that summarizes the script: batches, statements by kind, objects read, changed, executed, created and dropped, temporary tables and variables.</td></tr>
+  <tr><td>Fix Code Analysis Issues</td><td>Applies all repairs (above).</td></tr>
+  <tr><td>Preview UPDATE/DELETE As SELECT, Run And Roll Back (Dry Run)</td><td>See <a href="tools.html#preview">Editor and grid tools</a>.</td></tr>
+</table>
+</main>
+</body>
+</html>

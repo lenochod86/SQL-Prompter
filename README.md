@@ -4,6 +4,8 @@ Custom IntelliSense for the SQL editor in SQL Server Management Studio 22. The d
 
 **Status:** MVP. Runs in SSMS 22.11; unit tests pass.
 
+**Help:** [docs/help/index.html](docs/help/index.html) is the user help (what each feature does, settings, commands and keys). It ships inside the VSIX and opens from **SQL Prompter > Help**.
+
 ## Structure
 
 | Folder | Contents |

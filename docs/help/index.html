@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a class="current" href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>SQL Prompter</h1>
+<p class="lead">IntelliSense and editing tools for the query editor of SQL Server Management Studio 22. This is a reference: what each feature does, where it is configured and which keys it uses.</p>
+
+<p>The help describes the extension as built (VSIX 0.200.x) and was checked against SSMS 22.11. Screenshots are taken in the <em>Cool Breeze</em> theme; every window follows the theme of SSMS, so it looks the same in the dark and the other themes (<a href="#dark">examples below</a>).</p>
+
+<figure>
+  <img src="images/menu.png" alt="The SQL Prompter menu" width="560">
+  <figcaption>The <b>SQL Prompter</b> menu. It is under <b>Extensions</b> until you move it to the menu bar with <b>Extensions &gt; Customize Menu</b>. Every command is also reachable from the quick actions popup (<a href="quick-actions.html">Ctrl tap</a>).</figcaption>
+</figure>
+
+<h2>What it does</h2>
+<table>
+  <tr><th style="width:230px">Area</th><th>Summary</th></tr>
+  <tr><td><a href="completion.html">Completion</a></td><td>One suggestion list for the whole script, driven by the metadata of the connected database: tables, views, columns, functions, procedures, keywords, parameters. Loose matching, ranking by use, descriptions, scripts of objects, column picker, parameter info, tooltips.</td></tr>
+  <tr><td><a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a></td><td>Aliases for tables, qualified columns, JOIN conditions from foreign keys, INSERT with a column list, EXEC with its parameters, cross-database and linked-server names.</td></tr>
+  <tr><td><a href="snippets.html">Snippets</a></td><td>Prefix snippets with fields, shared folders, a manager window, wrapping the selection; compatible with the snippet files of SQL Prompt.</td></tr>
+  <tr><td><a href="formatting.html">Formatting</a></td><td>Format Document and Format Selection with named styles, an editor with a live preview, import of SQL Prompt styles.</td></tr>
+  <tr><td><a href="coloring.html">Coloring and confirmations</a></td><td>Tab, frame and status bar colored by server and database; confirmations before changes and open transactions.</td></tr>
+  <tr><td><a href="analysis.html">Code analysis and fixes</a></td><td>Squiggles for suspicious code from a catalog of rules, quick fixes, refactorings.</td></tr>
+  <tr><td><a href="quick-actions.html">Quick actions and navigation</a></td><td>The Ctrl tap popup, quick open, find in database code, dependencies, outline, Go To Definition.</td></tr>
+  <tr><td><a href="history.html">History and tabs</a></td><td>Query history and the history of tabs with their versions, restore of tabs at start, reopen a closed tab, rename a tab.</td></tr>
+  <tr><td><a href="tools.html">Editor and grid tools</a></td><td>Run a statement, dry run, preview, auto-close, highlighting, copy the grid in several formats, Open in Excel.</td></tr>
+</table>
+
+<h2>Principles</h2>
+<ul>
+  <li><b>Metadata only.</b> The extension reads <code>sys.*</code> views of the connected database in the background and never waits for the database while you type. Right after connecting, tables and columns may be missing for a moment.</li>
+  <li><b>Local.</b> Settings, snippets, history and statistics stay in <code>%APPDATA%\SqlPrompter</code>; the log is <code>%LOCALAPPDATA%\SqlPrompter\sqlprompter.log</code> and never holds passwords or script text. There is no telemetry. The only network access is the optional <a href="settings.html#updates">daily check for a new version</a>.</li>
+  <li><b>Our list everywhere.</b> The list comes from SQL Prompter everywhere except in strings, comments and numbers. Where it knows nothing it offers an empty list or keywords. The built-in IntelliSense of SSMS stays on for error underlining and quick info, but its list is not shown.</li>
+  <li><b>Windows authentication and SQL logins.</b> Windows and SQL authentication give full metadata. A window signed in with Microsoft Entra ID gets keywords and functions only.</li>
+</ul>
+
+<h2 id="dark">The same windows in the dark theme</h2>
+<figure>
+  <img src="images/dark-completion-join.png" alt="JOIN suggestions in the dark theme">
+  <figcaption>JOIN suggestions in the dark theme.</figcaption>
+</figure>
+<figure>
+  <img src="images/dark-quick-actions.png" alt="Quick actions popup in the dark theme" width="760">
+  <figcaption>The quick actions popup in the dark theme.</figcaption>
+</figure>
+
+<h2>Where to start</h2>
+<ul>
+  <li>Type in a query window; the list opens by itself. <kbd>Ctrl</kbd>+<kbd>Space</kbd> opens it anywhere.</li>
+  <li>Press and release <kbd>Ctrl</kbd> on its own to open <a href="quick-actions.html">quick actions</a>.</li>
+  <li>Open <b>SQL Prompter &gt; Settings...</b> for every option, described option by option in <a href="settings.html">Settings</a>.</li>
+  <li>All commands and keys are in <a href="commands.html">Commands and keys</a>; the log, versions and limits are in <a href="troubleshooting.html">Troubleshooting</a>.</li>
+</ul>
+</main>
+</body>
+</html>

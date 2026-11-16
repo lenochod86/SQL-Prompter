@@ -1,0 +1,36 @@
+:root {
+  --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --line: #d1d9e0; --accent: #0b5cad;
+  --code-bg: #f3f5f7; --nav-bg: #f6f8fa; --note-bg: #eef5fc; --note-line: #9ec5ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1d21; --fg: #dde1e6; --muted: #9aa4af; --line: #3a3f46; --accent: #6cb2f5;
+    --code-bg: #262a30; --nav-bg: #212429; --note-bg: #20303f; --note-line: #3f6a94;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 "Segoe UI", system-ui, sans-serif; display: flex; min-height: 100vh; }
+nav { width: 230px; flex: none; background: var(--nav-bg); border-right: 1px solid var(--line); padding: 20px 14px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+nav .brand { font-weight: 600; font-size: 16px; margin: 0 8px 14px; }
+nav a { display: block; padding: 4px 8px; border-radius: 4px; color: var(--fg); text-decoration: none; }
+nav a:hover { background: var(--line); }
+nav a.current { background: var(--accent); color: #fff; }
+main { max-width: 900px; padding: 28px 40px 60px; min-width: 0; }
+h1 { font-size: 26px; margin: 0 0 6px; }
+h2 { font-size: 19px; margin: 32px 0 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+h3 { font-size: 15px; margin: 20px 0 4px; }
+p, ul, ol, table, figure, .note { margin: 8px 0; }
+a { color: var(--accent); }
+code, kbd { font: 13px/1.4 Consolas, "Cascadia Mono", monospace; background: var(--code-bg); border-radius: 3px; padding: 1px 4px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; }
+pre { background: var(--code-bg); padding: 10px 12px; border-radius: 4px; overflow-x: auto; font: 13px/1.45 Consolas, "Cascadia Mono", monospace; }
+pre code { background: none; padding: 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; vertical-align: top; }
+th { background: var(--nav-bg); }
+figure { margin: 14px 0; }
+figure img { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; display: block; }
+figcaption { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.note { background: var(--note-bg); border-left: 3px solid var(--note-line); padding: 8px 12px; border-radius: 3px; }
+.lead { color: var(--muted); font-size: 16px; }
+@media (max-width: 760px) { body { display: block; } nav { position: static; width: auto; height: auto; } main { padding: 20px; } }
