@@ -977,6 +977,21 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>True when the active document of the shell is a query tab (#503); null when it cannot be told.</summary>
+        public bool? HasActiveQueryDocument()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var document = dte.ActiveDocument;
+                return document != null && IsQuery(document) && dte.ActiveWindow?.Kind == "Document";
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         private static bool IsQuery(Document document)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
