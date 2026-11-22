@@ -14,7 +14,7 @@ These instructions apply in every environment: locally on Windows, in the cloud 
 
 - `docs/architecture.md`: architecture, decisions and verified facts about SSMS. Read it before designing or changing the architecture.
 - `docs/decisions.md`: the user's earlier decisions. Work is planned only from the GitHub issues (there is no roadmap file).
-- `README.md`: build, installation and manual testing in SSMS.
+- `README.md`: the overview for new users (what it is, features, install). `docs/development.md`: build, installation of a build and manual testing in SSMS.
 
 ## Current state
 
