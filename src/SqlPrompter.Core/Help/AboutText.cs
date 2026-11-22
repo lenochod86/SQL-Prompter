@@ -6,7 +6,7 @@ namespace SqlPrompter.Core.Help
     /// <summary>The texts of the About window (#502): the version line, the update status and the diagnostic text that is copied into a bug report.</summary>
     public static class AboutText
     {
-        public const string License = "MIT License";
+        public const string License = "MIT License with Commons Clause";
 
         public const string Copyright = "Copyright (c) SQL Prompter contributors";
 
