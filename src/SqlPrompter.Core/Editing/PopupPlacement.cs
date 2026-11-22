@@ -18,5 +18,40 @@ namespace SqlPrompter.Core.Editing
             left = Math.Max(areaLeft, Math.Min(caretX, areaRight - width));
             top = belowLineY + height > areaBottom ? Math.Max(areaTop, belowLineY - height - lineHeight - gap) : belowLineY;
         }
+
+        /// <summary>
+        /// The vertical placement of a list next to the caret line (#501). It never covers the line: below it when the list fits there, otherwise above it
+        /// (its bottom edge ends <paramref name="gap"/> above the line) when it fits there, otherwise on the side with more room, and then the list shrinks
+        /// (but not below <paramref name="minHeight"/>, which may then stick out of the area, never over the line).
+        /// </summary>
+        /// <param name="lineTop">The top of the caret line.</param>
+        /// <param name="lineBottom">The bottom of the caret line.</param>
+        /// <param name="height">The wanted height of the list.</param>
+        /// <param name="minHeight">The smallest height the list may shrink to.</param>
+        /// <param name="gap">The space between the line and the list.</param>
+        /// <param name="top">The top of the list.</param>
+        /// <param name="fitHeight">The height the list gets (at most <paramref name="height"/>).</param>
+        public static void PlaceVertical(double lineTop, double lineBottom, double height, double minHeight, double gap, double areaTop, double areaBottom, out double top, out double fitHeight)
+        {
+            var roomBelow = areaBottom - (lineBottom + gap);
+            var roomAbove = lineTop - gap - areaTop;
+            bool below;
+            if (height <= roomBelow)
+            {
+                below = true;
+            }
+            else if (height <= roomAbove)
+            {
+                below = false;
+            }
+            else
+            {
+                below = roomBelow >= roomAbove;
+            }
+
+            var room = below ? roomBelow : roomAbove;
+            fitHeight = Math.Max(Math.Min(height, room), Math.Min(height, minHeight));
+            top = below ? lineBottom + gap : lineTop - gap - fitHeight;
+        }
     }
 }

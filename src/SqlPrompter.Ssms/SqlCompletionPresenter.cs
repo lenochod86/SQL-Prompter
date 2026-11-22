@@ -127,6 +127,7 @@ namespace SqlPrompter.Ssms
         private CompletionItem suggestionItem;
         private double listWidth = MinListWidth;
         private int visibleRows = VisibleRows;
+        private int chosenRows = VisibleRows;
         private double widthSetting;
         private double dragRows;
         private double dragWidth;
@@ -550,6 +551,7 @@ namespace SqlPrompter.Ssms
         {
             var behavior = SettingsService.Current.Behavior;
             visibleRows = Math.Max(MinRows, Math.Min(MaxRows, behavior.ListRows));
+            chosenRows = visibleRows;
             widthSetting = behavior.ListWidth > 0 ? Math.Max(MinWidth, Math.Min(MaxWidth, behavior.ListWidth)) : 0;
             lastItemList = null;
         }
@@ -578,6 +580,7 @@ namespace SqlPrompter.Ssms
                 dragRows += e.VerticalChange / RowHeight;
                 dragWidth += e.HorizontalChange;
                 visibleRows = Math.Max(MinRows, Math.Min(MaxRows, (int)Math.Round(dragRows)));
+                chosenRows = visibleRows;
                 widthSetting = Math.Max(MinWidth, Math.Min(MaxWidth, dragWidth));
                 listWidth = widthSetting;
                 listGrid.Width = listWidth;
@@ -1001,18 +1004,34 @@ namespace SqlPrompter.Ssms
 
         private void Position(ITrackingSpan applicableToSpan)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
                 var span = applicableToSpan.GetSpan(view.TextSnapshot);
                 var line = view.GetTextViewLineContainingBufferPosition(span.Start);
                 var bounds = line.GetCharacterBounds(span.Start);
-                var height = (Math.Min(items.Count, visibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + (footer == null ? GripHeight : FooterHeight + (string.IsNullOrEmpty(footer.Hint) ? 0 : 20)) + 2;
-                var left = bounds.Left - view.ViewportLeft;
-                var below = bounds.Bottom - view.ViewportTop + 2;
-                var above = bounds.Top - view.ViewportTop - height - 2;
+                // The bounds are in the unzoomed units of the text view, the popup is placed in the units of the editor control: scale them (#501).
+                var zoom = view.ZoomLevel / 100.0;
+                var fixedHeight = (showSuggestion ? RowHeight : 0) + (footer == null ? GripHeight : FooterHeight + (string.IsNullOrEmpty(footer.Hint) ? 0 : 20)) + 2;
+                var left = (bounds.Left - view.ViewportLeft) * zoom;
+                var lineTop = (bounds.Top - view.ViewportTop) * zoom;
+                var lineBottom = (bounds.Bottom - view.ViewportTop) * zoom;
+                var areaHeight = view.ViewportHeight * zoom;
+                var wantedRows = Math.Min(items.Count, chosenRows);
+                var wantedHeight = wantedRows * RowHeight + fixedHeight;
+                var minHeight = Math.Min(wantedRows, MinRows) * RowHeight + fixedHeight;
+                SqlPrompter.Core.Editing.PopupPlacement.PlaceVertical(lineTop, lineBottom, wantedHeight, minHeight, 2, 0, areaHeight, out var top, out var fitHeight);
 
-                // Above the caret when the list does not fit below and there is room above.
-                var top = below + height > view.ViewportHeight && above >= 0 ? above : below;
+                // Fewer rows (it scrolls) when the list does not fit on either side; the remembered height is only a maximum.
+                var rows = Math.Max(1, Math.Min(chosenRows, (int)Math.Floor((fitHeight - fixedHeight) / RowHeight)));
+                if (rows != visibleRows && (rows < chosenRows || visibleRows != chosenRows))
+                {
+                    visibleRows = rows;
+                    ApplyRows();
+                    var shownHeight = Math.Min(items.Count, visibleRows) * RowHeight + fixedHeight;
+                    SqlPrompter.Core.Editing.PopupPlacement.PlaceVertical(lineTop, lineBottom, shownHeight, shownHeight, 2, 0, areaHeight, out top, out fitHeight);
+                }
+
                 popup.PlacementTarget = view.VisualElement;
                 popup.HorizontalOffset = left;
                 popup.VerticalOffset = top;

@@ -78,5 +78,60 @@ namespace SqlPrompter.Tests
         {
             Assert.Equal((-1920d, 10d), Place(-1930, 10, 420, 340, -1920, 0, 0, 1040));
         }
+
+        private static (double Top, double Height) Vertical(double lineTop, double lineBottom, double height, double area = 1000, double min = 100)
+        {
+            PopupPlacement.PlaceVertical(lineTop, lineBottom, height, min, 2, 0, area, out var top, out var fit);
+            return (top, fit);
+        }
+
+        [Fact]
+        public void VerticalOpensBelowTheLineWhenItFits()
+        {
+            Assert.Equal((102d, 300d), Vertical(80, 100, 300));
+        }
+
+        [Fact]
+        public void VerticalOpensAboveTheLineWhenOnlyThereIsRoom()
+        {
+            // The bottom edge ends 2 above the line, the whole line stays visible.
+            Assert.Equal((900d - 2 - 300, 300d), Vertical(900, 920, 300));
+        }
+
+        [Fact]
+        public void VerticalShrinksOnTheSideWithMoreRoom()
+        {
+            var (top, height) = Vertical(500, 520, 900);
+            Assert.Equal((0d, 498d), (top, height));
+        }
+
+        [Fact]
+        public void VerticalShrinksAboveWithoutCoveringTheLine()
+        {
+            var (top, height) = Vertical(700, 720, 900, area: 760);
+            Assert.Equal(700d - 2, top + height);
+            Assert.Equal(698d, height);
+        }
+
+        [Theory]
+        [InlineData(0.5)]
+        [InlineData(0.93)]
+        [InlineData(1.0)]
+        [InlineData(1.5)]
+        public void VerticalNeverCoversTheLineAtAnyZoom(double zoom)
+        {
+            var lineTop = 880 * zoom;
+            var lineBottom = 900 * zoom;
+            PopupPlacement.PlaceVertical(lineTop, lineBottom, 400, 100, 2, 0, 1000 * zoom, out var top, out var fit);
+            Assert.True(top + fit <= lineTop || top >= lineBottom);
+        }
+
+        [Fact]
+        public void VerticalKeepsTheMinimumHeightEvenWhenThereIsNoRoom()
+        {
+            var (top, height) = Vertical(40, 60, 400, area: 100, min: 100);
+            Assert.Equal(100d, height);
+            Assert.True(top >= 60);
+        }
     }
 }
