@@ -1,88 +1,46 @@
 # SQL Prompter
 
-Custom IntelliSense for the SQL editor in SQL Server Management Studio 22. The design and the prototype results are in [docs/architecture.md](docs/architecture.md), the plan in the GitHub issues.
+**Smarter SQL editing for SQL Server Management Studio 22.**
 
-**Status:** MVP. Runs in SSMS 22.11; unit tests pass.
+Type a few letters and get the right table, column, join or procedure, formatted code and quick fixes, right in the query editor you already use. SQL Prompter is a free extension for SSMS 22 that works from what your database knows about itself: the list of tables, columns, keys and parameters, read in the background so typing never waits.
 
-**Help:** [docs/help/index.html](docs/help/index.html) is the user help (what each feature does, settings, commands and keys). It ships inside the VSIX and opens from **SQL Prompter > Help > Documentation**.
+[Download](https://github.com/lenochod86/SQL-Prompter/releases) · [Help](docs/help/index.html) · [Build from source](docs/development.md)
 
-## Structure
+## What you get
 
-| Folder | Contents |
+| Feature | Preview |
 |---|---|
-| `src/SqlPrompter.Core` | Lexer, caret context analysis and suggestion building (netstandard2.0, no dependencies) |
-| `src/SqlPrompter.Metadata` | Per-database metadata snapshots loaded from `sys.*` in the background (netstandard2.0) |
-| `src/SqlPrompter.Ssms` | VSIX for SSMS 22: completion source, window connection, commands (net48) |
-| `tests/SqlPrompter.Tests` | Tests of Core and Metadata (current .NET) |
-| `prototype/` | Diagnostic prototype that verified the basic assumptions |
+| **Suggestions that know your database.** One list for the whole script: tables, views, columns, functions, procedures, keywords and parameters, matched loosely and ranked by what you use most. Tab inserts the choice. | ![Suggestions for tables](docs/help/images/completion-tables.png) |
+| **Joins without typing the condition.** After `JOIN`, the tables linked by a foreign key come first, with the whole `ON` clause ready. | ![JOIN suggestions](docs/help/images/dark-completion-join.png) |
+| **Aliases, INSERT and EXEC done for you.** A table gets a short alias, `INSERT INTO` gets its column list, `EXEC` gets its parameters, and `*` expands to the columns on Tab. | ![Columns suggestions](docs/help/images/completion-columns.png) |
+| **Quick actions.** Tap Ctrl to open one popup with formatting, refactorings, quick open, find in database code and more. | ![Quick actions](docs/help/images/dark-quick-actions.png) |
+| **Formatting your way.** Format a document or a selection with named styles and a live preview. | ![Formatting styles](docs/help/images/formatting-styles.png) |
+| **Code analysis and quick fixes.** Squiggles for suspicious code, with one-click fixes. | ![Code analysis](docs/help/images/analysis-fix.png) |
+| **Snippets.** Short prefixes that expand into your own templates with fields; compatible with the snippet files of SQL Prompt. | ![Snippet list](docs/help/images/snippet-list.png) |
+| **Colors for safety.** Tabs and the status bar change color by server and database, and risky changes ask for a confirmation first. | ![Environment colors](docs/help/images/coloring.png) |
+| **History.** Every query you run is kept; closed tabs can be reopened and restored after a restart. | ![History](docs/help/images/history.png) |
+| **Handy tools.** Run one statement, dry run with a rollback, copy the results grid as CSV, JSON or Markdown, open it in Excel. | ![Grid menu](docs/help/images/grid-menu.png) |
 
-## Build
+Everything follows the theme of SSMS, light or dark.
 
-The .NET SDK 8 or later is enough; Visual Studio is not needed.
+## Install
 
-```powershell
-dotnet test tests\SqlPrompter.Tests
-dotnet build src\SqlPrompter.Ssms\SqlPrompter.Ssms.csproj -c Release
-```
+1. Download `SqlPrompter.Ssms.vsix` from the [latest release](https://github.com/lenochod86/SQL-Prompter/releases).
+2. Close SSMS and double-click the file.
+3. Start SSMS, open a query window and start typing. The **SQL Prompter** menu is under **Extensions**.
 
-The VSIX is created in `src\SqlPrompter.Ssms\bin\Release\net48\SqlPrompter.Ssms.vsix`. The tests run on any OS; the VSIX builds on Windows only.
+SQL Prompter checks once a day for a new version and offers to update; this is the only network access and it can be turned off in the settings.
 
-## Installing into SSMS 22
+## Your data stays yours
 
-1. Close SSMS.
-2. If the prototype is installed, uninstall it, otherwise "hello" would show up in the list as well:
-   ```powershell
-   & "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\VSIXInstaller.exe" /uninstall:SqlPrompter.Prototype.c9efd892-d89f-4178-8e0d-a9b7f925e617
-   ```
-3. Double-click `SqlPrompter.Ssms.vsix`.
+SQL Prompter only **reads** the structure of your database (table and column names, keys, parameters), never your data. Settings, snippets and history stay on your computer, there is no telemetry, and passwords and script text are never written to the log.
 
-Uninstall: close SSMS and double-click `Uninstall SQL Prompter.cmd` in the extension folder (`%LOCALAPPDATA%\Microsoft\SSMS\22.0_*\Extensions\<random name>\Uninstall`; search for the file name there). It removes the extension and asks whether to delete your settings, snippets, history and log too (they are kept by default). By hand: `VSIXInstaller.exe /uninstall:SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6`.
+## Learn more
 
-If SSMS reports after removing an extension that a package (e.g. `PrototypePackage`) did not load, it still holds the old registration. Run `SSMS.exe /updateconfiguration` from the `Common7\IDE` folder while SSMS is closed.
-
-The **SQL Prompter** menu with the **Refresh Metadata** command and the **Help** submenu (Documentation, Check for Updates, Open Log, About) is under **Extensions** by default. Move it to the main menu bar in **Extensions → Customize Menu…** by clearing SQL Prompter. The log is `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` and contains only metadata loading and errors, never passwords or script contents.
-
-## Behavior
-
-- The completion list always comes from SQL Prompter; you can tell by the **SQL Prompter** filter button at the bottom. The built-in IntelliSense stays enabled for error underlining and quick info, but its list is not shown.
-- Where the extension does not know the context (`EXEC`, `VALUES`, `SET @x =` …), it offers keywords, functions and data types. For new names (alias after `AS`, `@variable`, `#table`) it offers nothing.
-- Metadata, including columns, starts loading when a query window is activated. Right after connecting to a new database, table and column suggestions may be missing for a moment.
-- Tab, Enter and Space insert the selected suggestion. A dot, comma, parenthesis, semicolon, `]` or operator only closes the list and is typed, so `e.` keeps `e` and opens its columns. After a table source, where an alias is typed, the selection is only soft and only Tab inserts it.
-- Settings: **Tools → Options → SQL Prompter → Behavior** (enable suggestions, commit keys, keyword case); changes apply at once. They are stored in `%APPDATA%\SqlPrompter\settings.json`. **SQL Prompter → Export Settings…** and **Import Settings…** copy them; import also reads a SQL Prompt `.settings` export (suggestions on/off and commit keys; Enter and Tab always insert).
-- Choosing a table after `FROM`, `JOIN` or `APPLY` also inserts an alias made of the initials of the name (`OrderItems` → `dbo.OrderItems AS oi`; a clash with an alias in the query gives `oi1`). Not for `INSERT INTO`, `UPDATE`, `DELETE FROM`, table-valued functions or when an alias is already typed. Columns are inserted as `alias.Column`. Configure it in **Tools → Options → SQL Prompter → Aliases and Qualification** (custom aliases, ignored prefixes, `AS`, capitalising, schema qualification); the SQL Prompt import takes the alias options and custom aliases.
-- After `SELECT` without a `FROM`, typing the start of a column name offers matching columns of all tables and views (table in the suffix, at most 2000, names starting with the text first; nothing before the first character is typed). Choosing one inserts it as `alias.Column` and adds `FROM dbo.Table AS alias` at the end of the select list; the alias options apply.
-- Three-part names: after `FROM`, databases of the server are offered next to schemas; `OtherDb.`, `OtherDb..` and `OtherDb.dbo.` offer the objects of that database (loaded in the background on first use; a schema of the current database wins over a database of the same name). `USE Sales` on a line of its own makes completion follow that database from there on, also across `GO`. Synonyms are offered like tables and their columns come from the object they point to in the same database (chains included; targets on other databases or servers give no columns). Columns of tables in other databases and names with a server part are not supported yet.
-- Linked servers: their names are offered after `FROM`; `Srv.` offers its databases, `Srv.Db.` the schemas and objects and a four-part source gets its columns, each loaded in the background when you get there (the first try is empty, the next one has them; a server that does not answer is only logged). Choosing a schema or database of the current database wins over a linked server of the same name.
-- After `JOIN`, tables related by a foreign key to the tables of the query come first, each with the whole clause (`Orders AS o ON o.IdUser = u.IdUser`, several columns joined by `AND`); the key name is on the right. Columns show a key icon for primary and foreign keys.
-- After `INSERT INTO`, choosing a table inserts it with the column list of its insertable columns (not identity, computed or rowversion); after `EXEC`, choosing a procedure inserts all its parameters as `@name = value` (default values as written, `DECLARE` lines above for OUTPUT parameters). Options page *Inserts*: when the column list is offered (automatically, as a second item, or after typing `(`), its layout (one line, one per line, fit the width) and whether `VALUES` with a placeholder per column follows.
-- Tab right after the `*` of a select list (or after `alias.*`) replaces it with the columns, one per line, qualified with the alias (or with the table name when the query has several tables and the table has no alias). Without a result (columns not loaded, `*` in `COUNT(*)` or a product) Tab works as usual.
-- Parameter info: typing `(` or `,` in a call of a function of the database or after `EXEC procedure`, and Ctrl+Shift+Space (command *SQL Prompter → Parameter Info*), show the signature above the caret line with the current parameter in bold; it follows the caret and closes when the caret leaves the call or on Esc. Built-in functions are not covered.
-- The script of the selected table, view, function or procedure is shown under its description next to the list (the first 28 lines; a table as `CREATE TABLE`, the others as `CREATE OR ALTER`). It is loaded in the background after a short pause and kept for two minutes.
-- Ranking by usage: items you choose more often come first in their group (a table you use before the others, `WHERE` before the rarely used keywords). The counts are kept on this computer only, per database, in `%APPDATA%\SqlPrompter\usage.json`; nothing is sent anywhere. Turn it off with *Rank by usage* on the *Behavior* options page, forget the counts with *SQL Prompter → Reset Usage Statistics*.
-- After `ON` (and `AND` / `OR` in the condition), conditions that link the joined table to the tables before it come first: the whole foreign key (several columns joined by `AND`) and each of its columns, then columns with the same name. Options page *Joins*: column order (by default the new table is on the right, `u.IdUser = o.IdUser`), single columns of keys, same-name matches (optionally only with the same type).
-- Snippets are files in `%APPDATA%SqlPrompterSnippets` (or the folder set in *Tools → Options → SQL Prompter → Snippets*), one JSON file per snippet in the format of SQL Prompt's snippet folder; a folder copied from SQL Prompt works as is. *SQL Prompter → Import Snippets…* converts `.sqlpromptsnippet` backups (and copies `.json` files) into it; changes in the folder are picked up automatically. Typing a prefix offers the snippet in the list (with the description and the start of its body); Tab expands it, the caret ends at `$CURSOR$`, `$USER$`, `$DBNAME$` and `$DATE(format)$` are filled in, lines are indented like the line it goes into and custom fields get their default values (highlighted; Tab and Shift+Tab cycle between them and typing replaces the selected default, a field used several times is updated everywhere at once, Enter moves on and ends the editing after the last field, Esc ends it at once, the caret goes to `$CURSOR$`).
-- Menu *SQL Prompter → Surround Selection With Snippet…* wraps the selected text with a snippet that uses `$SELECTEDTEXT$` (e.g. `ISNULL($SELECTEDTEXT$, 0)`); *New Snippet From Selection…* and *Manage Snippets…* open a window to create, edit and delete snippets (prefix, description, body, fields).
-- The table list also opens after typing a space after `FROM`, `JOIN` and similar keywords.
-- After running a script that creates, alters or drops objects (or uses `sp_rename` or `SELECT … INTO`), the metadata of the window's database is refreshed within a few seconds. Otherwise changes are noticed at most 30 s later.
-
-## Manual test in SSMS
-
-Connect a window to a database with a few tables and try:
-
-| Type | Expected |
-|---|---|
-| `sel` | Keywords, `select` in lower case |
-| `SELECT * FROM ` | Tables and views as `dbo.Table`, schemas |
-| `SELECT * FROM sys.ob` | `objects` and other system views |
-| `SELECT * FROM dbo.T t WHERE t.` | Columns of the table |
-| `SELECT  FROM dbo.A a JOIN dbo.B b ON 1=1` with the caret after `SELECT` and Ctrl+Space | Columns of both tables, shared ones with their alias |
-| `SELECT * FROM dbo.T t ` | `WHERE`, `JOIN` … without a firm selection: Enter starts a new line |
-| `DECLARE @x int; SELECT @` | No list (the extension does not know variables yet) |
-| `SELECT CAST(1 AS ` | Data types |
-| `EXEC ` and Ctrl+Space | Keywords and functions without a firm selection |
-| Run `CREATE TABLE dbo.NewTable (Id int)`, wait a few seconds, then `SELECT * FROM New` | `dbo.NewTable` |
-| Run `ALTER TABLE dbo.NewTable ADD Name int`, then `SELECT * FROM dbo.NewTable n WHERE n.` | `Name` among the columns |
-| Window signed in with Entra ID | Keywords and functions, no tables or columns |
+- [User help](docs/help/index.html): what each feature does, the settings and the keys. It is also in SSMS under **SQL Prompter > Help > Documentation**.
+- [Development notes](docs/development.md): how to build and test it.
+- [Architecture](docs/architecture.md): how it works and what was learned about SSMS.
+- [Issues](https://github.com/lenochod86/SQL-Prompter/issues): the plan, bugs and ideas. Reports and suggestions are welcome.
 
 ## License
 

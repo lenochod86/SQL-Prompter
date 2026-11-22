@@ -188,7 +188,7 @@ Found in the SSMS 22.11.3 installation:
 
 ## MVP
 
-The code is in `src/` and the tests in `tests/`. Build: `dotnet build SqlPrompter.slnx -c Release` on Windows; tests: `dotnet test tests/SqlPrompter.Tests` anywhere. The manual test procedure is in the [README](../README.md).
+The code is in `src/` and the tests in `tests/`. Build: `dotnet build SqlPrompter.slnx -c Release` on Windows; tests: `dotnet test tests/SqlPrompter.Tests` anywhere. The manual test procedure is in [development.md](development.md).
 
 What the MVP does:
 
