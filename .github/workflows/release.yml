@@ -2,7 +2,7 @@ name: Release
 
 # A release is made by pushing a version tag, e.g. `git tag v0.200.54 && git push origin v0.200.54`.
 # The tag must equal the VSIX version in source.extension.vsixmanifest (without the leading `v`) and point to a commit on main.
-# The build runs on the self-hosted runner of the development PC (label `vsix`, no billed minutes). When the PC is off the job waits in the queue.
+# The build runs on a GitHub-hosted Windows runner.
 # The release gets the .vsix and a SHA-256 checksum file (SqlPrompter.Ssms.vsix.sha256) for the update check (#297).
 on:
   push:
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: [self-hosted, vsix]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
         with:

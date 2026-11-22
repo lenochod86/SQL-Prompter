@@ -1,6 +1,6 @@
 # SQL Prompter
 
-A custom IntelliSense extension for SSMS 22, intended to replace Redgate SQL Prompt. It will be released as open source under the MIT license.
+A custom IntelliSense extension for SSMS 22, intended to replace Redgate SQL Prompt. It is released under the MIT license with the Commons Clause (free to use, modify and share, but not to sell); see `LICENSE`.
 
 These instructions apply in every environment: locally on Windows, in the cloud and from mobile. Work the same way everywhere.
 
@@ -107,7 +107,7 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
 - If `dotnet` is not on PATH, install the .NET SDK into the scratchpad with `dotnet-install.ps1` (no admin rights needed) and set `DOTNET_ROOT`.
 - For every VSIX handed to the user, bump the version in `source.extension.vsixmanifest` (otherwise it will not install over the old one) and check the version inside the `.vsix`.
 - After changing `.vsct`, bump the version in `ProvideMenuResource`.
-- CI enforces both bumps in pull requests (`.github/scripts/Check-Versions.ps1`): any change under `src/` needs a higher VSIX version than `main`. CI also builds with warnings as errors. Billed Actions minutes are limited: a push to a pull request runs only the Ubuntu job (tests, version checks); the Windows VSIX build runs for a pull request with the label `build-vsix` (and manually with *Run workflow*); a push to `main` runs the tests only; the prototype workflow is manual only (#336). The VSIX job runs on the **self-hosted runner** of the user's PC (label `vsix`, installed in `E:\actions-runner` as the Windows service `actions.runner.lenochod86-SQL-Prompter.vojta-pc`, started automatically; no billed minutes). If it is not running the job waits in the queue: ask the user to start the service, or temporarily change `runs-on` in `build.yml` to `windows-latest`. Before the repository is made public the runner must be removed (checklist in #336).
+- CI enforces both bumps in pull requests (`.github/scripts/Check-Versions.ps1`): any change under `src/` needs a higher VSIX version than `main`. CI also builds with warnings as errors. A push to a pull request runs only the Ubuntu job (tests, version checks); the Windows VSIX build runs for a pull request with the label `build-vsix` (and manually with *Run workflow*); a push to `main` runs the tests only; the prototype workflow is manual only. Both Windows jobs (the VSIX build and the release) run on GitHub-hosted `windows-latest` runners; the repository is public, so the minutes are free.
 
 ## Environments
 
