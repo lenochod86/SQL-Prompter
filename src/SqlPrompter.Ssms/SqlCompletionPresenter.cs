@@ -1004,6 +1004,7 @@ namespace SqlPrompter.Ssms
 
         private void Position(ITrackingSpan applicableToSpan)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
                 var span = applicableToSpan.GetSpan(view.TextSnapshot);
