@@ -86,4 +86,4 @@ Connect a window to a database with a few tables and try:
 
 ## License
 
-The project will be released under the MIT license.
+SQL Prompter is released under the MIT license with the Commons Clause (see [LICENSE](LICENSE)): you may use, modify and share it, but not sell it.
