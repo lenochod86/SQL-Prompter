@@ -37,6 +37,12 @@ namespace SqlPrompter.Ssms
             "SqlPrompter",
             "updates");
 
+        /// <summary>What the last finished check of this session found (null before the first one); read by the About window (#502).</summary>
+        public static LastCheckResult LastCheck { get; private set; }
+
+        /// <summary>Raised on the UI thread when a check has finished.</summary>
+        public static event EventHandler LastCheckChanged;
+
         /// <summary>The version of the installed VSIX, read from the manifest next to the assembly; null when it cannot be read.</summary>
         public static Version CurrentVersion()
         {
@@ -222,6 +228,8 @@ namespace SqlPrompter.Ssms
 
                 // The settings change notifications are handled on the UI thread (the tab colors), so everything below that touches them runs there.
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                LastCheck = new LastCheckResult(release?.Version, failed || release == null);
+                LastCheckChanged?.Invoke(null, EventArgs.Empty);
                 var settings = SettingsService.Current.Updates;
                 var announce = release != null && (manual ? release.Version > current : UpdateDecision.ShouldAnnounce(settings, current, release, today));
                 Log.Write("Update check: installed " + current + ", latest " + (release?.Version.ToString() ?? "unknown") + (announce ? ", announcing." : ", nothing to announce."));

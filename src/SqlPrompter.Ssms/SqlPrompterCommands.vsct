@@ -36,6 +36,14 @@
           <CommandName>Formatting Styles</CommandName>
         </Strings>
       </Menu>
+      <!-- The Help submenu (#502): Documentation, Check for Updates, Open Log and About. -->
+      <Menu guid="guidSqlPrompterCmdSet" id="HelpMenu" priority="0x00FA" type="Menu">
+        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+        <Strings>
+          <ButtonText>Help</ButtonText>
+          <CommandName>Help</CommandName>
+        </Strings>
+      </Menu>
       <!-- The Tab Color item of the context menu of a document tab: the environments of the coloring settings (dynamic items) and Edit Environments. -->
       <Menu guid="guidSqlPrompterCmdSet" id="TabColorMenu" priority="0x0200" type="Menu">
         <Parent guid="guidSqlPrompterCmdSet" id="TabColorHostGroup" />
@@ -100,6 +108,9 @@
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="RefactoringGroup" priority="0x0100">
         <Parent guid="guidSqlPrompterCmdSet" id="RefactorMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="HelpGroup" priority="0x0100">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpMenu" />
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
@@ -410,22 +421,28 @@
           <ButtonText>Run And Roll Back (Dry Run)</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidHelp" priority="0x00FA" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidHelp" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
         <Strings>
-          <ButtonText>Help</ButtonText>
+          <ButtonText>Documentation</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidCheckForUpdates" priority="0x00F8" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCheckForUpdates" priority="0x0110" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
         <Strings>
           <ButtonText>Check for Updates</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0120" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
         <Strings>
           <ButtonText>Open Log</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAbout" priority="0x0130" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
+        <Strings>
+          <ButtonText>About</ButtonText>
         </Strings>
       </Button>
     </Buttons>
@@ -450,6 +467,8 @@
       <IDSymbol name="CopyAsGroup" value="0x101B" />
       <IDSymbol name="MetadataGroup" value="0x1010" />
       <IDSymbol name="DiagnosticsGroup" value="0x1011" />
+      <IDSymbol name="HelpMenu" value="0x1021" />
+      <IDSymbol name="HelpGroup" value="0x1022" />
       <IDSymbol name="SettingsGroup" value="0x1012" />
       <IDSymbol name="SnippetsGroup" value="0x1013" />
       <IDSymbol name="NavigationGroup" value="0x1014" />
@@ -506,6 +525,7 @@
       <IDSymbol name="cmdidOpenLog" value="0x0101" />
       <IDSymbol name="cmdidCheckForUpdates" value="0x0138" />
       <IDSymbol name="cmdidHelp" value="0x0139" />
+      <IDSymbol name="cmdidAbout" value="0x013A" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>
