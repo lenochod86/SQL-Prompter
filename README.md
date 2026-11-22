@@ -4,7 +4,7 @@ Custom IntelliSense for the SQL editor in SQL Server Management Studio 22. The d
 
 **Status:** MVP. Runs in SSMS 22.11; unit tests pass.
 
-**Help:** [docs/help/index.html](docs/help/index.html) is the user help (what each feature does, settings, commands and keys). It ships inside the VSIX and opens from **SQL Prompter > Help**.
+**Help:** [docs/help/index.html](docs/help/index.html) is the user help (what each feature does, settings, commands and keys). It ships inside the VSIX and opens from **SQL Prompter > Help > Documentation**.
 
 ## Structure
 
@@ -40,7 +40,7 @@ Uninstall: close SSMS and double-click `Uninstall SQL Prompter.cmd` in the exten
 
 If SSMS reports after removing an extension that a package (e.g. `PrototypePackage`) did not load, it still holds the old registration. Run `SSMS.exe /updateconfiguration` from the `Common7\IDE` folder while SSMS is closed.
 
-The **SQL Prompter** menu with the **Refresh Metadata** and **Open Log** commands is under **Extensions** by default. Move it to the main menu bar in **Extensions → Customize Menu…** by clearing SQL Prompter. The log is `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` and contains only metadata loading and errors, never passwords or script contents.
+The **SQL Prompter** menu with the **Refresh Metadata** command and the **Help** submenu (Documentation, Check for Updates, Open Log, About) is under **Extensions** by default. Move it to the main menu bar in **Extensions → Customize Menu…** by clearing SQL Prompter. The log is `%LOCALAPPDATA%\SqlPrompter\sqlprompter.log` and contains only metadata loading and errors, never passwords or script contents.
 
 ## Behavior
 
