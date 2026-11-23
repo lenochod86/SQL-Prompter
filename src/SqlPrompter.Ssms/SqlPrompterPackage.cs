@@ -399,7 +399,8 @@ namespace SqlPrompter.Ssms
                     return;
                 }
 
-                var name = TabHistoryService.Bind(chosen, document);
+                // The new tab gets the name the tab had (the record of the entry, or the name recorded with the run); never a temporary ~vs name (#511).
+                var name = SqlPrompter.Core.History.HistoryTabName.ForReopening(TabHistoryService.Bind(chosen, document)) ?? SqlPrompter.Core.History.HistoryTabName.ForReopening(chosen.Tab);
                 if (name != null)
                 {
                     TabSessionService.Current?.AdoptName(document, name);
@@ -492,10 +493,7 @@ namespace SqlPrompter.Ssms
 
             try
             {
-                (GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("File.NewQuery");
-                var view = ActiveEditor.GetView();
-                view?.TextBuffer.Insert(0, chosen.Text ?? string.Empty);
-                return view != null;
+                return SsmsConnection.OpenNewQueryWithText(chosen.Text);
             }
             catch (Exception ex)
             {

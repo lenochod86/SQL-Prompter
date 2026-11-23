@@ -108,14 +108,8 @@ namespace SqlPrompter.Ssms
         /// <summary>The name of the query window: the file name of the document (SQLQuery1.sql, or the saved script).</summary>
         private static string TabName(string document)
         {
-            try
-            {
-                return System.IO.Path.GetFileName(document);
-            }
-            catch (ArgumentException)
-            {
-                return document;
-            }
+            ThreadHelper.ThrowIfNotOnUIThread();
+            return TabCaption.DisplayName(document);
         }
 
         public static void DocumentClosed(string document)

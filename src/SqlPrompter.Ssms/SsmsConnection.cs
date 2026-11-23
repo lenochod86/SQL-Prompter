@@ -318,10 +318,148 @@ namespace SqlPrompter.Ssms
             }
 
             var scriptType = Enum.Parse(create.GetParameters()[0].ParameterType, "Sql");
-            create.Invoke(factory, new[] { scriptType, clone, null });
-            var view = ActiveEditor.GetView();
-            view?.TextBuffer.Insert(0, text ?? string.Empty);
-            return view != null;
+            var before = ActiveDocumentName();
+            var differentServer = !string.IsNullOrEmpty(server) && !string.Equals(server, Convert.ToString(infoType.GetProperty("ServerName")?.GetValue(info)), StringComparison.OrdinalIgnoreCase);
+            // The window is created and connected in one call that may show the Connect dialog (modal), fail or throw; the text goes into the tab whatever came of it (#511).
+            var outcome = NewTabOpener.Open(
+                () => create.Invoke(factory, new[] { scriptType, clone, null }),
+                () => WaitForNewWindow(before),
+                () => InsertIntoActiveWindow(text),
+                ex => Log.Error("Creating the query window failed (the connection was refused or cancelled); the text is put into the tab anyway", ex));
+            if (outcome == NewTabOutcome.Filled && differentServer)
+            {
+                SayWhenNotConnected(server);
+            }
+
+            return outcome == NewTabOutcome.Filled;
+        }
+
+        /// <summary>Opens a new query tab with the DTE command File.NewQuery (SSMS asks for a connection itself) and puts the text into it, whatever the connection did (#511).</summary>
+        public static bool OpenNewQueryWithText(string text)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var before = ActiveDocumentName();
+            return NewTabOpener.Open(
+                () => ExecuteNewQuery(),
+                () => WaitForNewWindow(before),
+                () => InsertIntoActiveWindow(text),
+                ex => Log.Error("Opening a new query tab failed; the text is put into the tab anyway", ex)) == NewTabOutcome.Filled;
+        }
+
+        private static void ExecuteNewQuery()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("File.NewQuery");
+        }
+
+        /// <summary>The document that is active now (the new window of SSMS becomes the active one), or null.</summary>
+        private static string ActiveDocumentName()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                return (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveDocument?.FullName;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Waits (the message loop keeps running) for up to two seconds until another document than <paramref name="before"/> is the active one.</summary>
+        private static bool WaitForNewWindow(string before)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            while (true)
+            {
+                var now = ActiveDocumentName();
+                if (now != null && !string.Equals(now, before, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                if (DateTime.UtcNow >= deadline)
+                {
+                    return false;
+                }
+
+                PumpMessages(50);
+            }
+        }
+
+        private static void PumpMessages(int milliseconds)
+        {
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(milliseconds) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                frame.Continue = false;
+            };
+            timer.Start();
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+        }
+
+        /// <summary>
+        /// Puts the text at the start of the active window: through its text view, or, when the view is not there yet (a window whose connection was cancelled
+        /// may take a moment to show its editor), through the DTE text document. False when neither worked.
+        /// </summary>
+        private static bool InsertIntoActiveWindow(string text)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var content = text ?? string.Empty;
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                var view = ActiveEditor.GetView();
+                if (view != null)
+                {
+                    view.TextBuffer.Insert(0, content);
+                    return true;
+                }
+
+                PumpMessages(100);
+            }
+
+            try
+            {
+                var document = (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveDocument;
+                if (document?.Object("TextDocument") is EnvDTE.TextDocument textDocument)
+                {
+                    textDocument.StartPoint.CreateEditPoint().Insert(content);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Putting the text into the new window failed", ex);
+            }
+
+            return false;
+        }
+
+        /// <summary>The new window is in front: when it is not connected the status bar says so (SSMS has already told the reason itself).</summary>
+        private static void SayWhenNotConnected(string server)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var main = System.Windows.Application.Current?.MainWindow;
+                if (main == null || !WindowStatusColoring.TryGetFront(new System.Windows.Interop.WindowInteropHelper(main).Handle, out var connected, out _) || connected)
+                {
+                    return;
+                }
+
+                Log.Write("The query window for " + server + " is not connected; the text is in the tab.");
+                if (Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsStatusbar)) is Microsoft.VisualStudio.Shell.Interop.IVsStatusbar statusBar)
+                {
+                    statusBar.SetText("SQL Prompter: could not connect " + server + ", the query is opened without a connection.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Checking the connection of the new window failed", ex);
+            }
         }
 
         /// <summary>
@@ -408,7 +546,17 @@ namespace SqlPrompter.Ssms
             }
 
             var scriptType = Enum.Parse(create.GetParameters()[0].ParameterType, "Sql");
-            create.Invoke(factory, new[] { scriptType, info, null });
+            var documentBefore = ActiveDocumentName();
+            try
+            {
+                create.Invoke(factory, new[] { scriptType, info, null });
+            }
+            catch (Exception ex)
+            {
+                // The connection was refused or the dialog cancelled and SSMS threw: the window may exist all the same, and the text goes into it (#511).
+                Log.Error("Opening the window of a saved tab failed; the text is put into the tab anyway", ex);
+            }
+
             connected = info != null;
             if (info == null)
             {
@@ -469,15 +617,13 @@ namespace SqlPrompter.Ssms
                 }
             }
 
-            var view = ActiveEditor.GetView();
-            if (view == null)
+            if (!WaitForNewWindow(documentBefore))
             {
-                Log.Write("Restoring a tab: the new window has no editor view.");
+                Log.Write("Restoring a tab: no new window came out of it.");
                 return false;
             }
 
-            view.TextBuffer.Insert(0, text);
-            return view != null;
+            return InsertIntoActiveWindow(text);
         }
 
         /// <summary>

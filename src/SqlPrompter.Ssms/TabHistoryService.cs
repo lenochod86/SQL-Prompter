@@ -244,7 +244,7 @@ namespace SqlPrompter.Ssms
                     result.Add(new Snapshot
                     {
                         Key = document.FullName,
-                        Name = TabSessionService.Current?.NameOf(document.FullName) ?? Path.GetFileName(document.FullName),
+                        Name = TabSessionService.Current?.NameOf(document.FullName) ?? TabCaption.DisplayName(document.FullName),
                         Server = connection?.Server,
                         Login = connection != null && connection.Authentication == AuthenticationKind.SqlPassword ? connection.UserName : null,
                         Database = connection?.Database,

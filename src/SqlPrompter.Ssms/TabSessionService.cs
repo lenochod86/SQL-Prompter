@@ -72,6 +72,17 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
+            // A name that an open tab has already is kept apart with a number (SQLQuery2 (2).sql), so two tabs do not look the same (#511).
+            var taken = new List<string>();
+            foreach (Document known in dte.Documents.Cast<Document>().ToList())
+            {
+                if (known.Windows.Count > 0 && !IsClosedWindow(known) && !string.Equals(known.FullName, document, StringComparison.OrdinalIgnoreCase))
+                {
+                    taken.Add(NameOf(known.FullName) ?? TabCaption.DisplayName(known.FullName));
+                }
+            }
+
+            name = SqlPrompter.Core.History.HistoryTabName.Unique(name.Trim(), taken);
             names[document] = name;
             TabCaption.Apply(document, name);
         }
