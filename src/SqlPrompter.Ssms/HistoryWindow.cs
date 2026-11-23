@@ -456,7 +456,7 @@ namespace SqlPrompter.Ssms
 
             public HistoryEntry Entry { get; }
 
-            public string TabName => Entry.Tab.Length > 0 ? Entry.Tab : "(no tab name)";
+            public string TabName => SqlPrompter.Core.History.HistoryTabName.Display(Entry.Tab);
 
             /// <summary>The time of the run (of the last change of a tab), to the minute.</summary>
             public string RunText => Entry.Kind == HistoryKind.Tab
