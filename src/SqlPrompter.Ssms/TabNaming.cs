@@ -98,6 +98,21 @@ namespace SqlPrompter.Ssms
             return fileName;
         }
 
+        /// <summary>Whether the window of the document has the caption <paramref name="name"/> set by <see cref="Apply"/>; false when the frame is not found or has another name (SSMS gives its own back when a query runs, #515).</summary>
+        public static bool HasName(string documentPath, string name)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                return VsShellUtilities.IsDocumentOpen(ServiceProvider.GlobalProvider, documentPath, Guid.Empty, out _, out _, out var frame) && frame != null &&
+                    frame.GetProperty((int)__VSFPROPID.VSFPROPID_OwnerCaption, out var value) == VSConstants.S_OK && string.Equals(value as string, name, StringComparison.Ordinal);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         /// <summary>Gives the window of the document the caption <paramref name="name"/>; an empty name gives the caption back to SSMS. Returns false when the frame was not found.</summary>
         public static bool Apply(string documentPath, string name)
         {
