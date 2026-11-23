@@ -62,7 +62,7 @@ namespace SqlPrompter.Ssms
                 }
 
                 var database = SsmsConnection.GetActive()?.Database;
-                if (!SsmsConnection.OpenNewWindow(database, insert))
+                if (!SsmsConnection.OpenNewWindow(database, insert, kind: SqlPrompter.Core.History.OpenedTabKind.Generated))
                 {
                     Clipboard.SetText(insert);
                     Tell("The script is on the clipboard (no connected window to open them in).");

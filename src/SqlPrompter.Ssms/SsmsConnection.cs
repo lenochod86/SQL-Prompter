@@ -241,7 +241,7 @@ namespace SqlPrompter.Ssms
         /// Opens a new query window connected like the active one but to <paramref name="database"/> and puts <paramref name="text"/> into it
         /// (verified in SSMS 22.11, see docs/architecture.md). Returns false when there is no connected window to copy from.
         /// </summary>
-        public static bool OpenNewWindow(string database, string text, string server = null, string login = null)
+        public static bool OpenNewWindow(string database, string text, string server = null, string login = null, OpenedTabKind kind = OpenedTabKind.UserText)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             if (!SsmsCompatibility.Has(SqlPrompter.Core.Compatibility.SsmsFeature.OpenWindow))
@@ -329,6 +329,12 @@ namespace SqlPrompter.Ssms
             if (outcome == NewTabOutcome.Filled && differentServer)
             {
                 SayWhenNotConnected(server);
+            }
+
+            if (outcome == NewTabOutcome.Filled && OpenedTabState.StartsUnmodified(kind))
+            {
+                // A text the user did not write: the tab starts as saved, closing it unchanged asks nothing (#512).
+                UnmodifiedTab.Schedule(ActiveDocumentName(), text ?? string.Empty);
             }
 
             return outcome == NewTabOutcome.Filled;

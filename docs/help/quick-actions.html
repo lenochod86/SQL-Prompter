@@ -60,7 +60,7 @@
 
 <h2>Go To Definition and Object Explorer</h2>
 <ul>
-  <li><b>Go To Definition</b> (<kbd>F12</kbd>) reads the dotted name around the caret (up to three parts), resolves an alias, or a table name used as a column qualifier, to its table and opens the script of the object in a new window: a table as <code>CREATE TABLE</code>, a view, function, procedure or trigger as <code>CREATE OR ALTER</code>. Names on a linked server are not followed.</li>
+  <li><b>Go To Definition</b> (<kbd>F12</kbd>) reads the dotted name around the caret (up to three parts), resolves an alias, or a table name used as a column qualifier, to its table and opens the script of the object in a new window: a table as <code>CREATE TABLE</code>, a view, function, procedure or trigger as <code>CREATE OR ALTER</code>. Names on a linked server are not followed. The new tab is not marked as modified: closing it unchanged does not ask to save (the same for the tabs that hold a generated text: a statement preview, an insert script of grid rows, the summary of a script); as soon as you type, it is modified as usual.</li>
   <li>The new window is on the same connection and its tab is named after the object, with a number when the name is already open.</li>
   <li><b>Show In Object Explorer</b> (<kbd>Ctrl</kbd>+<kbd>F12</kbd>) selects the object at the caret in Object Explorer.</li>
 </ul>
