@@ -255,6 +255,10 @@ namespace SqlPrompter.Ssms
                     service.timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(5) };
                     service.timer.Tick += (s2, e2) => service.Save();
                     service.timer.Start();
+                    // SSMS gives a tab its own caption back when a query runs (#515): the names are checked every second and put back.
+                    service.captionTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
+                    service.captionTimer.Tick += (s2, e2) => service.ReapplyNames();
+                    service.captionTimer.Start();
                     service.Subscribe();
                 };
                 wait.Start();
@@ -307,6 +311,33 @@ namespace SqlPrompter.Ssms
         }
 
         private DispatcherTimer afterEvent;
+        private DispatcherTimer captionTimer;
+
+        /// <summary>Puts the name back on the tabs that have a name of ours and whose caption SSMS has reset (#515).</summary>
+        private void ReapplyNames()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (names.Count == 0 || shuttingDown)
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (Document known in dte.Documents.Cast<Document>().ToList())
+                {
+                    if (known.Windows.Count > 0 && !IsClosedWindow(known) && names.TryGetValue(known.FullName, out var name) && !TabCaption.HasName(known.FullName, name))
+                    {
+                        TabCaption.Apply(known.FullName, name);
+                        Log.Write("The caption of " + System.IO.Path.GetFileName(known.FullName) + " was reset by SSMS; the name " + name + " is put back.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Checking the names of the tabs failed", ex);
+            }
+        }
 
         private const int WmClose = 0x0010;
         private const int WmQueryEndSession = 0x0011;
