@@ -144,7 +144,7 @@ namespace SqlPrompter.Ssms
                 var text = view.Selection.IsEmpty ? snapshot.GetText() : view.Selection.StreamSelectionSpan.SnapshotSpan.GetText();
                 var newLine = snapshot.LineCount > 1 ? snapshot.GetLineFromLineNumber(0).GetLineBreakText() : "\r\n";
                 var summary = SqlPrompter.Core.Editing.ScriptSummary.Build(text, newLine.Length > 0 ? newLine : "\r\n");
-                if (!SsmsConnection.OpenNewWindow(SsmsConnection.GetActive()?.Database, summary))
+                if (!SsmsConnection.OpenNewWindow(SsmsConnection.GetActive()?.Database, summary, kind: SqlPrompter.Core.History.OpenedTabKind.Generated))
                 {
                     System.Windows.Clipboard.SetText(summary);
                     SetStatus("SQL Prompter: the summary is on the clipboard (no connected window to open it in).");
