@@ -21,9 +21,21 @@ namespace SqlPrompter.Core.History
             var file = path.Replace('/', Separator);
             var folder = tempFolder.Replace('/', Separator).TrimEnd(Separator);
             var slash = file.LastIndexOf(Separator);
-            return slash > 0 &&
-                string.Equals(file.Substring(0, slash), folder, StringComparison.OrdinalIgnoreCase) &&
-                file.Substring(slash + 1).StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase);
+            var name = file.Substring(slash + 1);
+            if (slash <= 0)
+            {
+                return false;
+            }
+
+            // With some SSMS settings (seen with the Miscellaneous Files project shown and hot exit off) a new window is backed by a file called ~vs1a2b3c.sql (#543).
+            // It is a scratch file wherever it lives and is gone after a restart.
+            if (name.StartsWith("~vs", StringComparison.OrdinalIgnoreCase) && name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return string.Equals(file.Substring(0, slash), folder, StringComparison.OrdinalIgnoreCase) &&
+                name.StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

@@ -39,8 +39,7 @@ namespace SqlPrompter.Core.History
                     return string.Empty;
                 }
 
-                var temporary = string.Equals(Path.GetDirectoryName(fullName), (tempFolder ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) &&
-                    Path.GetFileName(fullName).StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase);
+                var temporary = TemporaryQueryFile.Is(fullName, tempFolder ?? string.Empty);
                 return temporary ? string.Empty : fullName;
             }
             catch (ArgumentException)
