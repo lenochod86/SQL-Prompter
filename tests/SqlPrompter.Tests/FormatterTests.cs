@@ -96,6 +96,26 @@ namespace SqlPrompter.Tests
             Assert.Contains("ELSE IF @a = 2", result);
         }
 
+        [Theory]
+        [InlineData("if @a>1 print 'a' else if @a<0 print 'b' else print 'c'")]
+        [InlineData("if @a>1 print 'a' else if @a<0 print 'b'")]
+        [InlineData("if @a>1 begin print 'a' end else if @a<0 begin print 'b' end else begin print 'c' end")]
+        [InlineData("if @a>1 print 'a'\nelse if @a<0 print 'b'\nelse if @a=0 print 'z'")]
+        public void ElseIfHasNoBlankLineAndFormattingTwiceChangesNothing(string sql)
+        {
+            var once = Format(sql);
+            var twice = Format(once);
+
+            Assert.DoesNotContain("\n\n", once);
+            Assert.Equal(once, twice);
+        }
+
+        [Fact]
+        public void ElseIfFollowsTheBodyOfTheIfDirectly()
+        {
+            Assert.Equal("IF @a > 1\n\tPRINT 'a'\nELSE IF @a < 0\n\tPRINT 'b'\nELSE\n\tPRINT 'c'", Format("if @a>1 print 'a' else if @a<0 print 'b' else print 'c'"));
+        }
+
         [Fact]
         public void GoStaysAlone()
         {

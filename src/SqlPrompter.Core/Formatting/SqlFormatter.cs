@@ -104,7 +104,8 @@ namespace SqlPrompter.Core.Formatting
                 {
                     var statement = statements[s];
                     var first = statement.Leading.Count > 0 ? statement.Leading[0].Start : statement.Body[0].Start;
-                    if (output.Length > 0)
+                    // The IF after "ELSE" continues the line of the ELSE that was already started: no new line (#525).
+                    if (output.Length > 0 && carry == null)
                     {
                         output.Append(nl);
                         if (style.KeepBlankLines && !previousWasGo && BlankLineBetween(previousEnd, first))
