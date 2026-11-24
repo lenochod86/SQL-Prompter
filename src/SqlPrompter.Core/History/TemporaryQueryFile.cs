@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 
 namespace SqlPrompter.Core.History
 {
@@ -9,6 +8,7 @@ namespace SqlPrompter.Core.History
     /// </summary>
     public static class TemporaryQueryFile
     {
+        /// <summary>True when <paramref name="path"/> is a file called <c>SQLQuery...</c> directly in <paramref name="tempFolder"/>; only the text of the paths is compared (both separators are accepted).</summary>
         public static bool Is(string path, string tempFolder)
         {
             if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(tempFolder))
@@ -16,16 +16,12 @@ namespace SqlPrompter.Core.History
                 return false;
             }
 
-            try
-            {
-                return Path.IsPathRooted(path) &&
-                    string.Equals(Path.GetDirectoryName(path), tempFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) &&
-                    Path.GetFileName(path).StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase);
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
+            var file = path.Replace('/', '\');
+            var folder = tempFolder.Replace('/', '\').TrimEnd('\');
+            var slash = file.LastIndexOf('\');
+            return slash > 0 &&
+                string.Equals(file.Substring(0, slash), folder, StringComparison.OrdinalIgnoreCase) &&
+                file.Substring(slash + 1).StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
