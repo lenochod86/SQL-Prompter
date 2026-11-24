@@ -679,7 +679,7 @@ namespace SqlPrompter.Core.Completion
                 yield break;
             }
 
-            if (context.Qualifier.Count == 0)
+            if (context.Qualifier.Count == 0 && !context.TableFunctionsOnly)
             {
                 foreach (var suggestion in ScriptTableSuggestions(context, metadata, script, options))
                 {
@@ -703,7 +703,7 @@ namespace SqlPrompter.Core.Completion
             {
                 // An empty schema (db..) means the default one.
                 var schema = context.Qualifier[0].Length == 0 ? metadata.DefaultSchema : context.Qualifier[0];
-                foreach (var dbObject in metadata.Objects.Where(o => o.Kind != DbObjectKind.ScalarFunction && string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
+                foreach (var dbObject in metadata.Objects.Where(o => o.Kind != DbObjectKind.ScalarFunction && (!context.TableFunctionsOnly || o.Kind == DbObjectKind.TableFunction) && string.Equals(o.Schema, schema, StringComparison.OrdinalIgnoreCase)))
                 {
                     var qualifiedInsert = SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject);
                     foreach (var suggestion in WithInsertColumns(context, metadata, options, dbObject, qualifiedInsert, null))
@@ -731,7 +731,7 @@ namespace SqlPrompter.Core.Completion
                 }
             }
 
-            foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem && o.Kind != DbObjectKind.ScalarFunction))
+            foreach (var dbObject in metadata.Objects.Where(o => !o.IsSystem && o.Kind != DbObjectKind.ScalarFunction && (!context.TableFunctionsOnly || o.Kind == DbObjectKind.TableFunction)))
             {
                 var insert = (options.Aliases.QualifyObjectNames ? SqlIdentifier.Quote(dbObject.Schema, quote) + "." : string.Empty) +
                     SqlIdentifier.Quote(dbObject.Name, quote) + ObjectAlias(context, options, dbObject);

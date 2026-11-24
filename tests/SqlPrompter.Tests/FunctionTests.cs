@@ -31,6 +31,33 @@ namespace SqlPrompter.Tests
             });
         }
 
+        [Theory]
+        [InlineData("SELECT * FROM dbo.Users u CROSS APPLY |")]
+        [InlineData("SELECT * FROM dbo.Users u OUTER APPLY fn|")]
+        public void OnlyTableFunctionsAreOfferedAfterApply(string sql)
+        {
+            var items = SuggestionBuilder.Build(Analyze(sql), WithFunctions());
+
+            Assert.Contains(items, i => i.DisplayText == "fnOrdersOf");
+            Assert.Contains(items, i => i.DisplayText == "fnAllUsers");
+            Assert.DoesNotContain(items, i => i.Kind == SuggestionKind.Table || i.Kind == SuggestionKind.View || i.Kind == SuggestionKind.ScalarFunction);
+        }
+
+        [Fact]
+        public void OnlyTableFunctionsOfASchemaAreOfferedAfterApplyAndTheSchemaName()
+        {
+            var items = SuggestionBuilder.Build(Analyze("SELECT * FROM dbo.Users u CROSS APPLY dbo.|"), WithFunctions());
+
+            Assert.Equal(new[] { "fnAllUsers", "fnOrdersOf" }, items.Select(i => i.DisplayText).OrderBy(n => n).ToArray());
+        }
+
+        [Fact]
+        public void TheApplyContextIsMarked()
+        {
+            Assert.True(Analyze("SELECT * FROM a CROSS APPLY |").TableFunctionsOnly);
+            Assert.False(Analyze("SELECT * FROM a JOIN |").TableFunctionsOnly);
+        }
+
         [Fact]
         public void ScalarFunctionsAreOfferedInExpressionsWithTheirParentheses()
         {

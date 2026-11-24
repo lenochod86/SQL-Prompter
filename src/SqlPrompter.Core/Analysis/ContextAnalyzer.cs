@@ -279,6 +279,7 @@ namespace SqlPrompter.Core.Analysis
 
                 var objectName = Make(ContextKind.ObjectName);
                 objectName.InsertTarget = (anchor.IsWord("INTO") && anchorIndex > statementStart && tokens[anchorIndex - 1].IsWord("INSERT")) || anchor.IsWord("INSERT");
+                objectName.TableFunctionsOnly = anchor.IsWord("APPLY");
                 objectName.ProcedureName = anchor.IsWord("EXEC") || anchor.IsWord("EXECUTE") || anchor.Kind == TokenKind.Operator;
                 objectName.PreferredKeywords = qualifier.Count == 0 ? objectKeywords ?? Array.Empty<string>() : Array.Empty<string>();
 
