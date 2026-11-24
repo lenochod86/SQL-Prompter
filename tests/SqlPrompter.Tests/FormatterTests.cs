@@ -116,6 +116,53 @@ namespace SqlPrompter.Tests
             Assert.Equal("IF @a > 1\n\tPRINT 'a'\nELSE IF @a < 0\n\tPRINT 'b'\nELSE\n\tPRINT 'c'", Format("if @a>1 print 'a' else if @a<0 print 'b' else print 'c'"));
         }
 
+        private static FormatStyle Cased(CaseStyle keyword, CaseStyle function, CaseStyle dataType) =>
+            new FormatStyle { KeywordCase = keyword, FunctionCase = function, DataTypeCase = dataType };
+
+        [Theory]
+        [InlineData("set nocount on", "SET NOCOUNT ON")]
+        [InlineData("set xact_abort on", "SET XACT_ABORT ON")]
+        [InlineData("set statistics io on", "SET STATISTICS IO ON")]
+        [InlineData("select * from t with (nolock)", "SELECT * FROM t WITH (NOLOCK)")]
+        [InlineData("select * from t with (nolock, index (ix))", "SELECT * FROM t WITH (NOLOCK, INDEX (ix))")]
+        [InlineData("select * from t option (recompile)", "SELECT * FROM t OPTION (RECOMPILE)")]
+        [InlineData("select * from t option (maxrecursion 10, maxdop 2)", "SELECT * FROM t OPTION (MAXRECURSION 10, MAXDOP 2)")]
+        [InlineData("select top 1 with ties a from b order by a", "SELECT TOP 1 WITH TIES a FROM b ORDER BY a")]
+        [InlineData("select * from openjson(@j) with (a int)", "SELECT * FROM OPENJSON(@j) WITH (a INT)")]
+        [InlineData("select @@rowcount, @@error, @@trancount", "SELECT @@ROWCOUNT, @@ERROR, @@TRANCOUNT")]
+        [InlineData("select * from string_split(@s, ',')", "SELECT * FROM STRING_SPLIT(@s, ',')")]
+        public void ContextKeywordsFollowTheUpperCaseStyle(string sql, string expected)
+        {
+            Assert.Equal(expected, Format(sql, Cased(CaseStyle.Upper, CaseStyle.Upper, CaseStyle.Upper)));
+        }
+
+        [Theory]
+        [InlineData("SET NOCOUNT ON", "set nocount on")]
+        [InlineData("SELECT * FROM t WITH (NOLOCK)", "select * from t with (nolock)")]
+        [InlineData("SELECT * FROM t OPTION (RECOMPILE)", "select * from t option (recompile)")]
+        [InlineData("SELECT TOP 1 WITH TIES a FROM b ORDER BY a", "select top 1 with ties a from b order by a")]
+        [InlineData("SELECT * FROM OPENJSON(@j) WITH (a INT)", "select * from openjson(@j) with (a int)")]
+        [InlineData("SELECT @@ROWCOUNT, @@ERROR", "select @@rowcount, @@error")]
+        public void ContextKeywordsFollowTheLowerCaseStyle(string sql, string expected)
+        {
+            Assert.Equal(expected, Format(sql, Cased(CaseStyle.Lower, CaseStyle.Lower, CaseStyle.Lower)));
+        }
+
+        [Fact]
+        public void OutputAndReadonlyOfAProcedureParameterFollowTheKeywordCase()
+        {
+            var result = Format("create proc p @x int output, @t dbo.T readonly as select 1", Cased(CaseStyle.Upper, CaseStyle.Upper, CaseStyle.Upper));
+
+            Assert.Contains("@x INT OUTPUT", result);
+            Assert.Contains("READONLY", result);
+        }
+
+        [Fact]
+        public void AVariableOfTheUserStaysAsWritten()
+        {
+            Assert.Equal("SELECT @rowcount, @Error", Format("select @rowcount, @Error", Cased(CaseStyle.Upper, CaseStyle.Upper, CaseStyle.Upper)));
+        }
+
         [Fact]
         public void GoStaysAlone()
         {
@@ -173,7 +220,7 @@ namespace SqlPrompter.Tests
             Assert.Equal(before.Count, after.Count);
             for (var i = 0; i < before.Count; i++)
             {
-                Assert.Equal(before[i].Text, after[i].Text, ignoreCase: before[i].Kind == SqlPrompter.Core.Lexing.TokenKind.Word);
+                Assert.Equal(before[i].Text, after[i].Text, ignoreCase: before[i].Kind == SqlPrompter.Core.Lexing.TokenKind.Word || before[i].Text.StartsWith("@@"));
             }
 
             Assert.Equal(0, result.Kept);
