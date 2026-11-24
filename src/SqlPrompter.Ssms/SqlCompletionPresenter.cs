@@ -127,6 +127,7 @@ namespace SqlPrompter.Ssms
         private CompletionItem suggestionItem;
         private double listWidth = MinListWidth;
         private int visibleRows = VisibleRows;
+        private ITrackingSpan lastSpan;
         private int chosenRows = VisibleRows;
         private double widthSetting;
         private double dragRows;
@@ -290,6 +291,7 @@ namespace SqlPrompter.Ssms
             suggestionItem = suggestion;
             EnsureSelectedVisible();
             Render();
+            lastSpan = applicableToSpan;
             Position(applicableToSpan);
             if (popup.IsOpen)
             {
@@ -585,6 +587,11 @@ namespace SqlPrompter.Ssms
                 listWidth = widthSetting;
                 listGrid.Width = listWidth;
                 ApplyRows();
+                // The list may be above the caret line: keep it off the line (its bottom edge stays) and within the room (#519).
+                if (lastSpan != null)
+                {
+                    Position(lastSpan);
+                }
             };
             thumb.DragCompleted += (s, e) =>
             {
