@@ -308,7 +308,7 @@ namespace SqlPrompter.Core.Completion
                         ? SchemaFunctionSuggestions(context, metadata).ToList()
                         : (IReadOnlyList<Suggestion>)Array.Empty<Suggestion>();
                 case ContextKind.Variable:
-                    return VariableSuggestions(context, script, 0).ToList();
+                    return ExecParameterSuggestions(context, metadata).Concat(VariableSuggestions(context, script, context.ExecProcedure != null ? 1 : 0)).ToList();
                 case ContextKind.DataType:
                     return ColumnTypeSuggestions(context, metadata).Concat(SizedTypeSuggestions(context)).Concat(DataTypeSuggestions(context, 0)).ToList();
                 case ContextKind.Fallback:
@@ -507,6 +507,23 @@ namespace SqlPrompter.Core.Completion
             var lines = (body ?? string.Empty).Replace("\r\n", "\n").Split('\n');
             var text = string.Join("\n", lines.Take(12));
             return lines.Length > 12 ? text + "\n…" : text;
+        }
+
+        /// <summary>The parameters of the procedure of an EXEC call that the call does not name yet; choosing one inserts <c>@Name = </c> (#523).</summary>
+        private static IEnumerable<Suggestion> ExecParameterSuggestions(CaretContext context, IDatabaseMetadata metadata)
+        {
+            var procedure = context.ExecProcedure == null ? null : ParameterInfoFinder.FindProcedure(context.ExecProcedure, metadata);
+            if (procedure == null)
+            {
+                yield break;
+            }
+
+            foreach (var parameter in procedure.Parameters.Where(p => !context.ExecUsedParameters.Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
+            {
+                var description = "parameter " + parameter.Name + " " + parameter.TypeName + (parameter.HasDefault ? " = " + (parameter.DefaultText ?? "...") : string.Empty) +
+                    (parameter.IsOutput ? " OUTPUT" : string.Empty) + " of " + procedure.Name;
+                yield return new Suggestion(SuggestionKind.Variable, parameter.Name, parameter.Name + " = ", parameter.Name, parameter.TypeName, description, 0);
+            }
         }
 
         private static IEnumerable<Suggestion> VariableSuggestions(CaretContext context, ScriptModel script, int group, TypeClass valueType = TypeClass.Unknown)

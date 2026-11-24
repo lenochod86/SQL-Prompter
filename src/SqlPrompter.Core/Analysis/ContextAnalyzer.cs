@@ -300,6 +300,15 @@ namespace SqlPrompter.Core.Analysis
                 return objectName;
             }
 
+            // EXEC schema.Procedure @|, EXEC schema.Procedure @a = 1, |: the parameters of the procedure (#523).
+            if (qualifier.Count == 0 && TryExecArgument(tokens, statementStart, statementEnd, caretIndex, word, out var execParts, out var execUsed))
+            {
+                var argument = Make(ContextKind.Variable);
+                argument.ExecProcedure = execParts;
+                argument.ExecUsedParameters = execUsed;
+                return argument;
+            }
+
             if (namesUnknownObject)
             {
                 // A variable being declared and a #table outside a table position are names of the user's own.
@@ -885,6 +894,64 @@ namespace SqlPrompter.Core.Analysis
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// The caret stands where an argument of <c>EXEC [@result =] name</c> starts (right after the name or after a comma): the name parts of the
+        /// procedure and the parameters already named in the call. A value after <c>=</c> is not such a place.
+        /// </summary>
+        private static bool TryExecArgument(List<Token> tokens, int statementStart, int statementEnd, int caretIndex, Token word, out List<string> parts, out List<string> used)
+        {
+            parts = null;
+            used = null;
+            if (statementStart >= tokens.Count || !(tokens[statementStart].IsWord("EXEC") || tokens[statementStart].IsWord("EXECUTE")) || (word != null && word.Kind != TokenKind.Variable))
+            {
+                return false;
+            }
+
+            var i = statementStart + 1;
+            if (i + 1 < statementEnd && tokens[i].Kind == TokenKind.Variable && tokens[i + 1].Kind == TokenKind.Operator && tokens[i + 1].Text == "=")
+            {
+                i += 2;
+            }
+
+            var names = new List<string>();
+            while (i < statementEnd && tokens[i].IsNamePart)
+            {
+                names.Add(tokens[i].IdentifierValue);
+                i++;
+                if (i + 1 < statementEnd && tokens[i].Kind == TokenKind.Dot && tokens[i + 1].IsNamePart)
+                {
+                    i++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (names.Count == 0 || caretIndex < i || caretIndex - 1 >= statementEnd || caretIndex == 0)
+            {
+                return false;
+            }
+
+            var previous = tokens[caretIndex - 1];
+            if (caretIndex != i && previous.Kind != TokenKind.Comma)
+            {
+                return false;
+            }
+
+            parts = names;
+            used = new List<string>();
+            for (var j = i; j + 1 < statementEnd; j++)
+            {
+                if (tokens[j].Kind == TokenKind.Variable && tokens[j + 1].Kind == TokenKind.Operator && tokens[j + 1].Text == "=" && !ReferenceEquals(tokens[j], word))
+                {
+                    used.Add(tokens[j].Text);
+                }
+            }
+
+            return true;
         }
 
         /// <summary>

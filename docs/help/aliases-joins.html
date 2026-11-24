@@ -80,6 +80,7 @@
 
 <h2 id="exec">EXEC</h2>
 <p>After <code>EXEC</code>, choosing a procedure inserts all its parameters as <code>@name = value</code> (a default value as written), and <code>DECLARE</code> lines above the call for <code>OUTPUT</code> parameters. System procedures are offered too. <a href="completion.html#parameter-info">Parameter info</a> shows the signature while you fill them in.</p>
+<p>In a call you typed by hand, <code>@</code> after the procedure name (or after a comma) lists the parameters the call does not name yet, with type and default in the description; choosing one inserts <code>@name = </code>. Variables of the script follow the parameters.</p>
 
 <h2 id="names">Cross-database and linked-server names</h2>
 <ul>
