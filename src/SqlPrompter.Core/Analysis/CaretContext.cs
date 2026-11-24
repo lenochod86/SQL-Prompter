@@ -194,6 +194,12 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>The name follows APPLY: only table-valued functions can be the right side (#522).</summary>
         public bool TableFunctionsOnly { get; internal set; }
 
+        /// <summary>With <see cref="ContextKind.Variable"/> at an argument of EXEC procedure: the name parts of the procedure, so that its parameters are offered (#523).</summary>
+        public IReadOnlyList<string> ExecProcedure { get; internal set; }
+
+        /// <summary>With <see cref="ExecProcedure"/>: the parameters the call already names (<c>@Name =</c>), with the at sign.</summary>
+        public IReadOnlyList<string> ExecUsedParameters { get; internal set; } = Array.Empty<string>();
+
         /// <summary>The name follows EXEC: stored procedures are offered and choosing one inserts its parameters.</summary>
         public bool ProcedureName { get; internal set; }
 
