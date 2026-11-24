@@ -379,6 +379,7 @@ namespace SqlPrompter.Ssms
                     }
                 };
                 WatchTabDoubleClick(window);
+                WatchNativeRenameDialog();
                 commandEvents = dte.Events.CommandEvents;
                 commandEvents.BeforeExecute += (string guid, int id, object customIn, object customOut, ref bool cancelDefault) =>
                 {
@@ -387,11 +388,68 @@ namespace SqlPrompter.Ssms
                     {
                         BeginShutdown("File.Exit");
                     }
+
                 };
             }
             catch (Exception ex)
             {
                 Log.Error("Watching the shutdown failed", ex);
+            }
+        }
+
+        private static bool nativeRenameWatched;
+
+        /// <summary>
+        /// The native <i>Rename Tab</i> of the tab menu (the command <c>OtherContextMenus.DocumentWindowTab.RenameTab</c>; it does not raise <c>CommandEvents</c>) offers the name of the temporary
+        /// file (<c>SQLQuery8</c>) and would rename that file, while the tab shows another name (#534). For a new query window the dialog is closed as soon as it has loaded and our prompt,
+        /// which starts with the name the tab has, opens instead (as for a double click on the tab). A file the user saved is left to SSMS.
+        /// </summary>
+        private void WatchNativeRenameDialog()
+        {
+            if (nativeRenameWatched)
+            {
+                return;
+            }
+
+            nativeRenameWatched = true;
+            System.Windows.EventManager.RegisterClassHandler(typeof(System.Windows.Window), System.Windows.FrameworkElement.LoadedEvent, new System.Windows.RoutedEventHandler((sender, args) =>
+            {
+                try
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    if (!(sender is System.Windows.Window dialog) || dialog.Title != "Rename Tab" || !IsActiveTemporaryQuery())
+                    {
+                        return;
+                    }
+
+                    dialog.Close();
+                    var rename = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(60) };
+                    rename.Tick += (s, e) =>
+                    {
+                        rename.Stop();
+                        ThreadHelper.ThrowIfNotOnUIThread();
+                        RenameActiveTab();
+                    };
+                    rename.Start();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Redirecting the native Rename Tab dialog failed", ex);
+                }
+            }));
+        }
+
+        private bool IsActiveTemporaryQuery()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var document = dte.ActiveDocument;
+                return document != null && IsQuery(document) && SqlPrompter.Core.History.TemporaryQueryFile.Is(document.FullName, System.IO.Path.GetTempPath());
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 
@@ -1050,8 +1108,7 @@ namespace SqlPrompter.Ssms
             ThreadHelper.ThrowIfNotOnUIThread();
             var name = document.FullName;
             // A new window is backed by a file in the temp folder (SQLQuery1.sql); that is not a document of the user.
-            var isFile = Path.IsPathRooted(name) && File.Exists(name) &&
-                !(string.Equals(Path.GetDirectoryName(name), Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) && Path.GetFileName(name).StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase));
+            var isFile = Path.IsPathRooted(name) && File.Exists(name) && !SqlPrompter.Core.History.TemporaryQueryFile.Is(name, Path.GetTempPath());
             string text = null;
             if (!isFile || !document.Saved)
             {
