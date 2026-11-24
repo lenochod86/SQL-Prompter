@@ -92,7 +92,7 @@ namespace SqlPrompter.Tests
         {
             var lines = Lines("create procedure dbo.p @a int,@b int=1 out as select 1;", new FormatStyle { ProcedureParametersOnNewLines = true });
 
-            Assert.Equal(new[] { "CREATE PROCEDURE dbo.p", "      @a INT", "    , @b INT = 1 out", "AS", "SELECT 1;" }, lines);
+            Assert.Equal(new[] { "CREATE PROCEDURE dbo.p", "      @a INT", "    , @b INT = 1 OUT", "AS", "SELECT 1;" }, lines);
         }
 
         [Fact]

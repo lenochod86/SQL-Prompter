@@ -202,7 +202,7 @@ namespace SqlPrompter.Core.Completion
 
         private static readonly System.Text.RegularExpressions.Regex Words = new System.Text.RegularExpressions.Regex(@"'[^']*'|\$[^$]*\$|[A-Za-z_][A-Za-z_0-9]*", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-        private static readonly HashSet<string> KeywordWords = new HashSet<string>(Keywords.All.SelectMany(k => k.Split(' ')), StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> KeywordWords = new HashSet<string>(Keywords.All.SelectMany(k => k.Split(' ')).Concat(ContextKeywords.AllWords()), StringComparer.OrdinalIgnoreCase);
 
         private static readonly HashSet<string> FunctionWords = new HashSet<string>(Keywords.BuiltInFunctions, StringComparer.OrdinalIgnoreCase);
 

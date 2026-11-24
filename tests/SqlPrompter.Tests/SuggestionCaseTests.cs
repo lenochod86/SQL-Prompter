@@ -42,6 +42,18 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void SetOptionsAndHintsFollowTheKeywordCaseOfTheStyle()
+        {
+            var lower = Follow(CaseStyle.Lower);
+            var upper = Follow(CaseStyle.Upper);
+
+            Assert.Contains(SuggestionBuilder.Build(Analyze("SET |"), null, null, lower), i => i.InsertText.StartsWith("nocount", System.StringComparison.Ordinal));
+            Assert.Contains(SuggestionBuilder.Build(Analyze("SET |"), null, null, upper), i => i.InsertText.StartsWith("NOCOUNT", System.StringComparison.Ordinal));
+            Assert.Contains(SuggestionBuilder.Build(Analyze("SELECT * FROM t WITH (|"), null, null, lower), i => i.InsertText == "nolock");
+            Assert.Contains(SuggestionBuilder.Build(Analyze("SELECT * FROM t OPTION (|"), null, null, upper), i => i.InsertText.StartsWith("RECOMPILE", System.StringComparison.Ordinal));
+        }
+
+        [Fact]
         public void KeywordsFunctionsAndTypesEachFollowTheirOwnCase()
         {
             var options = Follow(CaseStyle.Upper, CaseStyle.Lower, CaseStyle.Lower);
