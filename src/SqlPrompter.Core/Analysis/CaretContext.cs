@@ -191,6 +191,9 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>With <see cref="DatabaseName"/>: <c>CURRENT</c> is accepted in place of the name (ALTER DATABASE CURRENT SET ...).</summary>
         public bool CurrentDatabaseAllowed { get; internal set; }
 
+        /// <summary>The name follows APPLY: only table-valued functions can be the right side (#522).</summary>
+        public bool TableFunctionsOnly { get; internal set; }
+
         /// <summary>The name follows EXEC: stored procedures are offered and choosing one inserts its parameters.</summary>
         public bool ProcedureName { get; internal set; }
 

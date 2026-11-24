@@ -28,7 +28,7 @@
 <p class="lead">What choosing an item inserts beyond its name. Options are on the settings pages <em>Aliases and qualification</em> and <em>Inserts and joins</em>.</p>
 
 <h2 id="aliases">Aliases and qualification</h2>
-<p>Choosing a table or view after <code>FROM</code>, <code>JOIN</code> or <code>APPLY</code> also inserts an alias made of the initials of the name: <code>OrderItems</code> becomes <code>sales.OrderItems AS oi</code>. A clash with an alias already in the query gives <code>oi1</code>. No alias is added after <code>INSERT INTO</code>, <code>UPDATE</code>, <code>DELETE FROM</code>, for table-valued functions or when an alias is already typed.</p>
+<p>After <code>CROSS APPLY</code> and <code>OUTER APPLY</code> only table-valued functions are offered. Choosing a table or view after <code>FROM</code> or <code>JOIN</code> also inserts an alias made of the initials of the name: <code>OrderItems</code> becomes <code>sales.OrderItems AS oi</code>. A clash with an alias already in the query gives <code>oi1</code>. No alias is added after <code>INSERT INTO</code>, <code>UPDATE</code>, <code>DELETE FROM</code>, for table-valued functions or when an alias is already typed.</p>
 <p>Columns are inserted as <code>alias.Column</code>. A column that exists in several tables of the query is always qualified, whatever the option says.</p>
 
 <figure>
