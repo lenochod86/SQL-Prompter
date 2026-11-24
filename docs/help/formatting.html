@@ -35,7 +35,7 @@
   <tr><td>Unformat Selection</td><td>Turns the selection into a single line: white space between tokens becomes one space, strings, quoted names and block comments are kept, a <code>--</code> comment becomes <code>/* ... */</code>, a <code>GO</code> line stays on its own line.</td></tr>
   <tr><td>Formatting Styles &gt; Style</td><td>A submenu to switch the active style; <b>Edit Formatting Styles...</b> opens the editor.</td></tr>
 </table>
-<p>The result replaces only the part of the text that differs, so a single <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes it. The status bar says how many statements were formatted and how many were kept as written.</p>
+<p>The result replaces only the part of the text that differs, so a single <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes it. The status bar says how many statements were formatted and how many were kept as written. A comment inside a statement stays next to the token it followed: a <code>--</code> comment stays at the end of its line (the rest of the line moves to the next one) and such a statement is laid out in full, never collapsed to one line.</p>
 
 <h2>Styles</h2>
 <figure>
