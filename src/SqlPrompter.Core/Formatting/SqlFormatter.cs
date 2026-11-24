@@ -68,7 +68,7 @@ namespace SqlPrompter.Core.Formatting
         private sealed class Engine
         {
             private readonly string text;
-            private readonly FormatStyle style;
+            private FormatStyle style;
             private readonly string nl;
             private int formatted;
             private int kept;
@@ -324,23 +324,35 @@ namespace SqlPrompter.Core.Formatting
                 var prefix = carry ?? string.Empty;
                 string layout = null;
                 var hasInnerComment = body.Any(t => t.Kind == TokenKind.Comment);
-                if (!hasInnerComment)
+                var normalStyle = style;
+                try
                 {
-                    try
+                    collapsedNow = false;
+                    if (hasInnerComment)
                     {
-                        collapsedNow = false;
-                        layout = Layout(codeTokens, column);
+                        // A comment needs its line: the statement is laid out in full, then every comment is put back next to the token it followed (#528).
+                        style = LongLayout(style);
                     }
-                    catch (Exception)
+
+                    layout = Layout(codeTokens, column);
+                    if (hasInnerComment && layout != null)
                     {
-                        layout = null;
+                        layout = PutCommentsBack(layout, body, codeTokens);
                     }
+                }
+                catch (Exception)
+                {
+                    layout = null;
+                }
+                finally
+                {
+                    style = normalStyle;
                 }
 
                 if (layout != null)
                 {
                     var check = Lexer.Tokenize(layout).ToList();
-                    if (FormatTokens.Equivalent(codeTokens, check))
+                    if (FormatTokens.Equivalent(hasInnerComment ? body : codeTokens, check))
                     {
                         formatted++;
                         if (collapsedNow)
@@ -360,6 +372,110 @@ namespace SqlPrompter.Core.Formatting
 
                 kept++;
                 return Indent(column) + prefix + Verbatim(body);
+            }
+
+            private static FormatStyle LongLayout(FormatStyle style)
+            {
+                var copy = style.Clone();
+                copy.CollapseStatementsShorterThan = 0;
+                copy.CollapseSubqueriesShorterThan = 0;
+                copy.CollapseDdlShorterThan = 0;
+                copy.CollapseCaseShorterThan = 0;
+                return copy;
+            }
+
+            /// <summary>
+            /// The layout of the code tokens with the comments of the statement put back: each comment goes right behind the code token it followed in the original;
+            /// a <c>--</c> comment always ends its line (the rest of the line moves to a new line with the indentation of the line). Null when the layout does not
+            /// have the code tokens of the statement.
+            /// </summary>
+            private string PutCommentsBack(string layout, List<Token> body, List<Token> codeTokens)
+            {
+                var laid = Lexer.Tokenize(layout).Where(t => t.Kind != TokenKind.Comment).ToList();
+                if (!FormatTokens.Equivalent(codeTokens, laid))
+                {
+                    return null;
+                }
+
+                var after = new Dictionary<int, List<Token>>();
+                var code = -1;
+                foreach (var token in body)
+                {
+                    if (token.Kind != TokenKind.Comment)
+                    {
+                        code++;
+                    }
+                    else
+                    {
+                        if (!after.TryGetValue(code, out var list))
+                        {
+                            after[code] = list = new List<Token>();
+                        }
+
+                        list.Add(token);
+                    }
+                }
+
+                if (after.ContainsKey(-1))
+                {
+                    return null;
+                }
+
+                var sb = new StringBuilder();
+                var position = 0;
+                foreach (var key in after.Keys.OrderBy(k => k))
+                {
+                    var end = laid[key].End;
+                    sb.Append(layout, position, end - position);
+                    position = end;
+                    var lineStarted = false;
+                    var previousEndsLine = false;
+                    var lineStart = layout.LastIndexOf('\n', Math.Max(0, laid[key].Start - 1)) + 1;
+                    var indentEnd = lineStart;
+                    while (indentEnd < layout.Length && (layout[indentEnd] == ' ' || layout[indentEnd] == '\t'))
+                    {
+                        indentEnd++;
+                    }
+
+                    foreach (var comment in after[key])
+                    {
+                        if (previousEndsLine)
+                        {
+                            // A line comment ends its line: the next comment starts a new one.
+                            sb.Append(nl).Append(layout, lineStart, indentEnd - lineStart);
+                        }
+                        else if (!lineStarted)
+                        {
+                            sb.Append(' ');
+                        }
+
+                        lineStarted = false;
+                        sb.Append(comment.Text);
+                        previousEndsLine = comment.Text.StartsWith("--", StringComparison.Ordinal);
+                        if (!previousEndsLine)
+                        {
+                            continue;
+                        }
+
+                        // The rest of the line moves down, unless the line ends here anyway.
+                        var next = position;
+                        while (next < layout.Length && (layout[next] == ' ' || layout[next] == '\t'))
+                        {
+                            next++;
+                        }
+
+                        if (next < layout.Length && layout[next] != '\r' && layout[next] != '\n')
+                        {
+                            sb.Append(nl).Append(layout, lineStart, indentEnd - lineStart);
+                            position = next;
+                            lineStarted = true;
+                            previousEndsLine = false;
+                        }
+                    }
+                }
+
+                sb.Append(layout, position, layout.Length - position);
+                return sb.ToString();
             }
 
             private string PutOnLineOf(string prefix, string layout)
