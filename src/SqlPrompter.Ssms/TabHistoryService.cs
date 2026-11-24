@@ -60,6 +60,24 @@ namespace SqlPrompter.Ssms
             return name;
         }
 
+        /// <summary>The id of the history entry of the open tab of <paramref name="document"/>; null when the history has none for it yet.</summary>
+        public static string IdOf(string document) => ready && !string.IsNullOrEmpty(document) ? Store.IdOfOpen(document) : null;
+
+        /// <summary>
+        /// A tab that was restored (or reopened) continues the history entry it had before (#529): the entry is open again and gets the new document. It runs
+        /// after the load of the history in the chain, so it also works while the history is still loading.
+        /// </summary>
+        public static void Continue(string id, string document)
+        {
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(document) || !SettingsService.Current.Behavior.KeepHistory || !SettingsService.Current.Behavior.TrackTabs)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            Enqueue(() => Store.Rebind(id, document, now));
+        }
+
         public static void Touch(IEnumerable<string> ids, DateTime nowUtc) => Store.Touch(ids, nowUtc);
 
         public static void Delete(IEnumerable<string> ids) => Store.Delete(ids);

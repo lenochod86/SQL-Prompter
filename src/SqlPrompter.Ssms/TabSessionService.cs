@@ -865,6 +865,11 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var opened = OpenTabCore(tab, out var connected);
+            if (opened && !string.IsNullOrEmpty(tab.HistoryId) && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
+            {
+                TabHistoryService.Continue(tab.HistoryId, dte.ActiveDocument.FullName);
+            }
+
             if (opened && tab.Pinned && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
             {
                 TabCaption.Pin(dte.ActiveDocument.FullName);
@@ -1079,6 +1084,7 @@ namespace SqlPrompter.Ssms
                 Active = active,
                 Pinned = TabCaption.IsPinned(name),
                 Name = names.TryGetValue(name, out var tabName) ? tabName : null,
+                HistoryId = TabHistoryService.IdOf(name),
             };
         }
     }
