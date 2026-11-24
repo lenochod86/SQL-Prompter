@@ -146,7 +146,13 @@ namespace SqlPrompter.Ssms
             {
                 if (mruManager == null)
                 {
-                    var type = AssemblyTypes.FindLoaded("Microsoft.SqlServer.ConnectionDlg.VS.VSConnectionMruManager");
+                    // The assembly of the Connect dialog is loaded only when SSMS first shows the dialog, which is after the tabs are restored when SSMS starts empty (#543).
+                    var type = AssemblyTypes.FindLoaded("Microsoft.SqlServer.ConnectionDlg.VS.VSConnectionMruManager") ?? AssemblyTypes.LoadFromSsms("Microsoft.SqlServer.ConnectionDlg.VS", "Microsoft.SqlServer.ConnectionDlg.VS.VSConnectionMruManager");
+                    if (type == null)
+                    {
+                        Log.Write("The connections remembered by SSMS cannot be read: the class of the Connect dialog was not found.");
+                    }
+
                     mruManager = type == null ? null : Activator.CreateInstance(type);
                 }
 
@@ -777,6 +783,38 @@ namespace SqlPrompter.Ssms
 
     internal static class AssemblyTypes
     {
+        /// <summary>The type of an assembly of SSMS that is not loaded yet: by its name, then from the folders of SSMS next to the main executable (the shell keeps its extensions there).</summary>
+        public static Type LoadFromSsms(string assemblyName, string fullName)
+        {
+            try
+            {
+                try
+                {
+                    return System.Reflection.Assembly.Load(assemblyName)?.GetType(fullName, throwOnError: false);
+                }
+                catch (System.IO.IOException)
+                {
+                    // Not found by name: look in the folders of SSMS.
+                }
+
+                var folder = System.IO.Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+                foreach (var candidate in new[] { folder, System.IO.Path.Combine(folder, "Extensions", "Application") })
+                {
+                    var file = System.IO.Path.Combine(candidate, assemblyName + ".dll");
+                    if (System.IO.File.Exists(file))
+                    {
+                        return System.Reflection.Assembly.LoadFrom(file).GetType(fullName, throwOnError: false);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Loading " + assemblyName + " failed", ex);
+            }
+
+            return null;
+        }
+
         public static Type FindLoaded(string fullName)
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
