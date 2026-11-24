@@ -42,7 +42,7 @@ namespace SqlPrompter.Core.Editing
         /// The selection as a temporary table: <c>CREATE TABLE</c> with the columns (types inferred from the values, every column nullable,
         /// unique names), the multi-row <c>INSERT</c> and a final <c>DROP TABLE</c>. Null when the text is not a header line followed by a row.
         /// </summary>
-        public static string ToTemporaryTable(string gridText)
+        public static string ToTemporaryTable(string gridText, string decimalSeparator = ".")
         {
             var lines = (gridText ?? string.Empty).Replace("\r\n", "\n").Split('\n').ToList();
             while (lines.Count > 0 && lines[lines.Count - 1].Length == 0)
@@ -57,7 +57,10 @@ namespace SqlPrompter.Core.Editing
 
             var names = UniqueNames(lines[0].Split('\t'));
             var rows = lines.Skip(1).Select(l => l.Split('\t')).ToList();
-            var types = names.Select((n, i) => InferType(rows.Select(r => i < r.Length ? r[i] : "NULL"))).ToList();
+            // The grid copies numbers with the decimal separator of the culture of the user (1,25); they are read back as numbers and written with a point.
+            var separator = string.IsNullOrEmpty(decimalSeparator) ? "." : decimalSeparator;
+            var types = names.Select((n, i) => InferType(rows.Select(r => i < r.Length ? Normalize(r[i], separator) : "NULL"))).ToList();
+            var numeric = types.Select(t => !t.StartsWith("nvarchar", StringComparison.Ordinal) && t != "uniqueidentifier" && t != "date" && !t.StartsWith("datetime2", StringComparison.Ordinal) && !t.StartsWith("varbinary", StringComparison.Ordinal)).ToList();
             var text = new StringBuilder();
             text.Append("CREATE TABLE ").Append(TemporaryTableName).Append(" (\r\n");
             for (var i = 0; i < names.Count; i++)
@@ -66,8 +69,7 @@ namespace SqlPrompter.Core.Editing
             }
 
             text.Append(");\r\n\r\n");
-            var isText = types.Select(t => t.StartsWith("nvarchar", StringComparison.Ordinal)).ToList();
-            text.Append(BuildInsert(TemporaryTableName, names.Select(n => SqlIdentifier.Quote(n)).ToList(), rows, (value, index) => !isText[index] && value.Length == 0 ? "NULL" : Literal(value)));
+            text.Append(BuildInsert(TemporaryTableName, names.Select(n => SqlIdentifier.Quote(n)).ToList(), rows, (value, index) => TemporaryLiteral(value, types[index], numeric[index] ? Normalize(value, separator) : value)));
             text.Append("\r\n-- Work with the data here.\r\n\r\nDROP TABLE ").Append(TemporaryTableName).Append(";\r\n");
             return text.ToString();
         }
@@ -104,6 +106,16 @@ namespace SqlPrompter.Core.Editing
             if (present.Count == 0)
             {
                 return "nvarchar(max)";
+            }
+
+            if (present.Any(IsFloat) && present.All(v => IsFloat(v) || IsPlainNumber(v)))
+            {
+                return "float";
+            }
+
+            if (present.All(IsHexBinary))
+            {
+                return "varbinary(max)";
             }
 
             if (present.All(IsPlainNumber))
@@ -166,6 +178,62 @@ namespace SqlPrompter.Core.Editing
 
             return text.ToString();
         }
+        /// <summary>
+        /// A number the grid wrote with the decimal separator of the culture (<c>1,25</c>, <c>-0,5</c>, <c>1,5E+20</c>) with a point; any other text is returned as it is.
+        /// Only a value that is a number with exactly one separator is changed.
+        /// </summary>
+        internal static string Normalize(string value, string separator)
+        {
+            if (separator == "." || string.IsNullOrEmpty(value) || value.IndexOf(separator, StringComparison.Ordinal) < 0 || value.IndexOf(separator, StringComparison.Ordinal) != value.LastIndexOf(separator, StringComparison.Ordinal))
+            {
+                return value;
+            }
+
+            var candidate = value.Replace(separator, ".");
+            return IsPlainNumber(candidate) || IsFloat(candidate) ? candidate : value;
+        }
+
+        private static bool IsFloat(string v)
+        {
+            var e = v.IndexOfAny(new[] { 'e', 'E' });
+            if (e <= 0 || e == v.Length - 1)
+            {
+                return false;
+            }
+
+            var mantissa = v.Substring(0, e);
+            var exponent = v.Substring(e + 1);
+            if (exponent.Length > 0 && (exponent[0] == '+' || exponent[0] == '-'))
+            {
+                exponent = exponent.Substring(1);
+            }
+
+            var digits = mantissa.TrimStart('-');
+            var dot = digits.IndexOf('.');
+            var whole = dot < 0 ? digits : digits.Substring(0, dot);
+            var fraction = dot < 0 ? string.Empty : digits.Substring(dot + 1);
+            return whole.Length > 0 && whole.All(char.IsDigit) && fraction.All(char.IsDigit) && (dot < 0 || fraction.Length > 0) && exponent.Length > 0 && exponent.All(char.IsDigit);
+        }
+
+        private static bool IsHexBinary(string v) =>
+            v.Length >= 4 && v.Length % 2 == 0 && (v.StartsWith("0x", StringComparison.Ordinal) || v.StartsWith("0X", StringComparison.Ordinal)) && v.Skip(2).All(Uri.IsHexDigit);
+
+        /// <summary>The value for a column of the temporary table: an empty cell of a typed column is NULL, a float with an exponent and a binary value stay as they are.</summary>
+        private static string TemporaryLiteral(string original, string type, string value)
+        {
+            if (!type.StartsWith("nvarchar", StringComparison.Ordinal) && original.Length == 0)
+            {
+                return "NULL";
+            }
+
+            if ((type == "float" && IsFloat(value)) || (type.StartsWith("varbinary", StringComparison.Ordinal) && IsHexBinary(value)))
+            {
+                return value;
+            }
+
+            return Literal(value);
+        }
+
         public static string Literal(string value)
         {
             if (value == "NULL")

@@ -1,3 +1,4 @@
+using System.Linq;
 using SqlPrompter.Core.Editing;
 using Xunit;
 
@@ -122,5 +123,74 @@ namespace SqlPrompter.Tests
         [InlineData("SELECT 1", null)]
         [InlineData("-- FROM x\nSELECT * FROM db.dbo.T", "db.dbo.T")]
         public void TheTableIsTheFirstOneAfterFrom(string query, string expected) => Assert.Equal(expected, GridScripter.GuessTable(query));
+
+        // Numbers copied with the decimal comma of the user's culture (#530).
+
+        [Fact]
+        public void NumbersWithADecimalCommaBecomeDecimalColumnsWrittenWithAPoint()
+        {
+            var text = GridScripter.ToTemporaryTable("Fl\tMn\r\n1,25\t12,50\r\n100000,5\t3,00\r\n", ",");
+
+            Assert.Contains("Fl decimal(8, 2) NULL", text);
+            Assert.Contains("Mn decimal(4, 2) NULL", text);
+            Assert.Contains("(1.25, 12.50)", text);
+            Assert.Contains("(100000.5, 3.00)", text);
+            Assert.DoesNotContain("N'1,25'", text);
+        }
+
+        [Fact]
+        public void TheDecimalCommaIsOnlyAnumberWhenEveryValueOfTheColumnIsOne()
+        {
+            var text = GridScripter.ToTemporaryTable("Note\r\n1,5\r\nabc, def\r\n", ",");
+
+            Assert.Contains("Note nvarchar(50) NULL", text);
+            Assert.Contains("N'1,5'", text);
+        }
+
+        [Fact]
+        public void TheDefaultSeparatorLeavesACommaAlone()
+        {
+            var text = GridScripter.ToTemporaryTable("A\r\n1,25\r\n");
+
+            Assert.Contains("A nvarchar(50) NULL", text);
+            Assert.Contains("N'1,25'", text);
+        }
+
+        [Theory]
+        [InlineData("1,5E+20|2", ",", "float")]
+        [InlineData("1.5E-05|0.25", ".", "float")]
+        [InlineData("-3,25|4", ",", "decimal(3, 2)")]
+        public void NumbersWithAnExponentAreFloat(string values, string separator, string expected) =>
+            Assert.Equal(expected, GridScripter.InferType(values.Split('|').Select(v => GridScripter.Normalize(v, separator))));
+
+        [Fact]
+        public void FloatValuesKeepTheirExponentInTheScript()
+        {
+            var text = GridScripter.ToTemporaryTable("F\r\n1,5E+20\r\n2\r\n", ",");
+
+            Assert.Contains("F float NULL", text);
+            Assert.Contains("(1.5E+20)", text);
+            Assert.Contains("(2)", text);
+        }
+
+        [Fact]
+        public void BinaryValuesBecomeVarbinaryWithBinaryLiterals()
+        {
+            var text = GridScripter.ToTemporaryTable("B\r\n0x0102\r\nNULL\r\n");
+
+            Assert.Contains("B varbinary(max) NULL", text);
+            Assert.Contains("(0x0102)", text);
+            Assert.Contains("(NULL)", text);
+        }
+
+        [Fact]
+        public void NormalizeChangesOnlyNumbersWithOneSeparator()
+        {
+            Assert.Equal("1.25", GridScripter.Normalize("1,25", ","));
+            Assert.Equal("-0.5", GridScripter.Normalize("-0,5", ","));
+            Assert.Equal("1,2,3", GridScripter.Normalize("1,2,3", ","));
+            Assert.Equal("a,b", GridScripter.Normalize("a,b", ","));
+            Assert.Equal("1,25", GridScripter.Normalize("1,25", "."));
+        }
     }
 }

@@ -54,7 +54,7 @@ namespace SqlPrompter.Ssms
                     Clipboard.SetText(original);
                 }
 
-                var insert = GridScripter.ToTemporaryTable(copied);
+                var insert = GridScripter.ToTemporaryTable(copied, System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator);
                 if (insert == null)
                 {
                     Tell("Select the rows (or cells) in the results grid first.");
