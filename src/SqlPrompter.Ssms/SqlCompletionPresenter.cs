@@ -470,6 +470,12 @@ namespace SqlPrompter.Ssms
                 }
 
                 wasDown = down;
+                // The query tab was switched, opened or closed: the editor of this list is not on the screen or has lost the keyboard focus (#520). The list never takes the focus itself.
+                if (!outside && (!view.VisualElement.IsVisible || !view.HasAggregateFocus))
+                {
+                    outside = true;
+                }
+
                 if (!outside)
                 {
                     var foreground = GetForegroundWindow();
@@ -481,7 +487,7 @@ namespace SqlPrompter.Ssms
 
                 if (outside)
                 {
-                    Log.Write("The suggestion list closes: a click outside it or another application in front.");
+                    Log.Write("The suggestion list closes: a click outside it, another application in front or its editor is not visible.");
                     var session = ownerSession;
                     Close();
                     OutsideClicked?.Invoke(this, EventArgs.Empty);
