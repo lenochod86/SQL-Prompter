@@ -123,5 +123,70 @@ namespace SqlPrompter.Tests
 
             Assert.Equal(Key("SQLQuery3.sql"), store.Entries().Single().Key);
         }
+
+        // A tab that was restored at start continues its history entry (#529): its id is kept with the saved tab.
+
+        [Fact]
+        public void TheIdOfTheOpenTabIsKnownByItsDocument()
+        {
+            var store = Store();
+            Make(store, Key("SQLQuery5.sql"), "", "SELECT 1");
+
+            Assert.Equal(store.Entries().Single().Id, store.IdOfOpen(Key("SQLQuery5.sql")));
+            Assert.Null(store.IdOfOpen(Key("SQLQuery9.sql")));
+        }
+
+        [Fact]
+        public void ARestoredTabAfterANormalCloseContinuesItsEntryWithTheNewName()
+        {
+            var store = Store();
+            Make(store, Key("SQLQuery5.sql"), "", "SELECT 1");
+            var id = store.IdOfOpen(Key("SQLQuery5.sql"));
+            store.Close(Key("SQLQuery5.sql"), Now.AddMinutes(1));
+
+            // SSMS restores the unsaved tab under another number.
+            Assert.Equal(string.Empty, store.Rebind(id, Key("SQLQuery4.sql"), Now.AddMinutes(2)));
+            store.Track(Key("SQLQuery4.sql"), "", "s", "d", "SELECT 1", Now.AddMinutes(2));
+            store.Track(Key("SQLQuery4.sql"), "", "s", "d", "SELECT 1 FROM t", Now.AddMinutes(3));
+            store.Track(Key("SQLQuery4.sql"), "", "s", "d", "SELECT 1 FROM t", Now.AddMinutes(4));
+
+            var entry = Assert.Single(store.Entries());
+            Assert.Equal(id, entry.Id);
+            Assert.False(entry.ClosedAtUtc.HasValue);
+            Assert.Equal("SELECT 1 FROM t", entry.Text);
+        }
+
+        [Fact]
+        public void ARestoredTabAfterAKilledProcessContinuesItsEntryAndKeepsItsVersions()
+        {
+            var store = Store();
+            Make(store, Key("SQLQuery5.sql"), "", "SELECT 1");
+            store.Track(Key("SQLQuery5.sql"), "", "s", "d", "SELECT 2", Now.AddSeconds(10));
+            store.Track(Key("SQLQuery5.sql"), "", "s", "d", "SELECT 2", Now.AddSeconds(20));
+            var id = store.IdOfOpen(Key("SQLQuery5.sql"));
+
+            // The process was killed: the new run loads the file, where the tab is still open.
+            var next = Store();
+            next.Load();
+            next.Rebind(id, Key("SQLQuery4.sql"), Now.AddMinutes(5));
+            next.Track(Key("SQLQuery4.sql"), "", "s", "d", "SELECT 2", Now.AddMinutes(5));
+
+            var entry = Assert.Single(next.Entries());
+            Assert.Equal(id, entry.Id);
+            Assert.False(entry.ClosedAtUtc.HasValue);
+            Assert.Equal(2, next.Tabs.Single().Versions.Count);
+        }
+
+        [Fact]
+        public void TheHistoryIdIsSavedWithTheTab()
+        {
+            var path = Path.Combine(folder, "tabs.json");
+            new TabSessionStore(path).Save(new[] { new SavedTab { Text = "SELECT 1", HistoryId = "abc123" }, new SavedTab { Text = "SELECT 2" } });
+
+            var tabs = new TabSessionStore(path).Load();
+
+            Assert.Equal("abc123", tabs[0].HistoryId);
+            Assert.Null(tabs[1].HistoryId);
+        }
     }
 }
