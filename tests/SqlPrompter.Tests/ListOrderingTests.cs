@@ -83,5 +83,29 @@ namespace SqlPrompter.Tests
             Assert.False(ListOrdering.Matches("CustomerName", "zz"));
             Assert.False(ListOrdering.Matches(null, "a"));
         }
+
+        [Fact]
+        public void OneTypedCharacterKeepsOnlyTheMatchesAndTheBestOnesFirst()
+        {
+            // The objects of the sales schema of the test database, in the order of their sort text (#521).
+            var names = new[] { "Orders", "Customers", "OrderItems", "vOrderTotals", "Payments", "ProductCategories", "Products", "ShipmentLines" };
+
+            var matches = ListOrdering.Filter(names, "P", s => s, loose: true);
+
+            Assert.DoesNotContain("Orders", matches);
+            Assert.DoesNotContain("Customers", matches);
+            Assert.DoesNotContain("OrderItems", matches);
+            Assert.Equal(new[] { "Payments", "ProductCategories", "Products", "ShipmentLines" }, matches.ToArray());
+        }
+
+        [Fact]
+        public void OneTypedCharacterPutsThePrefixMatchBeforeTheOthers()
+        {
+            var names = new[] { "all_columns", "check_constraints", "columns", "objects" };
+
+            var matches = ListOrdering.Filter(names, "co", s => s, loose: true);
+
+            Assert.Equal("columns", matches[0]);
+        }
     }
 }
