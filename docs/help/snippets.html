@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snippets - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a class="current" href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Snippets</h1>
+<p class="lead">Text templates expanded from a prefix, with fields, and a way to wrap the selection.</p>
+
+<h2>Using a snippet</h2>
+<figure>
+  <img src="images/snippet-list.png" alt="A snippet in the suggestion list">
+  <figcaption>A snippet appears in the list marked <em>snippet</em>, with its description; the description area shows its body.</figcaption>
+</figure>
+<ol>
+  <li>Type the prefix. The snippet is in the suggestion list next to the other items.</li>
+  <li><kbd>Tab</kbd> (or <kbd>Enter</kbd>, or <kbd>Space</kbd> when the prefix is complete) expands it. Lines are indented like the line they go into.</li>
+  <li>If the snippet has fields, the caret goes to the first one. <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> cycle between the fields, typing replaces the selected default value, a field that appears several times is updated everywhere at once, <kbd>Enter</kbd> moves on and ends the editing after the last field, <kbd>Esc</kbd> ends it at once. The caret finally goes to <code>$CURSOR$</code>.</li>
+</ol>
+
+<h2>Snippet body</h2>
+<table>
+  <tr><th style="width:190px">Placeholder</th><th>Replaced by</th></tr>
+  <tr><td><code>$CURSOR$</code></td><td>Where the caret ends.</td></tr>
+  <tr><td><code>$SELECTEDTEXT$</code></td><td>The selected text (for <em>Surround Selection With Snippet</em>).</td></tr>
+  <tr><td><code>$USER$</code></td><td>The name of the Windows user.</td></tr>
+  <tr><td><code>$DBNAME$</code></td><td>The database of the window.</td></tr>
+  <tr><td><code>$DATE(format)$</code></td><td>The current date in a .NET format, for example <code>$DATE(yyyy-MM-dd)$</code>.</td></tr>
+  <tr><td><code>$field$</code></td><td>A custom field. Its default value is set in the <em>Custom fields</em> table of the manager and shown highlighted when the snippet is inserted.</td></tr>
+</table>
+
+<h2>The snippet manager</h2>
+<figure>
+  <img src="images/snippet-manager.png" alt="The snippet manager" width="640">
+  <figcaption><b>SQL Prompter &gt; Manage Snippets...</b>: the snippets by prefix, the body colored as SQL and the table of custom fields.</figcaption>
+</figure>
+<p>The manager lists the snippets by prefix; the body is colored (fields in bold), and the fields have their own table. <b>New</b> starts a snippet, <b>Save</b> writes it, <b>Delete</b> removes it. <b>Ctrl+Z</b> does not work inside the body box (the coloring rewrites the text); keep the text in the editor of your choice if you need undo. The same window opens from <b>Settings &gt; Snippets &gt; Edit snippets...</b>.</p>
+
+<h2>Commands</h2>
+<table>
+  <tr><th style="width:290px">Command (SQL Prompter menu)</th><th>What it does</th></tr>
+  <tr><td>Surround Selection With Snippet...</td><td>Lists the snippets that use <code>$SELECTEDTEXT$</code>; the chosen one wraps the selection (for example <code>ISNULL($SELECTEDTEXT$, 0)</code>).</td></tr>
+  <tr><td>New Snippet From Selection...</td><td>Opens the manager with the selected text as the body of a new snippet.</td></tr>
+  <tr><td>Manage Snippets...</td><td>Opens the manager.</td></tr>
+</table>
+<p>A run in the <a href="history.html">query history</a> can also be turned into a snippet (<b>Make A Snippet</b>).</p>
+
+<h2>Where snippets live</h2>
+<ul>
+  <li>One JSON file per snippet in <code>%APPDATA%\SqlPrompter\Snippets</code>, or in the folder set in <b>Settings &gt; Snippets &gt; Snippet folder</b>. The format is the one of the snippet folder of SQL Prompt; a folder copied from SQL Prompt works as is.</li>
+  <li><b>Shared snippet folders</b> (semicolon-separated: a folder in a repository, a network share) are read in addition to the personal folder. A personal snippet with the same prefix wins; the manager marks shared ones <em>(shared)</em>, and saving one writes a personal copy. All folders are watched and reload after a change.</li>
+  <li>The folders are watched, so a file you add or edit is picked up without a restart.</li>
+</ul>
+
+<figure>
+  <img src="images/settings-snippets.png" alt="Settings: Snippets" width="640">
+  <figcaption>Settings &gt; Snippets.</figcaption>
+</figure>
+
+<h2>Built-in snippets and import</h2>
+<p>About 30 snippets ship with SQL Prompter (queries such as <code>top100</code>, <code>sel</code>, <code>cnt</code>, data changes such as <code>ins</code>, <code>upd</code>, <code>del</code>, <code>merge</code>, structure such as <code>ct</code>, <code>idx</code>, control flow such as <code>tran</code>, <code>trycatch</code>, <code>cursor</code>, and information queries such as <code>blocking</code>, <code>locks</code>, <code>sizes</code>). Each is written to the folder once at the first start, so a snippet you edit or delete is never written again, and one of yours with the same prefix is skipped. <b>Settings &gt; Snippets &gt; Reset built-in snippets...</b> writes the originals back (your own snippets are not touched). <b>Import snippets...</b> converts <code>.sqlpromptsnippet</code> backups of SQL Prompt, and copies <code>.json</code> snippet files, into the folder.</p>
+</main>
+</body>
+</html>

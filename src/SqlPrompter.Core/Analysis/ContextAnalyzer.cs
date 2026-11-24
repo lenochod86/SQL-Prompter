@@ -39,7 +39,7 @@ namespace SqlPrompter.Core.Analysis
                 return Array.Empty<TableSource>();
             }
 
-            var tokens = Lexer.Tokenize(text).Where(t => t.Kind != TokenKind.Comment).ToList();
+            var tokens = CodeTokens(text, Lexer.Tokenize(text), position);
             var index = Math.Min(CountBefore(tokens, position), Math.Max(0, tokens.Count - 1));
             if (tokens.Count == 0)
             {
@@ -92,7 +92,7 @@ namespace SqlPrompter.Core.Analysis
                 return CaretContext.None;
             }
 
-            var tokens = WithMissingOn(all.Where(t => t.Kind != TokenKind.Comment).ToList());
+            var tokens = WithMissingOn(CodeTokens(text, all, caret));
             var word = tokens.FirstOrDefault(t => t.Start < caret && caret <= t.End);
             if (word != null && word.Kind == TokenKind.Number)
             {
@@ -147,6 +147,13 @@ namespace SqlPrompter.Core.Analysis
             var statementEnd = tokens.Count;
             for (var b = 0; b < bounds.Count; b++)
             {
+                // FROM |<newline>END (or a following statement): the next statement starts right at the caret, but the caret still completes the name of the previous one.
+                if (bounds[b] == nameStart && word == null && b > 0 && nameStart > 0 && tokens[nameStart - 1].Kind != TokenKind.Semicolon &&
+                    ObjectNameAnchor(tokens, nameStart - 1, bounds[b - 1]) != null)
+                {
+                    continue;
+                }
+
                 if (bounds[b] <= nameStart)
                 {
                     statementStart = bounds[b];
@@ -228,6 +235,32 @@ namespace SqlPrompter.Core.Analysis
                 return module;
             }
 
+            // ALTER DATABASE |, DROP DATABASE [IF EXISTS] |, USE |, BACKUP DATABASE |, DBCC CHECKDB (|: the databases of the server only (#447).
+            if (qualifier.Count == 0 && TryDatabaseName(tokens, statementStart, anchorIndex, out var currentAllowed))
+            {
+                var databases = Make(ContextKind.ObjectName);
+                databases.DatabaseName = true;
+                databases.CurrentDatabaseAllowed = currentAllowed;
+                return databases;
+            }
+
+            // ALTER DATABASE Db |: what can follow the name; DROP DATABASE Db |: nothing.
+            if (qualifier.Count == 0 && anchorIndex == statementStart + 2 && tokens[statementStart + 1].IsWord("DATABASE") && anchor.IsNamePart)
+            {
+                if (tokens[statementStart].IsWord("ALTER"))
+                {
+                    var afterName = Make(ContextKind.Keyword);
+                    afterName.PreferredKeywords = new[] { "SET", "MODIFY", "ADD", "REMOVE", "COLLATE" };
+                    afterName.OnlyExpectedKeywords = true;
+                    return afterName;
+                }
+
+                if (tokens[statementStart].IsWord("DROP"))
+                {
+                    return Make(ContextKind.Name);
+                }
+            }
+
             // 1. Object name after FROM, JOIN, UPDATE, INTO …
             var objectKeywords = ObjectNameAnchor(tokens, anchorIndex, statementStart);
             if (afterIfExists && objectKeywords != null)
@@ -246,6 +279,7 @@ namespace SqlPrompter.Core.Analysis
 
                 var objectName = Make(ContextKind.ObjectName);
                 objectName.InsertTarget = (anchor.IsWord("INTO") && anchorIndex > statementStart && tokens[anchorIndex - 1].IsWord("INSERT")) || anchor.IsWord("INSERT");
+                objectName.TableFunctionsOnly = anchor.IsWord("APPLY");
                 objectName.ProcedureName = anchor.IsWord("EXEC") || anchor.IsWord("EXECUTE") || anchor.Kind == TokenKind.Operator;
                 objectName.PreferredKeywords = qualifier.Count == 0 ? objectKeywords ?? Array.Empty<string>() : Array.Empty<string>();
 
@@ -264,6 +298,15 @@ namespace SqlPrompter.Core.Analysis
                 }
 
                 return objectName;
+            }
+
+            // EXEC schema.Procedure @|, EXEC schema.Procedure @a = 1, |: the parameters of the procedure (#523).
+            if (qualifier.Count == 0 && TryExecArgument(tokens, statementStart, statementEnd, caretIndex, word, out var execParts, out var execUsed))
+            {
+                var argument = Make(ContextKind.Variable);
+                argument.ExecProcedure = execParts;
+                argument.ExecUsedParameters = execUsed;
+                return argument;
             }
 
             if (namesUnknownObject)
@@ -500,24 +543,7 @@ namespace SqlPrompter.Core.Analysis
                 return;
             }
 
-            var parts = new List<string>();
-            var k = open - 1;
-            while (k >= s.StatementStart && tokens[k].IsNamePart)
-            {
-                parts.Insert(0, tokens[k].IdentifierValue);
-                if (k - 1 >= s.StatementStart && tokens[k - 1].Kind == TokenKind.Dot)
-                {
-                    k -= 2;
-                }
-                else
-                {
-                    k--;
-                    break;
-                }
-            }
-
-            if (parts.Count == 0 || parts.Count > 3 || k < s.StatementStart ||
-                !(tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= s.StatementStart && tokens[k - 1].IsWord("INSERT"))))
+            if (!TryInsertTable(tokens, s.StatementStart, open, out var parts))
             {
                 return;
             }
@@ -531,7 +557,7 @@ namespace SqlPrompter.Core.Analysis
                 }
             }
 
-            target.InsertTail = new TableSource(TableSourceKind.Object, parts, null, 0);
+            target.InsertTail = InsertTableSource(parts);
             target.InsertTailColumns = columns;
         }
 
@@ -661,6 +687,74 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The code tokens of a script without the comments. When the caret stands right after a comment (only white space between them) that begins on a line of
+        /// its own, the comment ends the statement before it as far as the caret is concerned: a token of no width, a semicolon, is put in front of the comment, so
+        /// that the caret is at the start of a statement and not at the continuation of the one above the comment (#412). A comment on the line of the previous
+        /// token (<c>SELECT a /* c */ |FROM</c>) is part of the statement.
+        /// </summary>
+        private static List<Token> CodeTokens(string text, IReadOnlyList<Token> all, int caret)
+        {
+            var tokens = all.Where(t => t.Kind != TokenKind.Comment).ToList();
+            var last = -1;
+            for (var i = 0; i < all.Count; i++)
+            {
+                if (all[i].Kind == TokenKind.Comment && all[i].End <= caret && IsBlank(text, all[i].End, caret))
+                {
+                    last = i;
+                }
+            }
+
+            if (last < 0)
+            {
+                return tokens;
+            }
+
+            // The run of comments that ends at the caret: the first one decides.
+            var first = last;
+            while (first > 0 && all[first - 1].Kind == TokenKind.Comment && IsBlank(text, all[first - 1].End, all[first].Start))
+            {
+                first--;
+            }
+
+            var runStart = all[first].Start;
+            var previous = tokens.FindLastIndex(t => t.End <= runStart);
+            if (previous < 0 || tokens[previous].Kind == TokenKind.Semicolon)
+            {
+                return tokens;
+            }
+
+            var onItsOwnLine = false;
+            for (var i = tokens[previous].End; i < runStart; i++)
+            {
+                if (text[i] == '\n' || text[i] == '\r')
+                {
+                    onItsOwnLine = true;
+                    break;
+                }
+            }
+
+            if (onItsOwnLine)
+            {
+                tokens.Insert(previous + 1, new Token(TokenKind.Semicolon, runStart, runStart, string.Empty, false));
+            }
+
+            return tokens;
+        }
+
+        private static bool IsBlank(string text, int from, int to)
+        {
+            for (var i = from; i < to; i++)
+            {
+                if (!char.IsWhiteSpace(text[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static bool Contains(Token token, int caret)
@@ -803,6 +897,64 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>
+        /// The caret stands where an argument of <c>EXEC [@result =] name</c> starts (right after the name or after a comma): the name parts of the
+        /// procedure and the parameters already named in the call. A value after <c>=</c> is not such a place.
+        /// </summary>
+        private static bool TryExecArgument(List<Token> tokens, int statementStart, int statementEnd, int caretIndex, Token word, out List<string> parts, out List<string> used)
+        {
+            parts = null;
+            used = null;
+            if (statementStart >= tokens.Count || !(tokens[statementStart].IsWord("EXEC") || tokens[statementStart].IsWord("EXECUTE")) || (word != null && word.Kind != TokenKind.Variable))
+            {
+                return false;
+            }
+
+            var i = statementStart + 1;
+            if (i + 1 < statementEnd && tokens[i].Kind == TokenKind.Variable && tokens[i + 1].Kind == TokenKind.Operator && tokens[i + 1].Text == "=")
+            {
+                i += 2;
+            }
+
+            var names = new List<string>();
+            while (i < statementEnd && tokens[i].IsNamePart)
+            {
+                names.Add(tokens[i].IdentifierValue);
+                i++;
+                if (i + 1 < statementEnd && tokens[i].Kind == TokenKind.Dot && tokens[i + 1].IsNamePart)
+                {
+                    i++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (names.Count == 0 || caretIndex < i || caretIndex - 1 >= statementEnd || caretIndex == 0)
+            {
+                return false;
+            }
+
+            var previous = tokens[caretIndex - 1];
+            if (caretIndex != i && previous.Kind != TokenKind.Comma)
+            {
+                return false;
+            }
+
+            parts = names;
+            used = new List<string>();
+            for (var j = i; j + 1 < statementEnd; j++)
+            {
+                if (tokens[j].Kind == TokenKind.Variable && tokens[j + 1].Kind == TokenKind.Operator && tokens[j + 1].Text == "=" && !ReferenceEquals(tokens[j], word))
+                {
+                    used.Add(tokens[j].Text);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// If a table name follows the token, returns the keywords that make sense there
         /// (e.g. FROM after DELETE). Otherwise null.
         /// </summary>
@@ -855,6 +1007,86 @@ namespace SqlPrompter.Core.Analysis
             }
         }
 
+        private static readonly HashSet<string> DbccDatabaseCommands = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "CHECKDB", "CHECKALLOC", "CHECKCATALOG", "SHRINKDATABASE", "CHECKFILEGROUP",
+        };
+
+        /// <summary>The caret is where the name of a database of the server goes (#447); <paramref name="currentAllowed"/> when CURRENT can stand in its place.</summary>
+        private static bool TryDatabaseName(List<Token> tokens, int statementStart, int anchorIndex, out bool currentAllowed)
+        {
+            currentAllowed = false;
+            var head = tokens[statementStart];
+            var second = statementStart + 1 < tokens.Count ? tokens[statementStart + 1] : null;
+            var anchor = tokens[anchorIndex];
+            if (anchorIndex == statementStart)
+            {
+                return head.IsWord("USE");
+            }
+
+            if (second != null && second.IsWord("DATABASE") && anchorIndex == statementStart + 1)
+            {
+                currentAllowed = head.IsWord("ALTER");
+                return head.IsWord("ALTER") || head.IsWord("DROP") || head.IsWord("BACKUP") || head.IsWord("RESTORE");
+            }
+
+            // DROP DATABASE a, |
+            if (head.IsWord("DROP") && second != null && second.IsWord("DATABASE") && anchor.Kind == TokenKind.Comma)
+            {
+                return true;
+            }
+
+            // DROP DATABASE IF EXISTS |
+            if (head.IsWord("DROP") && second != null && second.IsWord("DATABASE") && anchor.IsWord("EXISTS") && anchorIndex == statementStart + 3 &&
+                tokens[statementStart + 2].IsWord("IF"))
+            {
+                return true;
+            }
+
+            return head.IsWord("DBCC") && second != null && DbccDatabaseCommands.Contains(second.Upper ?? string.Empty) && anchorIndex == statementStart + 2 && anchor.Kind == TokenKind.OpenParen;
+        }
+
+        /// <summary>
+        /// The table of <c>INSERT [INTO] table (</c> before the opening parenthesis at <paramref name="open"/>: a name of up to three parts, a temporary
+        /// table (<c>#t</c>) or a table variable (<c>@t</c>, #449).
+        /// </summary>
+        private static bool TryInsertTable(List<Token> tokens, int statementStart, int open, out List<string> parts)
+        {
+            parts = new List<string>();
+            var k = open - 1;
+            if (k >= statementStart && tokens[k].Kind == TokenKind.Variable)
+            {
+                parts.Add(tokens[k].Text);
+                k--;
+            }
+            else
+            {
+                while (k >= statementStart && tokens[k].IsNamePart)
+                {
+                    parts.Insert(0, tokens[k].IdentifierValue);
+                    if (k - 1 >= statementStart && tokens[k - 1].Kind == TokenKind.Dot)
+                    {
+                        k -= 2;
+                    }
+                    else
+                    {
+                        k--;
+                        break;
+                    }
+                }
+            }
+
+            return parts.Count > 0 && parts.Count <= 3 && k >= statementStart &&
+                (tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= statementStart && tokens[k - 1].IsWord("INSERT")));
+        }
+
+        private static TableSource InsertTableSource(List<string> parts)
+        {
+            var name = parts.Count == 1 ? parts[0] : string.Empty;
+            var kind = name.StartsWith("@", StringComparison.Ordinal) ? TableSourceKind.Variable : name.StartsWith("#", StringComparison.Ordinal) ? TableSourceKind.TempTable : TableSourceKind.Object;
+            return new TableSource(kind, parts, null, 0);
+        }
+
         /// <summary>
         /// "INSERT INTO table (|" or "INSERT INTO table (a, |": the columns of the table. Null when the caret is somewhere else.
         /// </summary>
@@ -877,35 +1109,13 @@ namespace SqlPrompter.Core.Analysis
                 open = j;
             }
 
-            var parts = new List<string>();
-            var k = open - 1;
-            while (k >= statementStart && tokens[k].IsNamePart)
-            {
-                parts.Insert(0, tokens[k].IdentifierValue);
-                if (k - 1 >= statementStart && tokens[k - 1].Kind == TokenKind.Dot)
-                {
-                    k -= 2;
-                }
-                else
-                {
-                    k--;
-                    break;
-                }
-            }
-
-            if (parts.Count == 0 || parts.Count > 3 || k < statementStart)
-            {
-                return null;
-            }
-
-            var isInsert = tokens[k].IsWord("INSERT") || (tokens[k].IsWord("INTO") && k - 1 >= statementStart && tokens[k - 1].IsWord("INSERT"));
-            if (!isInsert)
+            if (!TryInsertTable(tokens, statementStart, open, out var parts))
             {
                 return null;
             }
 
             var context = make(ContextKind.InsertColumns);
-            context.Sources = new[] { new TableSource(TableSourceKind.Object, parts, null, 0) };
+            context.Sources = new[] { InsertTableSource(parts) };
             context.FirstInsertColumn = tokens[anchorIndex].Kind == TokenKind.OpenParen;
             return context;
         }

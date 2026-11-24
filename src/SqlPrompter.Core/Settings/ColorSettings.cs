@@ -51,6 +51,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "colorTab")]
         public bool ColorTab { get; set; }
 
+        /// <summary>How the tab of a query window is colored: the whole tab filled with the color (true, like SSMS does with the color of the Connect dialog, #438) or only the thin accent bar (false).</summary>
+        [DataMember(Name = "fillTab")]
+        public bool FillWholeTab { get; set; }
+
         /// <summary>Color the status strip inside each query window (the one with Connected, the server, login and database); each window by its own connection.</summary>
         [DataMember(Name = "colorWindowStatusBar")]
         public bool ColorWindowStatusBar { get; set; }
@@ -70,6 +74,7 @@ namespace SqlPrompter.Core.Settings
         {
             Enabled = Enabled,
             ColorTab = ColorTab,
+            FillWholeTab = FillWholeTab,
             ColorWindowStatusBar = ColorWindowStatusBar,
             ColorShellStatusBar = ColorShellStatusBar,
             Environments = Environments.Select(e => new ColorEnvironment { Name = e.Name, Color = e.Color }).ToList(),
@@ -90,6 +95,7 @@ namespace SqlPrompter.Core.Settings
         {
             Enabled = true;
             ColorTab = true;
+            FillWholeTab = true;
             ColorWindowStatusBar = true;
             ColorShellStatusBar = false;
             Environments = new List<ColorEnvironment>();

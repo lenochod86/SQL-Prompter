@@ -94,6 +94,8 @@ namespace SqlPrompter.Ssms
 #pragma warning restore VSSDK007
             SettingsService.Changed += changed;
             view.Closed += (s, e) => SettingsService.Changed -= changed;
+            MetadataService.SnapshotReplaced += changed;
+            view.Closed += (s, e) => MetadataService.SnapshotReplaced -= changed;
             delay.Start();
         }
 

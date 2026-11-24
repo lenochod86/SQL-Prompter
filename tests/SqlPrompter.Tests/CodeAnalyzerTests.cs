@@ -94,7 +94,7 @@ namespace SqlPrompter.Tests
         [Fact]
         public void ProcedureParametersAndSystemVariablesAreNotReported()
         {
-            Assert.Empty(Find("CREATE PROCEDURE p @a int AS SELECT 1"));
+            Assert.DoesNotContain(Find("CREATE PROCEDURE p @a int AS SELECT 1"), i => i.StartsWith("UnusedVariable"));
             Assert.Empty(Find("SELECT @@ROWCOUNT"));
         }
 

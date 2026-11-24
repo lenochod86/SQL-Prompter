@@ -127,6 +127,8 @@ namespace SqlPrompter.Ssms
         private CompletionItem suggestionItem;
         private double listWidth = MinListWidth;
         private int visibleRows = VisibleRows;
+        private ITrackingSpan lastSpan;
+        private int chosenRows = VisibleRows;
         private double widthSetting;
         private double dragRows;
         private double dragWidth;
@@ -151,6 +153,7 @@ namespace SqlPrompter.Ssms
             }
 
             ReadSizeSettings();
+            kindBrushes = null;
             scrollBar = new ScrollBar { Orientation = Orientation.Vertical, Width = 14, Visibility = Visibility.Collapsed, Focusable = false };
             scrollBar.ValueChanged += (s, e) =>
             {
@@ -238,6 +241,7 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             ReadSizeSettings();
+            kindBrushes = null;
             ownerSession = session;
             Update(session, presentation);
             popup.IsOpen = true;
@@ -287,6 +291,7 @@ namespace SqlPrompter.Ssms
             suggestionItem = suggestion;
             EnsureSelectedVisible();
             Render();
+            lastSpan = applicableToSpan;
             Position(applicableToSpan);
             if (popup.IsOpen)
             {
@@ -383,10 +388,31 @@ namespace SqlPrompter.Ssms
         public bool IsOpen => popup.IsOpen;
 
         /// <summary>Opens the popup for a list given with <see cref="Present"/> (the editor's session opens it through <see cref="Open"/>).</summary>
+        /// <summary>The editor colors of the classes a suggestion can take (index = <see cref="SqlPrompter.Core.Snippets.SnippetHighlighter"/> class), read again each time the list opens (#418).</summary>
+        private Brush[] kindBrushes;
+
+        private Brush KindBrush(int editorClass)
+        {
+            if (kindBrushes == null)
+            {
+                var palette = EditorColors.ByKind();
+                kindBrushes = new Brush[palette.Length];
+                for (var i = 0; i < palette.Length; i++)
+                {
+                    var brush = new SolidColorBrush(palette[i]);
+                    brush.Freeze();
+                    kindBrushes[i] = brush;
+                }
+            }
+
+            return editorClass < kindBrushes.Length ? kindBrushes[editorClass] : null;
+        }
+
         public void Show()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             ReadSizeSettings();
+            kindBrushes = null;
             ownerSession = null;
             popup.IsOpen = true;
             descriptionPopup.IsOpen = descriptionText.Text.Length > 0;
@@ -444,6 +470,12 @@ namespace SqlPrompter.Ssms
                 }
 
                 wasDown = down;
+                // The query tab was switched, opened or closed: the editor of this list is not on the screen or has lost the keyboard focus (#520). The list never takes the focus itself.
+                if (!outside && (!view.VisualElement.IsVisible || !view.HasAggregateFocus))
+                {
+                    outside = true;
+                }
+
                 if (!outside)
                 {
                     var foreground = GetForegroundWindow();
@@ -455,7 +487,7 @@ namespace SqlPrompter.Ssms
 
                 if (outside)
                 {
-                    Log.Write("The suggestion list closes: a click outside it or another application in front.");
+                    Log.Write("The suggestion list closes: a click outside it, another application in front or its editor is not visible.");
                     var session = ownerSession;
                     Close();
                     OutsideClicked?.Invoke(this, EventArgs.Empty);
@@ -527,6 +559,7 @@ namespace SqlPrompter.Ssms
         {
             var behavior = SettingsService.Current.Behavior;
             visibleRows = Math.Max(MinRows, Math.Min(MaxRows, behavior.ListRows));
+            chosenRows = visibleRows;
             widthSetting = behavior.ListWidth > 0 ? Math.Max(MinWidth, Math.Min(MaxWidth, behavior.ListWidth)) : 0;
             lastItemList = null;
         }
@@ -555,10 +588,16 @@ namespace SqlPrompter.Ssms
                 dragRows += e.VerticalChange / RowHeight;
                 dragWidth += e.HorizontalChange;
                 visibleRows = Math.Max(MinRows, Math.Min(MaxRows, (int)Math.Round(dragRows)));
+                chosenRows = visibleRows;
                 widthSetting = Math.Max(MinWidth, Math.Min(MaxWidth, dragWidth));
                 listWidth = widthSetting;
                 listGrid.Width = listWidth;
                 ApplyRows();
+                // The list may be above the caret line: keep it off the line (its bottom edge stays) and within the room (#519).
+                if (lastSpan != null)
+                {
+                    Position(lastSpan);
+                }
             };
             thumb.DragCompleted += (s, e) =>
             {
@@ -906,11 +945,14 @@ namespace SqlPrompter.Ssms
         /// <summary>The script colored as SQL (keywords, strings, comments, variables) for the light or the dark theme.</summary>
         internal static void FillColored(TextBlock block, string text)
         {
+            text = SqlPrompter.Core.Editing.TabExpander.Expand(text, EditorTabSize.Current());
             var palette = EditorColors.ByKind();
-            var colors = new Color?[]
+            var colors = new Color?[palette.Length];
+            for (var c = 1; c < palette.Length; c++)
             {
-                null, palette[1], palette[2], palette[3], palette[4], null, palette[6], palette[7],
-            };
+                colors[c] = palette[c];
+            }
+
             var kinds = SqlPrompter.Core.Snippets.SnippetHighlighter.Classify(text);
             block.Inlines.Clear();
             var i = 0;
@@ -975,18 +1017,34 @@ namespace SqlPrompter.Ssms
 
         private void Position(ITrackingSpan applicableToSpan)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
                 var span = applicableToSpan.GetSpan(view.TextSnapshot);
                 var line = view.GetTextViewLineContainingBufferPosition(span.Start);
                 var bounds = line.GetCharacterBounds(span.Start);
-                var height = (Math.Min(items.Count, visibleRows) + (showSuggestion ? 1 : 0)) * RowHeight + (footer == null ? GripHeight : FooterHeight + (string.IsNullOrEmpty(footer.Hint) ? 0 : 20)) + 2;
-                var left = bounds.Left - view.ViewportLeft;
-                var below = bounds.Bottom - view.ViewportTop + 2;
-                var above = bounds.Top - view.ViewportTop - height - 2;
+                // The bounds are in the unzoomed units of the text view, the popup is placed in the units of the editor control: scale them (#501).
+                var zoom = view.ZoomLevel / 100.0;
+                var fixedHeight = (showSuggestion ? RowHeight : 0) + (footer == null ? GripHeight : FooterHeight + (string.IsNullOrEmpty(footer.Hint) ? 0 : 20)) + 2;
+                var left = (bounds.Left - view.ViewportLeft) * zoom;
+                var lineTop = (bounds.Top - view.ViewportTop) * zoom;
+                var lineBottom = (bounds.Bottom - view.ViewportTop) * zoom;
+                var areaHeight = view.ViewportHeight * zoom;
+                var wantedRows = Math.Min(items.Count, chosenRows);
+                var wantedHeight = wantedRows * RowHeight + fixedHeight;
+                var minHeight = Math.Min(wantedRows, MinRows) * RowHeight + fixedHeight;
+                SqlPrompter.Core.Editing.PopupPlacement.PlaceVertical(lineTop, lineBottom, wantedHeight, minHeight, 2, 0, areaHeight, out var top, out var fitHeight);
 
-                // Above the caret when the list does not fit below and there is room above.
-                var top = below + height > view.ViewportHeight && above >= 0 ? above : below;
+                // Fewer rows (it scrolls) when the list does not fit on either side; the remembered height is only a maximum.
+                var rows = Math.Max(1, Math.Min(chosenRows, (int)Math.Floor((fitHeight - fixedHeight) / RowHeight)));
+                if (rows != visibleRows && (rows < chosenRows || visibleRows != chosenRows))
+                {
+                    visibleRows = rows;
+                    ApplyRows();
+                    var shownHeight = Math.Min(items.Count, visibleRows) * RowHeight + fixedHeight;
+                    SqlPrompter.Core.Editing.PopupPlacement.PlaceVertical(lineTop, lineBottom, shownHeight, shownHeight, 2, 0, areaHeight, out top, out fitHeight);
+                }
+
                 popup.PlacementTarget = view.VisualElement;
                 popup.HorizontalOffset = left;
                 popup.VerticalOffset = top;
@@ -1028,6 +1086,9 @@ namespace SqlPrompter.Ssms
             private readonly InlineUIContainer keyContainer;
             private readonly TextBlock suffix;
             private readonly SqlCompletionPresenter owner;
+            private readonly Border outline = new Border { BorderThickness = new Thickness(1), IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+            private readonly Border accentBar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+            private bool selectedNow;
             private readonly TextBlock check = new TextBlock { Width = 16, Height = 16, Margin = new Thickness(6, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, FontSize = 14, Visibility = Visibility.Collapsed };
 
             public Row(SqlCompletionPresenter owner)
@@ -1044,6 +1105,10 @@ namespace SqlPrompter.Ssms
                 Root.Children.Add(icon);
                 Grid.SetColumn(check, 0);
                 Root.Children.Add(check);
+                Grid.SetColumnSpan(outline, 4);
+                Grid.SetColumnSpan(accentBar, 4);
+                Root.Children.Add(outline);
+                Root.Children.Add(accentBar);
 
                 name = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
                 name.SetResourceReference(TextBlock.ForegroundProperty, VsBrushes.ToolWindowTextKey);
@@ -1060,6 +1125,8 @@ namespace SqlPrompter.Ssms
                 Grid.SetColumn(suffix, 3);
                 Root.Children.Add(suffix);
 
+                Root.MouseEnter += (s, e) => ApplyHover(true);
+                Root.MouseLeave += (s, e) => ApplyHover(false);
                 Root.MouseLeftButtonDown += (s, e) =>
                 {
                     owner.OnRowClicked(this, e.ClickCount);
@@ -1083,22 +1150,18 @@ namespace SqlPrompter.Ssms
                 name.Inlines.Clear();
                 name.Inlines.Add(new Run(entry.CompletionItem.DisplayText) { FontStyle = FontStyles.Italic });
                 suffix.Text = string.Empty;
-                SetTextColor(isSelected);
-                if (isSelected)
-                {
-                    Root.SetResourceReference(Panel.BackgroundProperty, VsBrushes.HighlightKey);
-                }
-                else
-                {
-                    Root.ClearValue(Panel.BackgroundProperty);
-                    Root.Background = Brushes.Transparent;
-                }
+                SetTextColor();
+                SetLook(isSelected ? Look.Selected : Look.None);
             }
 
             public void Bind(CompletionItemWithHighlight entry, bool isSelected, bool isSoft)
             {
                 Item = entry;
                 var item = entry.CompletionItem;
+                // Rows live as long as the presenter, so the icon theme is set again each time (#488: a theme switch in an open tab).
+                var back = BackgroundColor;
+                ImageThemingUtilities.SetImageBackgroundColor(icon, back);
+                ImageThemingUtilities.SetImageBackgroundColor(keyIcon, back);
                 Root.Visibility = Visibility.Visible;
                 if (item.Properties.TryGetProperty(SqlCompletionSource.PickerHeaderKey, out string heading))
                 {
@@ -1108,9 +1171,8 @@ namespace SqlPrompter.Ssms
                     name.Inlines.Clear();
                     name.Inlines.Add(new Run(heading) { FontWeight = FontWeights.Bold });
                     suffix.Text = item.Suffix;
-                    SetTextColor(false);
-                    Root.ClearValue(Panel.BackgroundProperty);
-                    Root.Background = Brushes.Transparent;
+                    SetTextColor();
+                    SetLook(Look.None);
                     return;
                 }
 
@@ -1130,7 +1192,7 @@ namespace SqlPrompter.Ssms
                 if (item.Properties.TryGetProperty(SqlCompletionSource.DetailKey, out string detail))
                 {
                     var run = new Run(" " + detail) { FontSize = 11 };
-                    run.SetResourceReference(TextElement.ForegroundProperty, isSelected && !isSoft ? VsBrushes.HighlightTextKey : VsBrushes.ControlLinkTextKey);
+                    run.SetResourceReference(TextElement.ForegroundProperty, VsBrushes.ControlLinkTextKey);
                     name.Inlines.Add(run);
                 }
 
@@ -1140,22 +1202,95 @@ namespace SqlPrompter.Ssms
                     name.Inlines.Add(keyContainer);
                 }
                 suffix.Text = item.Suffix;
-                SetTextColor(isSelected && !isSoft);
-                if (isSelected)
+                SetTextColor();
+                if (item.Properties.TryGetProperty(SqlCompletionSource.KindKey, out SqlPrompter.Core.Completion.SuggestionKind kind))
                 {
-                    Root.SetResourceReference(Panel.BackgroundProperty, isSoft ? VsBrushes.ToolWindowBorderKey : VsBrushes.HighlightKey);
+                    var editorClass = SqlPrompter.Core.Completion.SuggestionColors.ClassOf(kind);
+                    var colored = editorClass.HasValue ? owner.KindBrush(editorClass.Value) : null;
+                    if (colored != null)
+                    {
+                        name.Foreground = colored;
+                    }
                 }
-                else
+                SetLook(isSelected ? (isSoft ? Look.Soft : Look.Selected) : Look.None);
+            }
+
+            private enum Look
+            {
+                None,
+                Hover,
+                Soft,
+                Selected,
+            }
+
+            private Look look;
+
+            private static int Rgb(System.Drawing.Color c)
+            {
+                return (c.R << 16) | (c.G << 8) | c.B;
+            }
+
+            private static SolidColorBrush Solid(int rgb)
+            {
+                var brush = new SolidColorBrush(Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb));
+                brush.Freeze();
+                return brush;
+            }
+
+            /// <summary>
+            /// A light row (#475): the accent of the theme blended into the background of the list, so the icon and the text keep their own colors on it.
+            /// A hard (typed or arrow-selected) row also gets an outline and an accent bar; a soft one only a weaker tint; the hovered one the weakest tint.
+            /// </summary>
+            private void SetLook(Look value)
+            {
+                look = value;
+                selectedNow = value == Look.Selected || value == Look.Soft;
+                if (value == Look.None)
                 {
                     Root.ClearValue(Panel.BackgroundProperty);
                     Root.Background = Brushes.Transparent;
+                    outline.Visibility = Visibility.Collapsed;
+                    accentBar.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                var accent = Rgb(VSColorTheme.GetThemedColor(EnvironmentColors.SystemHighlightColorKey));
+                var back = Rgb(VSColorTheme.GetThemedColor(EnvironmentColors.ToolWindowBackgroundColorKey));
+                var text = Rgb(VSColorTheme.GetThemedColor(EnvironmentColors.ToolWindowTextColorKey));
+                var ratio = value == Look.Selected ? SqlPrompter.Core.Completion.RowTint.SelectedRatio
+                    : value == Look.Soft ? SqlPrompter.Core.Completion.RowTint.SoftRatio
+                    : SqlPrompter.Core.Completion.RowTint.HoverRatio;
+                Root.Background = Solid(SqlPrompter.Core.Completion.RowTint.Background(accent, back, text, ratio));
+                var hard = value == Look.Selected;
+                outline.Visibility = hard ? Visibility.Visible : Visibility.Collapsed;
+                accentBar.Visibility = hard ? Visibility.Visible : Visibility.Collapsed;
+                if (hard)
+                {
+                    outline.BorderBrush = Solid(SqlPrompter.Core.Completion.RowTint.Blend(accent, back, 0.6));
+                    accentBar.Background = Solid(accent);
                 }
             }
 
-            /// <summary>On the highlighted (hard selected) row the text takes the highlight text color; rows are reused, so it is always set.</summary>
-            private void SetTextColor(bool highlighted)
+            private void ApplyHover(bool over)
             {
-                var key = highlighted ? VsBrushes.HighlightTextKey : VsBrushes.ToolWindowTextKey;
+                if (Item == null || selectedNow)
+                {
+                    return;
+                }
+
+                if (over && Item.Value.CompletionItem.Properties.TryGetProperty(SqlCompletionSource.PickerHeaderKey, out string _))
+                {
+                    return;
+                }
+
+                SetLook(over ? Look.Hover : Look.None);
+                selectedNow = false;
+            }
+
+            /// <summary>The text keeps its own color on every row, also the selected one (#475); rows are reused, so it is always set.</summary>
+            private void SetTextColor()
+            {
+                var key = VsBrushes.ToolWindowTextKey;
                 name.SetResourceReference(TextBlock.ForegroundProperty, key);
                 suffix.SetResourceReference(TextBlock.ForegroundProperty, key);
                 check.SetResourceReference(TextBlock.ForegroundProperty, key);

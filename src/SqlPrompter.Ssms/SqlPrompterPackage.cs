@@ -13,7 +13,7 @@ namespace SqlPrompter.Ssms
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     // The second parameter is the menu version. Bump it after every .vsct change, otherwise SSMS uses cached menus.
-    [ProvideMenuResource("Menus.ctmenu", 44)]
+    [ProvideMenuResource("Menus.ctmenu", 55)]
     [ProvideOptionPage(typeof(OptionsLauncherPage), "SQL Prompter", "General", 0, 0, true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(HistoryToolWindowPane), Style = VsDockStyle.MDI, Transient = true)]
@@ -23,6 +23,9 @@ namespace SqlPrompter.Ssms
         public static readonly Guid CommandSet = new Guid("15e19ce9-b3c9-47dd-97f9-49fe13869730");
         public const int RefreshMetadataId = 0x0100;
         public const int OpenLogId = 0x0101;
+        public const int CheckForUpdatesId = 0x0138;
+        public const int HelpId = 0x0139;
+        public const int AboutId = 0x013A;
         public const int SettingsId = 0x011F;
         public const int FormattingStylesId = 0x0120;
         public const int EditEnvironmentsId = 0x0134;
@@ -31,6 +34,7 @@ namespace SqlPrompter.Ssms
         public const int PickerRightId = 0x0123;
         public const int FormatDocumentId = 0x011A;
         public const int FormatSelectionId = 0x011B;
+        public const int UnformatSelectionId = 0x0136;
         public const int AddNPrefixId = 0x011C;
         public const int AddAsId = 0x011D;
         public const int RemoveAsId = 0x011E;
@@ -40,6 +44,7 @@ namespace SqlPrompter.Ssms
         public const int GoToDefinitionId = 0x010B;
         public const int LocateInObjectExplorerId = 0x0133;
         public const int RunStatementId = 0x010C;
+        public const int RunStatementsUpToCaretId = 0x0135;
         public const int ParameterInfoId = 0x010D;
         public const int AddCommasId = 0x010F;
         public const int AddQuotesAndCommasId = 0x0110;
@@ -55,12 +60,12 @@ namespace SqlPrompter.Ssms
         public const int FixCodeIssuesId = 0x0124;
         public const int PreviewAsSelectId = 0x0125;
         public const int DryRunId = 0x0126;
-        public const int ScriptOutlineId = 0x012C;
         public const int QuickOpenId = 0x012D;
         public const int FindInCodeId = 0x012E;
         public const int ShowDependenciesId = 0x012F;
         public const int ReopenClosedTabId = 0x0130;
         public const int RenameQueryTabId = 0x0132;
+        public const int OpenGridInExcelId = 0x0137;
         public const int CopyGridAsInListId = 0x0127;
         public const int CopyGridAsValuesId = 0x0128;
         public const int CopyGridAsJsonId = 0x0129;
@@ -74,64 +79,72 @@ namespace SqlPrompter.Ssms
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
-            Log.Write("SQL Prompter " + typeof(SqlPrompterPackage).Assembly.GetName().Version + " loaded.");
+            Log.Write("SQL Prompter " + (UpdateService.CurrentVersion()?.ToString() ?? typeof(SqlPrompterPackage).Assembly.GetName().Version.ToString()) + " loaded.");
             SnippetService.Start();
             UsageService.Start();
             HistoryService.Start();
+            UpdateService.Start();
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             TabColoring.Start();
             HideSsmsTabColor.Register();
             DefaultKeyBindings.Apply();
             GridContextMenu.Install();
+            GridCommands.CleanTemporaryExcelFiles();
             ToolbarVisibility.ShowOnce();
             if (await GetServiceAsync(typeof(IMenuCommandService)) is OleMenuCommandService commands)
             {
-                commands.AddCommand(new MenuCommand((s, e) => RefreshMetadata(), new CommandID(CommandSet, RefreshMetadataId)));
+                MenuState.Add(commands, CommandSet, RefreshMetadataId, SqlPrompter.Core.Editing.MenuCommandKind.RefreshMetadata, () => RefreshMetadata());
                 commands.AddCommand(new MenuCommand((s, e) => OpenLog(), new CommandID(CommandSet, OpenLogId)));
+                commands.AddCommand(new MenuCommand((s, e) => UpdateService.CheckNow(), new CommandID(CommandSet, CheckForUpdatesId)));
+                commands.AddCommand(new MenuCommand((s, e) => HelpLauncher.Open(), new CommandID(CommandSet, HelpId)));
+                commands.AddCommand(new MenuCommand((s, e) => AboutWindow.Open(), new CommandID(CommandSet, AboutId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenSettings(), new CommandID(CommandSet, SettingsId)));
                 commands.AddCommand(new MenuCommand((s, e) => FormattingStylesWindow.Open(), new CommandID(CommandSet, FormattingStylesId)));
                 FormattingStylesMenu.Register(commands, CommandSet);
                 TabColorMenu.Register(commands, CommandSet, EditEnvironmentsId);
-                commands.AddCommand(new MenuCommand((s, e) => ShowSuggestions(), new CommandID(CommandSet, ShowSuggestionsId)));
+                MenuState.Add(commands, CommandSet, ShowSuggestionsId, SqlPrompter.Core.Editing.MenuCommandKind.ShowSuggestions, () => ShowSuggestions());
                 commands.AddCommand(new MenuCommand((s, e) => PickerKey(left: true), new CommandID(CommandSet, PickerLeftId)));
                 commands.AddCommand(new MenuCommand((s, e) => PickerKey(left: false), new CommandID(CommandSet, PickerRightId)));
-                commands.AddCommand(new MenuCommand((s, e) => SurroundSelection(), new CommandID(CommandSet, SurroundWithSnippetId)));
-                commands.AddCommand(new MenuCommand((s, e) => NewSnippetFromSelection(), new CommandID(CommandSet, NewSnippetFromSelectionId)));
+                MenuState.Add(commands, CommandSet, SurroundWithSnippetId, SqlPrompter.Core.Editing.MenuCommandKind.SurroundWithSnippet, () => SurroundSelection());
+                MenuState.Add(commands, CommandSet, NewSnippetFromSelectionId, SqlPrompter.Core.Editing.MenuCommandKind.NewSnippetFromSelection, () => NewSnippetFromSelection());
                 commands.AddCommand(new MenuCommand((s, e) => ManageSnippets(), new CommandID(CommandSet, ManageSnippetsId)));
-                commands.AddCommand(new MenuCommand((s, e) => GoToDefinitionHandler.Run(ActiveEditor.GetView()), new CommandID(CommandSet, GoToDefinitionId)));
-                commands.AddCommand(new MenuCommand((s, e) => LocateInObjectExplorer.Run(ActiveEditor.GetView()), new CommandID(CommandSet, LocateInObjectExplorerId)));
-                commands.AddCommand(new MenuCommand((s, e) => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddCommas, "commas"), new CommandID(CommandSet, AddCommasId)));
-                commands.AddCommand(new MenuCommand((s, e) => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddQuotesAndCommas, "quotes and commas"), new CommandID(CommandSet, AddQuotesAndCommasId)));
+                MenuState.Add(commands, CommandSet, GoToDefinitionId, SqlPrompter.Core.Editing.MenuCommandKind.GoToDefinition, () => GoToDefinitionHandler.Run(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, LocateInObjectExplorerId, SqlPrompter.Core.Editing.MenuCommandKind.LocateInObjectExplorer, () => LocateInObjectExplorer.Run(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, AddCommasId, SqlPrompter.Core.Editing.MenuCommandKind.AddCommas, () => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddCommas, "commas"));
+                MenuState.Add(commands, CommandSet, AddQuotesAndCommasId, SqlPrompter.Core.Editing.MenuCommandKind.AddQuotesAndCommas, () => LineCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.LineTools.AddQuotesAndCommas, "quotes and commas"));
                 commands.AddCommand(new MenuCommand((s, e) => OpenQueryHistory(), new CommandID(CommandSet, QueryHistoryId)));
                 commands.AddCommand(new MenuCommand((s, e) => OpenQueryHistory(), new CommandID(CommandSet, QueryHistoryToolbarId)));
-                commands.AddCommand(new MenuCommand((s, e) => GridCommands.ScriptSelectionAsInsert(), new CommandID(CommandSet, ScriptGridAsInsertId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.RemoveBrackets, "square brackets removed"), new CommandID(CommandSet, RemoveBracketsId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.InsertSemicolons, "semicolons inserted"), new CommandID(CommandSet, InsertSemicolonsId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.RemoveUnusedVariables, "unused variables removed"), new CommandID(CommandSet, RemoveUnusedVariablesId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), text => SqlPrompter.Core.Editing.CodeFixes.Apply(text, SettingsService.Current.Analysis, MetadataService.Current?.MetadataForScript(text)), "code analysis issues fixed"), new CommandID(CommandSet, FixCodeIssuesId)));
-                commands.AddCommand(new MenuCommand((s, e) => PreviewStatement.AsSelect(ActiveEditor.GetView()), new CommandID(CommandSet, PreviewAsSelectId)));
-                commands.AddCommand(new MenuCommand((s, e) => PreviewStatement.DryRun(ActiveEditor.GetView()), new CommandID(CommandSet, DryRunId)));
-                commands.AddCommand(new MenuCommand((s, e) => { var view = ActiveEditor.GetView(); if (view != null) { QuickActionsPopup.ShowOutline(view); } }, new CommandID(CommandSet, ScriptOutlineId)));
-                commands.AddCommand(new MenuCommand((s, e) => { var view = ActiveEditor.GetView(); if (view != null) { QuickActionsPopup.ShowObjects(view); } }, new CommandID(CommandSet, QuickOpenId)));
-                commands.AddCommand(new MenuCommand((s, e) => FindInCode.Run(ActiveEditor.GetView()), new CommandID(CommandSet, FindInCodeId)));
-                commands.AddCommand(new MenuCommand((s, e) => ShowDependencies.Run(ActiveEditor.GetView()), new CommandID(CommandSet, ShowDependenciesId)));
-                commands.AddCommand(new MenuCommand((s, e) => tabSession?.ReopenClosedTab(), new CommandID(CommandSet, ReopenClosedTabId)));
-                commands.AddCommand(new MenuCommand((s, e) => tabSession?.RenameActiveTab(), new CommandID(CommandSet, RenameQueryTabId)));
-                commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsInList(t), "an IN list"), new CommandID(CommandSet, CopyGridAsInListId)));
-                commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsValues(t), "VALUES"), new CommandID(CommandSet, CopyGridAsValuesId)));
-                commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsJson(t), "JSON"), new CommandID(CommandSet, CopyGridAsJsonId)));
-                commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsCsv(t), "CSV"), new CommandID(CommandSet, CopyGridAsCsvId)));
-                commands.AddCommand(new MenuCommand((s, e) => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsMarkdown(t), "a Markdown table"), new CommandID(CommandSet, CopyGridAsMarkdownId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.ExpandStars(ActiveEditor.GetView()), new CommandID(CommandSet, ExpandStarsId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.QualifyNames(ActiveEditor.GetView()), new CommandID(CommandSet, QualifyNamesId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), true), new CommandID(CommandSet, FormatDocumentId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.FormatScript(ActiveEditor.GetView(), false), new CommandID(CommandSet, FormatSelectionId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddNPrefix, "N prefix added to strings"), new CommandID(CommandSet, AddNPrefixId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddAs, "AS added to aliases"), new CommandID(CommandSet, AddAsId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.RemoveAs, "AS removed from aliases"), new CommandID(CommandSet, RemoveAsId)));
-                commands.AddCommand(new MenuCommand((s, e) => RefactorCommands.ShowSummary(ActiveEditor.GetView()), new CommandID(CommandSet, ScriptSummaryId)));
-                commands.AddCommand(new MenuCommand((s, e) => RunStatement.Run(ActiveEditor.GetView()), new CommandID(CommandSet, RunStatementId)));
-                commands.AddCommand(new MenuCommand((s, e) => { if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view) { ParameterInfoPopup.Show(view); } }, new CommandID(CommandSet, ParameterInfoId)));
+                MenuState.Add(commands, CommandSet, ScriptGridAsInsertId, SqlPrompter.Core.Editing.MenuCommandKind.ScriptGridAsTempTable, () => GridCommands.ScriptSelectionAsInsert());
+                MenuState.Add(commands, CommandSet, RemoveBracketsId, SqlPrompter.Core.Editing.MenuCommandKind.RemoveBrackets, () => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.RemoveBrackets, "square brackets removed"));
+                MenuState.Add(commands, CommandSet, InsertSemicolonsId, SqlPrompter.Core.Editing.MenuCommandKind.InsertSemicolons, () => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.InsertSemicolons, "semicolons inserted"));
+                MenuState.Add(commands, CommandSet, RemoveUnusedVariablesId, SqlPrompter.Core.Editing.MenuCommandKind.RemoveUnusedVariables, () => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.Refactorings.RemoveUnusedVariables, "unused variables removed"));
+                MenuState.Add(commands, CommandSet, FixCodeIssuesId, SqlPrompter.Core.Editing.MenuCommandKind.FixCodeIssues, () => RefactorCommands.Run(ActiveEditor.GetView(), text => SqlPrompter.Core.Editing.CodeFixes.Apply(text, SettingsService.Current.Analysis, MetadataService.Current?.MetadataForScript(text)), "code analysis issues fixed"));
+                MenuState.Add(commands, CommandSet, PreviewAsSelectId, SqlPrompter.Core.Editing.MenuCommandKind.PreviewAsSelect, () => PreviewStatement.AsSelect(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, DryRunId, SqlPrompter.Core.Editing.MenuCommandKind.DryRun, () => PreviewStatement.DryRun(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, QuickOpenId, SqlPrompter.Core.Editing.MenuCommandKind.QuickOpen, () => { var view = ActiveEditor.GetView(); if (view != null) { QuickActionsPopup.ShowObjects(view); } });
+                MenuState.Add(commands, CommandSet, FindInCodeId, SqlPrompter.Core.Editing.MenuCommandKind.FindInCode, () => FindInCode.Run(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, ShowDependenciesId, SqlPrompter.Core.Editing.MenuCommandKind.ShowDependencies, () => ShowDependencies.Run(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, ReopenClosedTabId, SqlPrompter.Core.Editing.MenuCommandKind.ReopenClosedTab, () => tabSession?.ReopenClosedTab());
+                MenuState.Add(commands, CommandSet, RenameQueryTabId, SqlPrompter.Core.Editing.MenuCommandKind.RenameQueryTab, () => tabSession?.RenameActiveTab());
+                // An IN list holds the values of one column: the command is off while the selection of the grid covers several (#446). Decided every time a menu opens.
+                MenuState.Add(commands, CommandSet, CopyGridAsInListId, SqlPrompter.Core.Editing.MenuCommandKind.CopyGridAsInList, () => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsInList(t), "an IN list"));
+                MenuState.Add(commands, CommandSet, OpenGridInExcelId, SqlPrompter.Core.Editing.MenuCommandKind.OpenGridInExcel, () => GridCommands.OpenInExcel());
+                MenuState.Add(commands, CommandSet, CopyGridAsValuesId, SqlPrompter.Core.Editing.MenuCommandKind.CopyGridAs, () => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsValues(t), "VALUES"));
+                MenuState.Add(commands, CommandSet, CopyGridAsJsonId, SqlPrompter.Core.Editing.MenuCommandKind.CopyGridAs, () => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsJson(t), "JSON"));
+                MenuState.Add(commands, CommandSet, CopyGridAsCsvId, SqlPrompter.Core.Editing.MenuCommandKind.CopyGridAs, () => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsCsv(t), "CSV"));
+                MenuState.Add(commands, CommandSet, CopyGridAsMarkdownId, SqlPrompter.Core.Editing.MenuCommandKind.CopyGridAs, () => GridCommands.CopyAs(t => SqlPrompter.Core.Editing.GridFormats.AsMarkdown(t), "a Markdown table"));
+                MenuState.Add(commands, CommandSet, ExpandStarsId, SqlPrompter.Core.Editing.MenuCommandKind.ExpandStars, () => RefactorCommands.ExpandStars(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, QualifyNamesId, SqlPrompter.Core.Editing.MenuCommandKind.QualifyNames, () => RefactorCommands.QualifyNames(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, FormatDocumentId, SqlPrompter.Core.Editing.MenuCommandKind.FormatDocument, () => RefactorCommands.FormatScript(ActiveEditor.GetView(), true));
+                MenuState.Add(commands, CommandSet, FormatSelectionId, SqlPrompter.Core.Editing.MenuCommandKind.FormatSelection, () => RefactorCommands.FormatScript(ActiveEditor.GetView(), false));
+                MenuState.Add(commands, CommandSet, UnformatSelectionId, SqlPrompter.Core.Editing.MenuCommandKind.UnformatSelection, () => RefactorCommands.UnformatSelection(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, AddNPrefixId, SqlPrompter.Core.Editing.MenuCommandKind.AddNPrefix, () => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddNPrefix, "N prefix added to strings"));
+                MenuState.Add(commands, CommandSet, AddAsId, SqlPrompter.Core.Editing.MenuCommandKind.AddAs, () => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.AddAs, "AS added to aliases"));
+                MenuState.Add(commands, CommandSet, RemoveAsId, SqlPrompter.Core.Editing.MenuCommandKind.RemoveAs, () => RefactorCommands.Run(ActiveEditor.GetView(), SqlPrompter.Core.Editing.AliasRefactorings.RemoveAs, "AS removed from aliases"));
+                MenuState.Add(commands, CommandSet, ScriptSummaryId, SqlPrompter.Core.Editing.MenuCommandKind.ScriptSummary, () => RefactorCommands.ShowSummary(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, RunStatementId, SqlPrompter.Core.Editing.MenuCommandKind.RunStatement, () => RunStatement.Run(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, RunStatementsUpToCaretId, SqlPrompter.Core.Editing.MenuCommandKind.RunStatementsUpToCaret, () => RunStatement.RunUpToCaret(ActiveEditor.GetView()));
+                MenuState.Add(commands, CommandSet, ParameterInfoId, SqlPrompter.Core.Editing.MenuCommandKind.ParameterInfo, () => { if (ActiveEditor.GetView() is Microsoft.VisualStudio.Text.Editor.IWpfTextView view) { ParameterInfoPopup.Show(view); } });
             }
 
             try
@@ -158,8 +171,8 @@ namespace SqlPrompter.Ssms
 
         private static void RefreshMetadata()
         {
-            MetadataService.Current?.Caches.InvalidateAll();
-            Log.Write("Metadata dropped; it is loaded again on the next completion.");
+            ThreadHelper.ThrowIfNotOnUIThread();
+            RefreshNow.Run();
         }
 
         private sealed class MainWindowOwner : System.Windows.Forms.IWin32Window
@@ -386,7 +399,8 @@ namespace SqlPrompter.Ssms
                     return;
                 }
 
-                var name = TabHistoryService.Bind(chosen, document);
+                // The new tab gets the name the tab had (the record of the entry, or the name recorded with the run); never a temporary ~vs name (#511).
+                var name = SqlPrompter.Core.History.HistoryTabName.ForReopening(TabHistoryService.Bind(chosen, document)) ?? SqlPrompter.Core.History.HistoryTabName.ForReopening(chosen.Tab);
                 if (name != null)
                 {
                     TabSessionService.Current?.AdoptName(document, name);
@@ -479,10 +493,7 @@ namespace SqlPrompter.Ssms
 
             try
             {
-                (GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ExecuteCommand("File.NewQuery");
-                var view = ActiveEditor.GetView();
-                view?.TextBuffer.Insert(0, chosen.Text ?? string.Empty);
-                return view != null;
+                return SsmsConnection.OpenNewQueryWithText(chosen.Text);
             }
             catch (Exception ex)
             {
@@ -565,17 +576,48 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>Opens the snippet folder in Explorer.</summary>
-        internal static void OpenSnippetsFolder()
+        internal static void OpenSnippetsFolder() => OpenSnippetsFolder(null);
+
+        /// <summary>Opens the snippet folder; <paramref name="configured"/> is the folder as typed in the settings (empty or null: the folder of the saved settings).</summary>
+        internal static void OpenSnippetsFolder(string configured)
         {
             try
             {
-                var folder = SnippetService.Folder;
+                var folder = string.IsNullOrWhiteSpace(configured) ? (configured == null ? SnippetService.Folder : SnippetService.DefaultFolder) : Environment.ExpandEnvironmentVariables(configured.Trim());
                 System.IO.Directory.CreateDirectory(folder);
                 System.Diagnostics.Process.Start("explorer.exe", "\"" + folder + "\"");
             }
             catch (Exception ex)
             {
                 Log.Error("Opening the snippet folder failed", ex);
+            }
+        }
+
+        /// <summary>Writes the built-in snippets over the snippet folder after a confirmation (default No), then reloads the snippets (#417).</summary>
+        internal static void ResetBuiltInSnippets(System.Windows.Forms.IWin32Window owner)
+        {
+            if (System.Windows.Forms.MessageBox.Show(owner,
+                    "This writes all the built-in snippets into the snippet folder in their original text.\r\n\r\n" +
+                    "Built-in snippets you deleted come back, and those you edited are restored: your changes to them will be lost. " +
+                    "A snippet of yours with the prefix of a built-in one is replaced too. Your other snippets are not touched.\r\n\r\nContinue?",
+                    "SQL Prompter", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Warning,
+                    System.Windows.Forms.MessageBoxDefaultButton.Button2) != System.Windows.Forms.DialogResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                var store = new SqlPrompter.Core.Snippets.SnippetStore(SnippetService.Folder);
+                var result = new SqlPrompter.Core.Snippets.BuiltInInstaller(store).ResetAll();
+                SnippetService.Reload();
+                Log.Write("Snippets: reset the built-in snippets in " + store.Folder + " (" + result.Restored + " restored, " + result.Added + " added).");
+                System.Windows.Forms.MessageBox.Show(owner, result.Restored + " built-in snippets restored and " + result.Added + " added in " + store.Folder + ".", "SQL Prompter");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Resetting the built-in snippets failed", ex);
+                System.Windows.Forms.MessageBox.Show(owner, "Resetting the built-in snippets failed: " + ex.Message, "SQL Prompter", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
             }
         }
 
@@ -649,6 +691,7 @@ namespace SqlPrompter.Ssms
                 Log.Error("Switching the suggestion list failed", ex);
             }
         }
+
 
         private void OpenLog()
         {

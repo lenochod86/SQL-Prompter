@@ -114,6 +114,82 @@ namespace SqlPrompter.Core.Formatting
         [DataMember(Name = "alignComparisons")]
         public bool AlignComparisons { get; set; }
 
+        /// <summary>The items of every clause of a statement start in one column (that of the longest keyword), not each after its own keyword (#305).</summary>
+        [DataMember(Name = "alignAcrossClauses")]
+        public bool AlignAcrossClauses { get; set; }
+
+        /// <summary>JOIN lines are indented to the column of the table after FROM (#305).</summary>
+        [DataMember(Name = "indentJoinTable")]
+        public bool IndentJoinTable { get; set; }
+
+        /// <summary><c>SET @x = value</c> that is not collapsed puts the equals sign and the value on the next line (#305).</summary>
+        [DataMember(Name = "equalsOnNewLine")]
+        public bool EqualsOnNewLine { get; set; }
+
+        /// <summary>BEGIN and END are indented one level under the IF, WHILE or ELSE they belong to, and the contents one more level (#305).</summary>
+        [DataMember(Name = "indentBeginEnd")]
+        public bool IndentBeginEnd { get; set; }
+
+        /// <summary>The opening parenthesis of a subquery that is not collapsed is on a line of its own, at the column of the item (otherwise it ends the line before) (#305).</summary>
+        [DataMember(Name = "parenOnNewLine")]
+        public bool ParenOnNewLine { get; set; }
+
+        /// <summary>The contents of such a subquery are indented one level under the parentheses (#305).</summary>
+        [DataMember(Name = "indentParenContents")]
+        public bool IndentParenContents { get; set; }
+
+        /// <summary>The opening parenthesis of a CTE is on a line of its own (otherwise it ends the line of AS) (#305).</summary>
+        [DataMember(Name = "cteParenOnNewLine")]
+        public bool CteParenOnNewLine { get; set; }
+
+        /// <summary>The contents of a CTE are indented under its parentheses (#305).</summary>
+        [DataMember(Name = "cteIndentContents")]
+        public bool CteIndentContents { get; set; }
+
+        /// <summary>AS of a CTE is on a line of its own, under the name (#305).</summary>
+        [DataMember(Name = "cteAsOnNewLine")]
+        public bool CteAsOnNewLine { get; set; }
+
+        /// <summary>The opening parenthesis of CREATE TABLE is on a line of its own (otherwise it ends the first line) (#305).</summary>
+        [DataMember(Name = "ddlParenOnNewLine")]
+        public bool DdlParenOnNewLine { get; set; }
+
+        /// <summary>The column definitions of CREATE TABLE are indented under the parentheses (#305).</summary>
+        [DataMember(Name = "ddlIndentContents")]
+        public bool DdlIndentContents { get; set; }
+
+        /// <summary>The data types of the columns of CREATE TABLE start in one column (#305).</summary>
+        [DataMember(Name = "alignDdlColumns")]
+        public bool AlignDdlColumns { get; set; }
+
+        /// <summary>The parameters of CREATE / ALTER PROCEDURE are written one per line under the name (#305).</summary>
+        [DataMember(Name = "procedureParametersOnNewLines")]
+        public bool ProcedureParametersOnNewLines { get; set; }
+
+        /// <summary>The column list of INSERT INTO is written one column per line when the line is longer than this; 1 is always, 0 never (#305).</summary>
+        [DataMember(Name = "insertColumnsBreakLength")]
+        public int InsertColumnsBreakLength { get; set; }
+
+        /// <summary>The opening parenthesis of a broken INSERT column list is on a line of its own (otherwise it ends the first line) (#305).</summary>
+        [DataMember(Name = "insertParenOnNewLine")]
+        public bool InsertParenOnNewLine { get; set; }
+
+        /// <summary>The rows of INSERT ... VALUES each get a line; off keeps them on the line of VALUES (#305).</summary>
+        [DataMember(Name = "insertValuesOnNewLines")]
+        public bool InsertValuesOnNewLines { get; set; }
+
+        /// <summary>A CASE expression shorter than this stays on one line, a longer one is broken into lines for WHEN, ELSE and END; 0 breaks every CASE (#305).</summary>
+        [DataMember(Name = "collapseCaseShorterThan")]
+        public int CollapseCaseShorterThan { get; set; }
+
+        /// <summary>The expression of a simple CASE (<c>CASE expr WHEN ...</c>) is on the line after CASE (#305).</summary>
+        [DataMember(Name = "caseExpressionOnNewLine")]
+        public bool CaseExpressionOnNewLine { get; set; }
+
+        /// <summary>A space after the opening and before the closing parenthesis of the contents of IN: <c>IN ( 1, 2 )</c> (#305).</summary>
+        [DataMember(Name = "spaceAroundInContents")]
+        public bool SpaceAroundInContents { get; set; }
+
         /// <summary>The contents of BEGIN … END are indented.</summary>
         [DataMember(Name = "indentBlocks")]
         public bool IndentBlocks { get; set; }
@@ -149,6 +225,25 @@ namespace SqlPrompter.Core.Formatting
             OnOnNewLine = false;
             AlignAliases = false;
             AlignComparisons = false;
+            AlignAcrossClauses = false;
+            IndentJoinTable = false;
+            EqualsOnNewLine = false;
+            IndentBeginEnd = false;
+            ParenOnNewLine = false;
+            IndentParenContents = true;
+            CteParenOnNewLine = true;
+            CteIndentContents = true;
+            CteAsOnNewLine = false;
+            DdlParenOnNewLine = true;
+            DdlIndentContents = true;
+            AlignDdlColumns = true;
+            ProcedureParametersOnNewLines = false;
+            InsertColumnsBreakLength = 0;
+            InsertParenOnNewLine = false;
+            InsertValuesOnNewLines = true;
+            CollapseCaseShorterThan = 35;
+            CaseExpressionOnNewLine = false;
+            SpaceAroundInContents = false;
             MaxLineLength = 120;
             KeepBlankLines = true;
             IndentBlocks = true;

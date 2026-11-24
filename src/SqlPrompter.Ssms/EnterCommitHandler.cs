@@ -29,13 +29,16 @@ namespace SqlPrompter.Ssms
         public bool ExecuteCommand(ReturnKeyCommandArgs args, CommandExecutionContext executionContext)
         {
             var session = Broker.GetSession(args.TextView);
-            if (session == null || session.IsDismissed || !session.Properties.TryGetProperty(SqlCompletionSource.HardSelectionKey, out bool hard) || !hard)
+            if (session == null)
             {
                 return false;
             }
 
-            var items = session.GetComputedItems(CancellationToken.None);
-            if (items.SuggestionItemSelected || items.SelectedItem == null)
+            var hard = session.Properties.TryGetProperty(SqlCompletionSource.HardSelectionKey, out bool hardValue) && hardValue;
+            var ownListOpen = InvokedList.Of(args.TextView)?.IsOpen == true;
+            var items = session.IsDismissed ? null : session.GetComputedItems(CancellationToken.None);
+            // The list SQL Prompter runs itself (opened after a snippet, by Ctrl+Space) has the selection the user sees; it handles Enter itself (#517).
+            if (items == null || !SqlPrompter.Core.Completion.EnterCommitRule.EditorSessionShouldCommit(ownListOpen, session.IsDismissed, hard, items.SuggestionItemSelected, items.SelectedItem != null))
             {
                 return false;
             }

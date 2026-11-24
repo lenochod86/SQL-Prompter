@@ -1,6 +1,6 @@
 # SQL Prompter
 
-A custom IntelliSense extension for SSMS 22, intended to replace Redgate SQL Prompt. It will be released as open source under the MIT license.
+A custom IntelliSense extension for SSMS 22, intended to replace Redgate SQL Prompt. It is released under the MIT license with the Commons Clause (free to use, modify and share, but not to sell); see `LICENSE`.
 
 These instructions apply in every environment: locally on Windows, in the cloud and from mobile. Work the same way everywhere.
 
@@ -13,17 +13,17 @@ These instructions apply in every environment: locally on Windows, in the cloud 
 ## Documents
 
 - `docs/architecture.md`: architecture, decisions and verified facts about SSMS. Read it before designing or changing the architecture.
-- `docs/roadmap.md`: phases with checkboxes and the user's decisions. Pick the next work from it.
-- `README.md`: build, installation and manual testing in SSMS.
+- `docs/decisions.md`: the user's earlier decisions. Work is planned only from the GitHub issues (there is no roadmap file).
+- `README.md`: the overview for new users (what it is, features, install). `docs/development.md`: build, installation of a build and manual testing in SSMS.
 
 ## Current state
 
-MVP 0.2.x runs in SSMS 22.11. What is done and what comes next is in `docs/roadmap.md`; phase 0 is next.
+MVP 0.2.x runs in SSMS 22.11. What is done and what comes next is in the GitHub issues (labels `phase-N` give the area).
 
 ## At the start of a session
 
 1. Run `git status` and `git fetch`, and check the current branch. Never overwrite or delete uncommitted changes; ask first.
-2. Read `docs/roadmap.md` and the open issues.
+2. Read the open issues.
    - Work only on issues assigned to `claude-lenochod86`. Do not start an issue assigned to the user or to nobody; if one seems to be next, ask the user (and comment on the issue) instead.
    - Work through those issues in ascending order of their number, unless the user says otherwise.
    - If an issue has sub-issues, finish all of them before sending the pull request, unless the user agrees on something else.
@@ -37,9 +37,9 @@ Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator w
 
 ### Workflow for every piece of work
 
-1. **Issue.** Every separate piece of work (a roadmap item or group of items, a bug, a research task) has a GitHub issue. Create it before writing code if it does not exist yet.
+1. **Issue.** Every separate piece of work (a feature or group of features, a bug, a research task) has a GitHub issue. Create it before writing code if it does not exist yet.
    - Title: short and descriptive, without the phase number (e.g. "Configurable commit keys for suggestions").
-   - Body: goal, scope, acceptance criteria and a link to the item in `docs/roadmap.md`.
+   - Body: goal, scope and acceptance criteria.
    - Labels: the kind (`enhancement`, `bug`, `documentation`, `research`) and the phase (`phase-0`, `phase-1`, …). Create a label if it is missing.
    - Use `gh` (on Windows `C:\Program Files\GitHub CLI\gh.exe` if it is not on PATH) or the GitHub tools of the environment.
 2. **Branch** from the current `main`, named `<issue-number>-<short-description>`, lowercase with hyphens, e.g. `12-commit-keys`. One issue per branch.
@@ -50,6 +50,7 @@ Claude works on GitHub as its own account, `claude-lenochod86` (a collaborator w
 4. **Push** the branch (`git push -u origin <branch>`) so the work can be picked up from another environment. Before a push run `pwsh .github/scripts/Verify-Local.ps1` (what CI runs: the tests, the version checks against `origin/main` and, on Windows, the VSIX build with warnings as errors; `-SkipVsix` when `src/SqlPrompter.Ssms` did not change): a red push wastes billed Actions minutes. Push a branch as few times as possible.
 5. **Pull request** to `main` when the work is ready for review.
    - Describe what changed, how to test it in SSMS, and what is verified and what is not.
+   - If the change is visible to the user (a feature, option, key, command or window), update the matching page of `docs/help` in the same pull request and retake the screenshots of any window that changed (the help rules are in `docs/architecture.md`, section "User help").
    - Include `Closes #<number>`.
    - CI runs the tests and the version checks on every push to the pull request, but the Windows VSIX build (it costs twice the billed minutes, the repository is private) only for a pull request with the label `build-vsix`. Add the label `build-vsix` when the work is ready, so that the VSIX of the final commit is built once; it is a required step before a merge.
 6. **Approval.** Merge only after the user explicitly agrees. The user usually tests the VSIX from the branch in SSMS.
@@ -106,7 +107,7 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
 - If `dotnet` is not on PATH, install the .NET SDK into the scratchpad with `dotnet-install.ps1` (no admin rights needed) and set `DOTNET_ROOT`.
 - For every VSIX handed to the user, bump the version in `source.extension.vsixmanifest` (otherwise it will not install over the old one) and check the version inside the `.vsix`.
 - After changing `.vsct`, bump the version in `ProvideMenuResource`.
-- CI enforces both bumps in pull requests (`.github/scripts/Check-Versions.ps1`): any change under `src/` needs a higher VSIX version than `main`. CI also builds with warnings as errors. Billed Actions minutes are limited: a push to a pull request runs only the Ubuntu job (tests, version checks); the Windows VSIX build runs for a pull request with the label `build-vsix` (and manually with *Run workflow*); a push to `main` runs the tests only; the prototype workflow is manual only (#336). The VSIX job runs on the **self-hosted runner** of the user's PC (label `vsix`, installed in `E:\actions-runner` as the Windows service `actions.runner.lenochod86-SQL-Prompter.vojta-pc`, started automatically; no billed minutes). If it is not running the job waits in the queue: ask the user to start the service, or temporarily change `runs-on` in `build.yml` to `windows-latest`. Before the repository is made public the runner must be removed (checklist in #336).
+- CI enforces both bumps in pull requests (`.github/scripts/Check-Versions.ps1`): any change under `src/` needs a higher VSIX version than `main`. CI also builds with warnings as errors. A push to a pull request runs only the Ubuntu job (tests, version checks); the Windows VSIX build runs for a pull request with the label `build-vsix` (and manually with *Run workflow*); a push to `main` runs the tests only; the prototype workflow is manual only. Both Windows jobs (the VSIX build and the release) run on GitHub-hosted `windows-latest` runners; the repository is public, so the minutes are free.
 
 ## Environments
 
@@ -117,6 +118,6 @@ Chat messages can get lost or overlooked, so everything that needs the user's at
 ## How to work
 
 - If you do not know something, or it is the user's decision, ask. Do not make up SSMS or SQL Prompt behavior or the user's wishes.
-- Do not mark anything about SSMS as verified until it has run in SSMS 22. Tick a checkbox in `docs/roadmap.md` only after verification, on the issue's branch.
+- Do not mark anything about SSMS as verified until it has run in SSMS 22.
 - Report results precisely: what passed, what failed (with output) and what was not tested.
-- Record the user's decisions in `docs/roadmap.md` (Decisions section) and verified SSMS facts in `docs/architecture.md`.
+- Record the user's decisions as a comment on the issue they belong to and verified SSMS facts in `docs/architecture.md`.

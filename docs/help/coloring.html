@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coloring and confirmations - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a class="current" href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Coloring and confirmations</h1>
+<p class="lead">Make it obvious which server and database a query window is connected to, and ask before a script changes data or leaves a transaction open.</p>
+
+<h2>Coloring by server and database</h2>
+<figure>
+  <img src="images/coloring.png" alt="A query window colored by its database">
+  <figcaption>A window connected to <code>SqlPrompterTest_Shop</code>: the tab, the frame and the status bar of the window have the color of the matching environment.</figcaption>
+</figure>
+<p>A <b>rule</b> maps a server and a database to an <b>environment</b>; an environment is a name and a color. Every query window is colored by the connection of <em>its own</em> window (not only the one in front) and the colors follow the connection when it changes (for example after <code>USE</code>).</p>
+
+<figure>
+  <img src="images/settings-coloring.png" alt="Settings: Coloring" width="640">
+  <figcaption>Settings &gt; Coloring.</figcaption>
+</figure>
+<table>
+  <tr><th style="width:250px">Option</th><th>Effect</th></tr>
+  <tr><td>Color query windows by their server and database</td><td>Master switch. It hides the default <em>Set Tab Color</em> of SSMS in the tab menu and uses <b>Tab Color</b> of SQL Prompter.</td></tr>
+  <tr><td>Tab and frame</td><td>Colors the tab and the frame of the window.</td></tr>
+  <tr><td>Status bar of each query window</td><td>Colors the strip with <em>Connected</em>, the server, the login and the database (the text turns white on a dark color).</td></tr>
+  <tr><td>Status bar of the SSMS window</td><td>Colors the bar at the bottom of the main window.</td></tr>
+  <tr><td>Tab color style</td><td><em>Whole tab</em> fills the tab, also when it is not active; <em>Accent bar</em> uses the thin strip of SSMS.</td></tr>
+</table>
+<h3>Rules</h3>
+<p>Each row of the table is a rule: <b>Server</b>, <b>Database</b>, <b>Environment</b>, the color of the environment (click it to change it) and <b>Ask before changes</b>. Server and database accept the wildcards <code>*</code> and <code>?</code>; an empty server or database means every server or database. Choose <em>New environment...</em> in the environment column to create one (a name and a color). The most specific rule wins whatever the order: a rule with a database, then one without wildcards, then the longer pattern. Rows that conflict or are incomplete are reported under the table.</p>
+<p>A window without a connection is not colored.</p>
+
+<h3>Tab Color menu</h3>
+<p>The context menu of a document tab has <b>Tab Color</b> with the environments (a check mark on the one that applies to the window) and <b>Edit Environments...</b>, which opens the settings on the Coloring page. Choosing an environment changes the rule of that exact server and database (or adds it), so the tab, the status bar and the frame change at once.</p>
+
+<h2 id="confirmations">Confirmations</h2>
+<p>Before a script runs, SQL Prompter can ask <em>Run it anyway?</em> (default <b>No</b>). The checks are on the <em>Warnings</em> page of the settings:</p>
+<table>
+  <tr><th style="width:300px">Check</th><th>Asks when</th></tr>
+  <tr><td>Warn about DELETE without WHERE</td><td>A <code>DELETE</code> has no <code>WHERE</code>, no <code>TOP</code> and does not clear a temporary table or table variable.</td></tr>
+  <tr><td>Warn about UPDATE without WHERE</td><td>The same for <code>UPDATE</code>.</td></tr>
+  <tr><td>Warn about an open transaction</td><td>A <code>BEGIN TRAN</code> has no <code>COMMIT</code> or <code>ROLLBACK</code> in the same batch (batches that store a procedure, function or trigger are skipped).</td></tr>
+  <tr><td>Ask before changes (per coloring rule)</td><td>The window matches a rule with that box checked and the script contains <code>UPDATE</code>, <code>DELETE</code>, <code>TRUNCATE</code>, <code>DROP</code>, <code>ALTER</code>, <code>CREATE OR ALTER</code>, <code>MERGE</code> or <code>EXEC sp_rename</code> (temporary tables and table variables are left out). It belongs to the rule, not the environment, so one database of a server can be protected.</td></tr>
+</table>
+<p>The checks run when you execute the script or a selection (Execute, F5).</p>
+</main>
+</body>
+</html>

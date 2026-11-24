@@ -24,6 +24,92 @@ namespace SqlPrompter.Core.Analysis
         OldStyleJoin,
         AmbiguousColumn,
         ImplicitConversion,
+        UnknownColumn,
+
+        // The rules of the catalog (AnalysisRules) that have no kind of their own above, named by their code.
+        BP001,
+        BP002,
+        BP003,
+        BP009,
+        BP012,
+        BP013,
+        BP014,
+        BP015,
+        BP016,
+        BP017,
+        BP018,
+        BP022,
+        BP023,
+        BP024,
+        DEP001,
+        DEP002,
+        DEP003,
+        DEP006,
+        DEP007,
+        DEP009,
+        DEP011,
+        DEP012,
+        DEP013,
+        DEP014,
+        DEP015,
+        DEP016,
+        DEP018,
+        DEP019,
+        DEP020,
+        DEP021,
+        DEP022,
+        DEP025,
+        DEP026,
+        DEP027,
+        EI003,
+        EI011,
+        EI012,
+        EI013,
+        EI015,
+        EI016,
+        EI021,
+        EI023,
+        EI024,
+        EI028,
+        EI029,
+        EI030,
+        MI001,
+        MI002,
+        MI003,
+        MI006,
+        MI007,
+        MI008,
+        PE001,
+        PE002,
+        PE003,
+        PE004,
+        PE005,
+        PE006,
+        PE007,
+        PE008,
+        PE010,
+        PE011,
+        PE012,
+        PE013,
+        PE014,
+        PE015,
+        PE016,
+        PE017,
+        PE018,
+        PE019,
+        PE020,
+        PE021,
+        PE023,
+        SC004,
+        SC005,
+        SC006,
+        ST002,
+        ST003,
+        ST006,
+        ST007,
+        ST008,
+        ST010,
+        ST013,
     }
 
     public enum CodeIssueSeverity
@@ -63,6 +149,9 @@ namespace SqlPrompter.Core.Analysis
         }
 
         public CodeIssueKind Kind { get; }
+
+        /// <summary>The code of the rule in the catalog (BP005, DEP001 ...).</summary>
+        public string Code => AnalysisRules.Of(Kind)?.Code;
 
         public CodeIssueSeverity Severity { get; }
 
@@ -131,9 +220,9 @@ namespace SqlPrompter.Core.Analysis
                 FindInsertWithoutColumns(tokens, issues);
             }
 
-            if (settings.UnusedVariable)
+            if (settings.UnusedVariable || settings.IsOn(CodeIssueKind.MI001))
             {
-                FindUnusedVariables(tokens, issues);
+                FindUnusedVariables(tokens, settings, issues);
             }
 
             if (settings.SelectStar)
@@ -147,6 +236,7 @@ namespace SqlPrompter.Core.Analysis
             }
 
             FindMoreIssues(script, tokens, settings, metadata, issues);
+            CatalogRules.Run(script, allTokens, tokens, settings, metadata, issues);
 
             return issues.OrderBy(i => i.Start).ToList();
         }
@@ -326,7 +416,7 @@ namespace SqlPrompter.Core.Analysis
         }
 
         /// <summary>A variable declared with DECLARE that the batch (up to GO) never mentions again.</summary>
-        private static void FindUnusedVariables(List<Token> tokens, List<CodeIssue> issues)
+        private static void FindUnusedVariables(List<Token> tokens, AnalysisSettings settings, List<CodeIssue> issues)
         {
             var batchStart = 0;
             for (var i = 0; i <= tokens.Count; i++)
@@ -338,6 +428,7 @@ namespace SqlPrompter.Core.Analysis
 
                 var uses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 var declarations = new List<Token>();
+                var tableDeclarations = new HashSet<Token>();
                 var declaring = false;
                 var depth = 0;
                 for (var j = batchStart; j < i; j++)
@@ -365,6 +456,10 @@ namespace SqlPrompter.Core.Analysis
                         if (declaring && depth == 0 && j > batchStart && (tokens[j - 1].IsWord("DECLARE") || tokens[j - 1].Kind == TokenKind.Comma))
                         {
                             declarations.Add(token);
+                            if (j + 1 < tokens.Count && tokens[j + 1].IsWord("TABLE"))
+                            {
+                                tableDeclarations.Add(token);
+                            }
                         }
                     }
                     else if (declaring && depth == 0 && token.Kind == TokenKind.Word && StartsStatement.Contains(token.Text))
@@ -377,7 +472,15 @@ namespace SqlPrompter.Core.Analysis
                 {
                     if (uses[declaration.Text] == 1)
                     {
-                        issues.Add(Issue(CodeIssueKind.UnusedVariable, CodeIssueSeverity.Hint, declaration, "Variable " + declaration.Text + " is declared but never used."));
+                        var isTable = tableDeclarations.Contains(declaration);
+                        if (isTable && settings.IsOn(CodeIssueKind.MI001))
+                        {
+                            issues.Add(Issue(CodeIssueKind.MI001, CodeIssueSeverity.Hint, declaration, "Table variable " + declaration.Text + " is declared but never used."));
+                        }
+                        else if (!isTable && settings.UnusedVariable)
+                        {
+                            issues.Add(Issue(CodeIssueKind.UnusedVariable, CodeIssueSeverity.Hint, declaration, "Variable " + declaration.Text + " is declared but never used."));
+                        }
                     }
                 }
 

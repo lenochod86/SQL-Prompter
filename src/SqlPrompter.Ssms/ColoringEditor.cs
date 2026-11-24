@@ -19,6 +19,7 @@ namespace SqlPrompter.Ssms
         private const string NewEnvironmentItem = "New environment...";
         private readonly CheckBox enabled = new CheckBox { Text = "Color query windows by their server and database", AutoSize = true };
         private readonly CheckBox colorTab = new CheckBox { Text = "Tab and frame", AutoSize = true, Margin = new Padding(20, 0, 12, 0) };
+        private readonly ComboBox tabStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Width = 150, Margin = new Padding(0, 0, 12, 0) };
         private readonly CheckBox colorWindowBar = new CheckBox { Text = "Status bar of each query window (Connected, server, login, database)", AutoSize = true, Margin = new Padding(0, 0, 12, 0) };
         private readonly CheckBox colorShellBar = new CheckBox { Text = "Status bar of the SSMS window (at the bottom)", AutoSize = true, Margin = new Padding(0) };
         private readonly DataGridView rules = NewGrid();
@@ -44,7 +45,14 @@ namespace SqlPrompter.Ssms
             parts.Controls.AddRange(new Control[] { new Label { Text = "Colored parts:", AutoSize = true, Margin = new Padding(0, 3, 0, 0) }, colorTab, colorWindowBar, colorShellBar });
             top.Controls.Add(enabled);
             top.Controls.Add(new Label { Text = "Hides the default SSMS Set Tab Color in the tab menu and uses Tab Color of SQL Prompter.", AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(20, 0, 0, 4) });
+            tabStyle.Items.AddRange(new object[] { "Whole tab", "Accent bar" });
+            tabStyle.SelectedIndex = 0;
+            var tabStyleRow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Margin = new Padding(20, 0, 0, 4) };
+            tabStyleRow.Controls.Add(new Label { Text = "Tab color style:", AutoSize = true, Margin = new Padding(0, 4, 4, 0) });
+            tabStyleRow.Controls.Add(tabStyle);
+            tabStyleRow.Controls.Add(new Label { Text = "Whole tab fills the tab, also when it is not active; Accent bar is the thin strip of SSMS.", AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(0, 4, 0, 0) });
             top.Controls.Add(parts);
+            top.Controls.Add(tabStyleRow);
             layout.Controls.Add(top, 0, 0);
             layout.Controls.Add(Heading("Rules: server and database with * and ? wildcards (an empty server or database means every server or database, shown as a gray placeholder). The environment gives the color; " +
                 "pick one or choose \"New environment...\", and click the color of a row to change the color of that environment. The most specific rule wins, " +
@@ -97,6 +105,7 @@ namespace SqlPrompter.Ssms
             loading = true;
             enabled.Checked = settings.Enabled;
             colorTab.Checked = settings.ColorTab;
+            tabStyle.SelectedIndex = settings.FillWholeTab ? 0 : 1;
             colorWindowBar.Checked = settings.ColorWindowStatusBar;
             colorShellBar.Checked = settings.ColorShellStatusBar;
             environments.Clear();
@@ -117,7 +126,7 @@ namespace SqlPrompter.Ssms
 
         public ColorSettings ToSettings()
         {
-            var settings = new ColorSettings { Enabled = enabled.Checked, ColorTab = colorTab.Checked, ColorWindowStatusBar = colorWindowBar.Checked, ColorShellStatusBar = colorShellBar.Checked };
+            var settings = new ColorSettings { Enabled = enabled.Checked, ColorTab = colorTab.Checked, FillWholeTab = tabStyle.SelectedIndex != 1, ColorWindowStatusBar = colorWindowBar.Checked, ColorShellStatusBar = colorShellBar.Checked };
             foreach (var environment in environments)
             {
                 settings.Environments.Add(new ColorEnvironment

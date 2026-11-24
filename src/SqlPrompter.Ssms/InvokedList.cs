@@ -61,6 +61,9 @@ namespace SqlPrompter.Ssms
         private bool refreshing;
         private bool deleted;
 
+        // The item that was selected when the items were replaced (a lazy load finished, #517): it stays selected when the new items still have it.
+        private string keepSelected;
+
         // The column picker.
         private bool pickerMode;
         private readonly HashSet<CompletionItem> checkedItems = new HashSet<CompletionItem>();
@@ -78,7 +81,9 @@ namespace SqlPrompter.Ssms
             view.TextBuffer.Changed += (s, e) =>
             {
                 // A deletion (Backspace, Delete, cut, undo) can change the context, so the items are made again, not only filtered (#352).
-                if (e.Changes.Any(c => c.NewLength < c.OldLength))
+                // Only while the list is open: a deletion before it opened (the prefix a snippet replaces) would make the first refresh ask again and
+                // put the selection back on the first item (#517).
+                if (IsOpen && e.Changes.Any(c => c.NewLength < c.OldLength))
                 {
                     deleted = true;
                 }
@@ -319,6 +324,15 @@ namespace SqlPrompter.Ssms
             var matches = ListOrdering.Filter(suggestions.Items, typed, i => i.FilterText, loose);
             shown = matches.Select(i => new CompletionItemWithHighlight(i, Highlight(i, typed))).ToList();
             selected = Math.Min(selected, Math.Max(0, shown.Count - 1));
+            if (keepSelected != null)
+            {
+                var kept = shown.FindIndex(x => x.CompletionItem.InsertText == keepSelected);
+                keepSelected = null;
+                if (kept >= 0)
+                {
+                    selected = kept;
+                }
+            }
         }
 
         /// <summary>The picker keeps the order of the sources; a heading stays while a column below it matches.</summary>
@@ -719,8 +733,10 @@ namespace SqlPrompter.Ssms
                 return false;
             }
 
-            if (!fresh.Items.Select(i => i.InsertText).SequenceEqual(suggestions.Items.Select(i => i.InsertText)))
+            // The display text counts too: the row that says "Loading..." is replaced by the one that says why the load failed (#470).
+            if (!fresh.Items.Select(i => i.InsertText + "\u0000" + i.DisplayText).SequenceEqual(suggestions.Items.Select(i => i.InsertText + "\u0000" + i.DisplayText)))
             {
+                keepSelected = selected < shown.Count ? shown[selected].CompletionItem.InsertText : null;
                 suggestions = fresh;
                 selected = 0;
                 BuildPickerItems();

@@ -503,6 +503,15 @@ namespace SqlPrompter.Core.History
             }
         }
 
+        /// <summary>The id of the record of the open tab of the document, or null when it has none (yet).</summary>
+        public string IdOfOpen(string key)
+        {
+            lock (sync)
+            {
+                return FindOpen(key)?.Id;
+            }
+        }
+
         private TabRecord FindOpen(string key) =>
             tabs.LastOrDefault(t => !t.ClosedAtUtc.HasValue && string.Equals(t.Key, key ?? string.Empty, StringComparison.OrdinalIgnoreCase));
 

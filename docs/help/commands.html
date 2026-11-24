@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commands and keys - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a class="current" href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Commands and keys</h1>
+<p class="lead">Every command of the <b>SQL Prompter</b> menu, the keys that come with the extension, and the keys of the suggestion list.</p>
+
+<h2>The SQL Prompter menu</h2>
+<p>The menu is under <b>Extensions</b> by default; <b>Extensions &gt; Customize Menu</b> moves it to the menu bar. Items marked <em>R</em> are in the <b>Refactor</b> submenu. Every command is also in the <a href="quick-actions.html">quick actions</a> popup, and all of them can be bound to a key in <b>Tools &gt; Options &gt; Environment &gt; Keyboard</b> (command names start with <code>SQLPrompter.</code>).</p>
+<table>
+  <tr><th style="width:300px">Command</th><th style="width:210px">Default key</th><th>See</th></tr>
+  <tr><td>Refresh Metadata</td><td></td><td><a href="completion.html#metadata">Completion</a></td></tr>
+  <tr><td>Surround Selection With Snippet...</td><td></td><td rowspan="3"><a href="snippets.html">Snippets</a></td></tr>
+  <tr><td>New Snippet From Selection...</td><td></td></tr>
+  <tr><td>Manage Snippets...</td><td></td></tr>
+  <tr><td>Show Suggestions</td><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td><a href="completion.html">Completion</a></td></tr>
+  <tr><td>Go To Definition</td><td><kbd>F12</kbd></td><td rowspan="2"><a href="quick-actions.html">Quick actions and navigation</a></td></tr>
+  <tr><td>Show In Object Explorer</td><td><kbd>Ctrl</kbd>+<kbd>F12</kbd></td></tr>
+  <tr><td>Run Statement At Caret</td><td><kbd>Shift</kbd>+<kbd>F5</kbd></td><td rowspan="2"><a href="tools.html#run-statement">Editor and grid tools</a></td></tr>
+  <tr><td>Run Statements Up To Caret</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F5</kbd></td></tr>
+  <tr><td>Parameter Info</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd></td><td><a href="completion.html#parameter-info">Completion</a></td></tr>
+  <tr><td>Query History...</td><td></td><td><a href="history.html">History and tabs</a></td></tr>
+  <tr><td>Script As Temp Table</td><td></td><td rowspan="3"><a href="tools.html">Editor and grid tools</a></td></tr>
+  <tr><td>Copy Grid Selection As: IN List, VALUES, JSON, CSV, Markdown Table</td><td></td></tr>
+  <tr><td>Open in Excel</td><td></td></tr>
+  <tr><td>Quick Open Object</td><td></td><td rowspan="3"><a href="quick-actions.html">Quick actions and navigation</a></td></tr>
+  <tr><td>Find In Database Code</td><td></td></tr>
+  <tr><td>Show Dependencies</td><td></td></tr>
+  <tr><td>Reopen Closed Query Tab</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd></td><td rowspan="2"><a href="history.html">History and tabs</a></td></tr>
+  <tr><td>Rename Query Tab...</td><td>double click on the tab, or <em>Rename Tab</em> in the menu of the tab (for a new query window; a saved file is renamed by SSMS)</td></tr>
+  <tr><td>Formatting Styles &gt; Style, Edit Formatting Styles...</td><td></td><td rowspan="4"><a href="formatting.html">Formatting</a></td></tr>
+  <tr><td>Format Document</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>Y</kbd></td></tr>
+  <tr><td>Format Selection</td><td></td></tr>
+  <tr><td>Unformat Selection</td><td></td></tr>
+  <tr><td>R: Qualify Object Names, Expand All Select Stars, Remove Square Brackets, Insert Semicolons, Remove Unused Variables, Add N Prefix To Strings, Add AS To Aliases, Remove AS From Aliases, Add Commas / Quotes And Commas To Selected Lines, Script Summary</td><td></td><td><a href="analysis.html#refactor-menu">Code analysis and fixes</a></td></tr>
+  <tr><td>R: Fix Code Analysis Issues</td><td></td><td><a href="analysis.html#quick-fixes">Code analysis and fixes</a></td></tr>
+  <tr><td>R: Preview UPDATE/DELETE As SELECT, Run And Roll Back (Dry Run)</td><td></td><td><a href="tools.html#preview">Editor and grid tools</a></td></tr>
+  <tr><td>Settings...</td><td></td><td><a href="settings.html">Settings</a></td></tr>
+  <tr><td>Help &gt; Documentation</td><td></td><td>this help</td></tr>
+  <tr><td>Help &gt; Check for Updates</td><td></td><td><a href="settings.html#updates">Settings</a></td></tr>
+  <tr><td>Help &gt; Open Log</td><td></td><td><a href="troubleshooting.html">Troubleshooting</a></td></tr>
+  <tr><td>Help &gt; About</td><td></td><td>version, SSMS build, license, links and a <b>Copy diagnostics</b> button for bug reports; <a href="troubleshooting.html">Troubleshooting</a></td></tr>
+</table>
+<p>Commands that cannot be used at the moment are grayed out: for example the run and refactoring commands when no query editor is active, the selection commands when nothing is selected, the commands that need a database when the window is not connected, and <b>Copy As IN list</b> when the grid selection covers several columns. A grayed command run by its key does nothing.</p>
+<p>A default key is set once, and only when the key is free; if you remove or change it, your choice is kept. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F5</kbd> takes over the key from the command that SSMS binds to it. Reopen Closed Query Tab uses the first free of <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> (Go To File in SSMS), <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> (Template Explorer) and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>.</p>
+
+<h2>Other places with commands</h2>
+<ul>
+  <li><b>Tab context menu:</b> <em>Tab Color</em> with the environments and <em>Edit Environments...</em>.</li>
+  <li><b>Results grid context menu:</b> <em>Script As Temp Table</em>, <em>Copy as</em>, <em>Open in Excel</em>.</li>
+  <li><b>Toolbar:</b> <em>SQL History</em> opens the query history. SSMS keeps a new toolbar hidden until it is turned on; SQL Prompter shows it once after the first install.</li>
+  <li><b>Light bulb</b> in the editor margin and <kbd>Ctrl</kbd>+<kbd>.</kbd>: the quick fixes of the code analysis.</li>
+  <li><b>Tap of Ctrl:</b> the quick actions popup.</li>
+</ul>
+
+<h2>Keys inside the suggestion list</h2>
+<table>
+  <tr><th style="width:300px">Key</th><th>Action</th></tr>
+  <tr><td><kbd>Tab</kbd>, <kbd>Enter</kbd></td><td>Insert the selected item (after a table source, where an alias is typed, only <kbd>Tab</kbd>).</td></tr>
+  <tr><td><kbd>Space</kbd> and the other commit keys</td><td>Insert the selected item and type the key (<a href="settings.html#completion">settings</a>).</td></tr>
+  <tr><td><kbd>Up</kbd> / <kbd>Down</kbd> / <kbd>PgUp</kbd> / <kbd>PgDn</kbd></td><td>Move the selection.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Left</kbd> / <kbd>Ctrl</kbd>+<kbd>Right</kbd></td><td>Column picker / all suggestions.</td></tr>
+  <tr><td><kbd>Space</kbd> in the picker</td><td>Check or uncheck the selected column.</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Close the list.</td></tr>
+</table>
+
+<h2>Keys inside a snippet</h2>
+<table>
+  <tr><th style="width:300px">Key</th><th>Action</th></tr>
+  <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Next / previous field.</td></tr>
+  <tr><td><kbd>Enter</kbd></td><td>Next field; ends the editing after the last one.</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>End the editing; the caret goes to <code>$CURSOR$</code>.</td></tr>
+</table>
+</main>
+</body>
+</html>

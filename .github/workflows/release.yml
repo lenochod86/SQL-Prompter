@@ -1,0 +1,79 @@
+name: Release
+
+# A release is made by pushing a version tag, e.g. `git tag v0.200.54 && git push origin v0.200.54`.
+# The tag must equal the VSIX version in source.extension.vsixmanifest (without the leading `v`) and point to a commit on main.
+# The build runs on a GitHub-hosted Windows runner.
+# The release gets the .vsix and a SHA-256 checksum file (SqlPrompter.Ssms.vsix.sha256) for the update check (#297).
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Check the tag
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $manifest = [xml](Get-Content src/SqlPrompter.Ssms/source.extension.vsixmanifest -Raw)
+          $version = $manifest.PackageManifest.Metadata.Identity.Version
+          if ($tag -ne "v$version") {
+            throw "The tag $tag does not match the VSIX version $version in source.extension.vsixmanifest."
+          }
+          # The runner service runs as another user than the owner of the workspace, so git must be told to trust it.
+          git config --global --add safe.directory '*'
+          git fetch --quiet origin main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "The tag $tag does not point to a commit on main."
+          }
+      - name: Tests
+        run: dotnet test tests/SqlPrompter.Tests/SqlPrompter.Tests.csproj -v:minimal -warnaserror
+      - name: Build VSIX
+        run: dotnet build src/SqlPrompter.Ssms/SqlPrompter.Ssms.csproj -c Release -v:minimal -warnaserror
+      - name: Check the version inside the VSIX and write the checksum
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $vsix = Get-Item src/SqlPrompter.Ssms/bin/Release/net48/SqlPrompter.Ssms.vsix
+          $zip = [IO.Compression.ZipFile]::OpenRead($vsix.FullName)
+          try {
+            $entry = $zip.Entries | Where-Object FullName -eq 'extension.vsixmanifest'
+            $reader = New-Object IO.StreamReader($entry.Open())
+            $version = ([xml]$reader.ReadToEnd()).PackageManifest.Metadata.Identity.Version
+            $reader.Dispose()
+          }
+          finally {
+            $zip.Dispose()
+          }
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "The VSIX contains version $version, the tag is $env:GITHUB_REF_NAME."
+          }
+          $hash = (Get-FileHash $vsix.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          # The format of sha256sum: "<hash> *<file name>".
+          "$hash *$($vsix.Name)" | Set-Content -Path "$($vsix.FullName).sha256" -Encoding ascii
+          "VSIX **$($vsix.Name)**, version **$version**, SHA-256 ``$hash``" >> $env:GITHUB_STEP_SUMMARY
+      - name: Create the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $dir = 'src/SqlPrompter.Ssms/bin/Release/net48'
+          gh release create $env:GITHUB_REF_NAME "$dir/SqlPrompter.Ssms.vsix" "$dir/SqlPrompter.Ssms.vsix.sha256" `
+            --title $env:GITHUB_REF_NAME --generate-notes --verify-tag
+          if ($LASTEXITCODE -ne 0) { throw 'gh release create failed.' }

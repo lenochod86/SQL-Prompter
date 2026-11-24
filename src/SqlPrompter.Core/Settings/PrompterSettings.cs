@@ -45,6 +45,9 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "analysis")]
         public AnalysisSettings Analysis { get; set; }
 
+        [DataMember(Name = "updates")]
+        public UpdateSettings Updates { get; set; }
+
         /// <summary>The active formatting style (what Format Document and the inserted lists use). It is always a copy of the active named style.</summary>
         [DataMember(Name = "formatting")]
         public FormatStyle Formatting { get; set; }
@@ -57,7 +60,7 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "activeFormattingStyle")]
         public string ActiveFormattingStyle { get; set; }
 
-        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone(), Analysis = Analysis.Clone(), Formatting = Formatting.Clone(), FormattingStyles = (FormattingStyles ?? new List<NamedFormatStyle>()).Select(s => s.Clone()).ToList(), ActiveFormattingStyle = ActiveFormattingStyle };
+        public PrompterSettings Clone() => new PrompterSettings { Version = Version, Behavior = Behavior.Clone(), Aliases = Aliases.Clone(), Joins = Joins.Clone(), Inserts = Inserts.Clone(), Snippets = Snippets.Clone(), Coloring = Coloring.Clone(), Analysis = Analysis.Clone(), Updates = Updates.Clone(), Formatting = Formatting.Clone(), FormattingStyles = (FormattingStyles ?? new List<NamedFormatStyle>()).Select(s => s.Clone()).ToList(), ActiveFormattingStyle = ActiveFormattingStyle };
 
         public SqlPrompter.Core.Completion.SuggestionOptions ToSuggestionOptions() =>
             new SqlPrompter.Core.Completion.SuggestionOptions(Behavior.KeywordCase, Aliases, null, Joins, null, Inserts, new SqlPrompter.Core.Completion.EditorLayout { Style = Formatting });
@@ -86,6 +89,7 @@ namespace SqlPrompter.Core.Settings
             Snippets = Snippets ?? new SnippetSettings();
             Coloring = Coloring ?? new ColorSettings();
             Analysis = Analysis ?? new AnalysisSettings();
+            Updates = Updates ?? new UpdateSettings();
             Formatting = Formatting ?? new FormatStyle();
             EnsureStyles();
         }
@@ -148,6 +152,7 @@ namespace SqlPrompter.Core.Settings
             Snippets = new SnippetSettings();
             Coloring = new ColorSettings();
             Analysis = new AnalysisSettings();
+            Updates = new UpdateSettings();
             Formatting = new FormatStyle();
             // Empty on purpose: a file from before the styles has only 'formatting', which EnsureStyles turns into the first style.
             FormattingStyles = new List<NamedFormatStyle>();
@@ -195,9 +200,47 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "rankByUsage")]
         public bool RankByUsage { get; set; }
 
-        /// <summary>Typing <c>'</c> or <c>[</c> also inserts the closing character.</summary>
-        [DataMember(Name = "autoClose")]
-        public bool AutoClose { get; set; }
+        /// <summary>Typing <c>'</c> also inserts the closing quote (#440).</summary>
+        [DataMember(Name = "autoCloseQuote")]
+        public bool AutoCloseQuote { get; set; }
+
+        /// <summary>Typing <c>(</c> also inserts the closing parenthesis.</summary>
+        [DataMember(Name = "autoCloseParenthesis")]
+        public bool AutoCloseParenthesis { get; set; }
+
+        /// <summary>Typing <c>[</c> also inserts the closing bracket.</summary>
+        [DataMember(Name = "autoCloseBracket")]
+        public bool AutoCloseBracket { get; set; }
+
+        /// <summary>Typing <c>/*</c> also inserts <c> */</c>.</summary>
+        [DataMember(Name = "autoCloseBlockComment")]
+        public bool AutoCloseBlockComment { get; set; }
+
+        /// <summary>
+        /// The single switch of the settings files from before there was one per pair: it is read once (on = the quote, the parenthesis and the bracket on, off = all
+        /// three off; the block comment pair did not exist and keeps its default) and never written again. A value of a pair in the same file wins (it is read later).
+        /// </summary>
+        [DataMember(Name = "autoClose", EmitDefaultValue = false)]
+        private bool? LegacyAutoClose
+        {
+            get => null;
+            set
+            {
+                if (value.HasValue)
+                {
+                    AutoCloseQuote = value.Value;
+                    AutoCloseParenthesis = value.Value;
+                    AutoCloseBracket = value.Value;
+                }
+            }
+        }
+
+        /// <summary>The pairs that are closed automatically.</summary>
+        public SqlPrompter.Core.Editing.AutoClosePairs AutoClosePairs =>
+            (AutoCloseQuote ? SqlPrompter.Core.Editing.AutoClosePairs.Quote : 0) |
+            (AutoCloseParenthesis ? SqlPrompter.Core.Editing.AutoClosePairs.Parenthesis : 0) |
+            (AutoCloseBracket ? SqlPrompter.Core.Editing.AutoClosePairs.Bracket : 0) |
+            (AutoCloseBlockComment ? SqlPrompter.Core.Editing.AutoClosePairs.BlockComment : 0);
 
         /// <summary>The list opens by itself after a comma (and the space after it) where the next item is a name or an expression.</summary>
         [DataMember(Name = "suggestAfterComma")]
@@ -245,6 +288,10 @@ namespace SqlPrompter.Core.Settings
         /// <summary>The other places of the name under the caret are highlighted.</summary>
         [DataMember(Name = "highlightMatches")]
         public bool HighlightMatches { get; set; }
+
+        /// <summary>The keywords that belong together with the one at the caret (BEGIN and END, TRY and CATCH, ...) are highlighted.</summary>
+        [DataMember(Name = "highlightBlockKeywords")]
+        public bool HighlightBlockKeywords { get; set; }
 
         /// <summary>Every executed query is written to the history on this machine.</summary>
         [DataMember(Name = "keepHistory")]
@@ -333,9 +380,13 @@ namespace SqlPrompter.Core.Settings
             KeywordCase = KeywordCase.FollowStyle;
             LooseMatching = true;
             RankByUsage = true;
-            AutoClose = true;
+            AutoCloseQuote = true;
+            AutoCloseParenthesis = true;
+            AutoCloseBracket = true;
+            AutoCloseBlockComment = true;
             SuggestAfterComma = true;
             HighlightMatches = true;
+            HighlightBlockKeywords = true;
             PickerTableOrder = false;
             ShowColumnPickerHint = true;
             OwnTypingList = false;

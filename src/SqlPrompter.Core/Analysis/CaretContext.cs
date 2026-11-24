@@ -185,6 +185,21 @@ namespace SqlPrompter.Core.Analysis
         /// <summary>The name is the target of INSERT [INTO]: choosing a table can insert its column list with it.</summary>
         public bool InsertTarget { get; internal set; }
 
+        /// <summary>With <see cref="ContextKind.ObjectName"/>: the name of a database of the server (ALTER DATABASE, DROP DATABASE, USE, ...), nothing else (#447).</summary>
+        public bool DatabaseName { get; internal set; }
+
+        /// <summary>With <see cref="DatabaseName"/>: <c>CURRENT</c> is accepted in place of the name (ALTER DATABASE CURRENT SET ...).</summary>
+        public bool CurrentDatabaseAllowed { get; internal set; }
+
+        /// <summary>The name follows APPLY: only table-valued functions can be the right side (#522).</summary>
+        public bool TableFunctionsOnly { get; internal set; }
+
+        /// <summary>With <see cref="ContextKind.Variable"/> at an argument of EXEC procedure: the name parts of the procedure, so that its parameters are offered (#523).</summary>
+        public IReadOnlyList<string> ExecProcedure { get; internal set; }
+
+        /// <summary>With <see cref="ExecProcedure"/>: the parameters the call already names (<c>@Name =</c>), with the at sign.</summary>
+        public IReadOnlyList<string> ExecUsedParameters { get; internal set; } = Array.Empty<string>();
+
         /// <summary>The name follows EXEC: stored procedures are offered and choosing one inserts its parameters.</summary>
         public bool ProcedureName { get; internal set; }
 
@@ -347,6 +362,8 @@ namespace SqlPrompter.Core.Analysis
             AliasAllowed = AliasAllowed,
             AfterJoin = AfterJoin,
             InsertTarget = InsertTarget,
+            DatabaseName = DatabaseName,
+            CurrentDatabaseAllowed = CurrentDatabaseAllowed,
             ProcedureName = ProcedureName,
             FirstInsertColumn = FirstInsertColumn,
             IndexColumns = IndexColumns,

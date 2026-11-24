@@ -29,7 +29,8 @@ namespace SqlPrompter.Ssms
         public bool ExecuteCommand(TypeCharCommandArgs args, CommandExecutionContext executionContext)
         {
             var typed = args.TypedChar;
-            if ((typed != '\'' && typed != '[' && typed != ']' && typed != '(' && typed != ')') || !SettingsService.Current.Behavior.AutoClose)
+            var pairs = SettingsService.Current.Behavior.AutoClosePairs;
+            if ((typed != '\'' && typed != '[' && typed != ']' && typed != '(' && typed != ')' && typed != '*' && typed != '/') || pairs == AutoClosePairs.None)
             {
                 return false;
             }
@@ -43,10 +44,18 @@ namespace SqlPrompter.Ssms
             try
             {
                 var caret = view.Caret.Position.BufferPosition;
-                var action = AutoClose.Decide(caret.Snapshot.GetText(), caret.Position, typed);
+                var action = AutoClose.Decide(caret.Snapshot.GetText(), caret.Position, typed, pairs);
                 if (action == AutoCloseAction.Overtype)
                 {
                     view.Caret.MoveTo(new SnapshotPoint(caret.Snapshot, caret.Position + 1));
+                    return true;
+                }
+
+                if (action == AutoCloseAction.OvertypeCommentStar)
+                {
+                    // The closing  */  of a comment that was closed automatically: step over its space (if any) and star.
+                    var skip = caret.Snapshot[caret.Position] == ' ' ? 2 : 1;
+                    view.Caret.MoveTo(new SnapshotPoint(caret.Snapshot, caret.Position + skip));
                     return true;
                 }
 
@@ -54,7 +63,7 @@ namespace SqlPrompter.Ssms
                 {
                     // The editor types the character in its own handler, which runs after this one: add the closing partner once the
                     // very next change of the buffer (that character) has happened.
-                    var closing = typed == '[' ? ']' : typed == '(' ? ')' : '\'';
+                    var closing = typed == '[' ? "]" : typed == '(' ? ")" : typed == '*' ? AutoClose.BlockCommentClosing : "'";
                     var position = caret.Position;
                     var nextWas = position < caret.Snapshot.Length ? caret.Snapshot[position] : '\0';
                     var buffer = view.TextBuffer;
@@ -87,7 +96,7 @@ namespace SqlPrompter.Ssms
             return false;
         }
 
-        private static void InsertClosing(ITextView view, int typedAt, char opening, char closing, char nextWas)
+        private static void InsertClosing(ITextView view, int typedAt, char opening, string closing, char nextWas)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             try
@@ -107,7 +116,7 @@ namespace SqlPrompter.Ssms
                     return;
                 }
 
-                var edited = view.TextBuffer.Insert(after, closing.ToString());
+                var edited = view.TextBuffer.Insert(after, closing);
                 view.Caret.MoveTo(new SnapshotPoint(edited, after));
             }
             catch (Exception ex)

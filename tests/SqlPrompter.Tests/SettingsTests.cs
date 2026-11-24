@@ -46,6 +46,15 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void AnOldSettingsFileWithInstallBuiltInStillLoads()
+        {
+            var settings = SettingsJson.Deserialize("{ \"snippets\": { \"installBuiltIn\": false, \"folder\": \"D:/snippets\" } }");
+
+            Assert.Equal("D:/snippets", settings.Snippets.Folder);
+            Assert.DoesNotContain("installBuiltIn", SettingsJson.Serialize(settings));
+        }
+
+        [Fact]
         public void JsonRoundTripKeepsEverything()
         {
             var settings = new PrompterSettings();

@@ -109,6 +109,7 @@ namespace SqlPrompter.Ssms
         private readonly ListBox list = new ListBox { BorderThickness = new Thickness(0) };
         private readonly List<Entry> entries;
         private Func<string, List<Entry>> search;
+        private int initialIndex;
         private Action chosen;
         private bool closing;
         private readonly CtrlTapDetector closeTap = new CtrlTapDetector();
@@ -147,6 +148,12 @@ namespace SqlPrompter.Ssms
             Loaded += (s, e) =>
             {
                 filter.Focus();
+                if (initialIndex > 0 && initialIndex < list.Items.Count && filter.Text.Length == 0)
+                {
+                    list.SelectedIndex = initialIndex;
+                    list.ScrollIntoView(list.SelectedItem);
+                }
+
                 StartOutsideClickWatch();
             };
             Closing += (s, e) =>
@@ -288,7 +295,9 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
-            Open(new QuickActionsPopup(view, entries, "Script outline: type to filter; Enter jumps to the item, Esc closes"));
+            var outline = new QuickActionsPopup(view, entries, "Script outline: type to filter; Enter jumps to the item, Esc closes");
+            outline.initialIndex = Math.Max(0, SqlPrompter.Core.Navigation.ScriptOutline.IndexAt(items, view.Caret.Position.BufferPosition.Position));
+            Open(outline);
         }
 
         /// <summary>Quick open (#223): objects of the current database by a part of the name; Enter opens the definition, Shift+Enter inserts the name.</summary>
@@ -356,15 +365,40 @@ namespace SqlPrompter.Ssms
             var y = Math.Max(0, line.Bottom - view.ViewportTop + 2);
             var device = view.VisualElement.PointToScreen(new Point(0, y));
             var source = PresentationSource.FromVisual(view.VisualElement);
-            var dip = source?.CompositionTarget != null ? source.CompositionTarget.TransformFromDevice.Transform(device) : device;
-            var area = SystemParameters.WorkArea;
-            Left = Math.Max(area.Left, Math.Min(dip.X, area.Right - Width));
-            Top = dip.Y + Height > area.Bottom ? Math.Max(area.Top, dip.Y - Height - line.Height - 4) : dip.Y;
+            var scale = source?.CompositionTarget != null ? source.CompositionTarget.TransformToDevice.M11 : 1.0;
+
+            // The monitor that contains the caret decides, not the primary one (#451). Everything is computed in device pixels.
+            var area = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)device.X, (int)device.Y)).WorkingArea;
+            PopupPlacement.Place(device.X, device.Y, line.Height * scale, 4 * scale, Width * scale, Height * scale, area.Left, area.Top, area.Right, area.Bottom, out var left, out var top);
+            var dip = source?.CompositionTarget != null ? source.CompositionTarget.TransformFromDevice.Transform(new Point(left, top)) : new Point(left, top);
+            Left = dip.X;
+            Top = dip.Y;
+
+            // Left and Top in DIPs are converted with the DPI of the monitor the window starts on, so the exact position is set in pixels once the window exists.
+            SourceInitialized += (s, e) => SetWindowPos(new System.Windows.Interop.WindowInteropHelper(this).Handle, IntPtr.Zero, (int)Math.Round(left), (int)Math.Round(top), 0, 0, 0x0001 | 0x0004 | 0x0010);
         }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 
         private static List<Entry> BuildEntries(IWpfTextView view, bool hasSelection)
         {
             var result = new List<Entry>();
+
+            // On a BEGIN or END the jump to the other end comes first (#224).
+            var match = hasSelection ? null : SqlPrompter.Core.Navigation.BlockMatcher.Find(view.TextSnapshot.GetText(), view.Caret.Position.BufferPosition.Position);
+            if (match != null)
+            {
+                result.Add(new Entry("Go To " + match.Name, "Moves the caret to the " + (match.TargetIsEnd ? "end" : "beginning") + " of this block (line " + match.Line + ").", () =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    var position = new SnapshotPoint(view.TextSnapshot, Math.Min(match.Target, view.TextSnapshot.Length));
+                    view.Selection.Clear();
+                    view.Caret.MoveTo(position);
+                    view.ViewScroller.EnsureSpanVisible(new SnapshotSpan(position, 0), Microsoft.VisualStudio.Text.Editor.EnsureSpanVisibleOptions.ShowStart);
+                }));
+            }
+
             foreach (var action in QuickActionCatalog.Actions(hasSelection))
             {
                 var id = action.Id;
@@ -417,6 +451,7 @@ namespace SqlPrompter.Ssms
             switch (id)
             {
                 case QuickActionCatalog.Format: RefactorCommands.FormatScript(view, !hasSelection); break;
+                case QuickActionCatalog.Unformat: RefactorCommands.UnformatSelection(view); break;
                 case QuickActionCatalog.QualifyNames: RefactorCommands.QualifyNames(view); break;
                 case QuickActionCatalog.ExpandStars: RefactorCommands.ExpandStars(view); break;
                 case QuickActionCatalog.RemoveBrackets: RefactorCommands.Run(view, Refactorings.RemoveBrackets, "square brackets removed"); break;
@@ -428,6 +463,7 @@ namespace SqlPrompter.Ssms
                 case QuickActionCatalog.AddNPrefix: RefactorCommands.Run(view, AliasRefactorings.AddNPrefix, "N prefix added to strings"); break;
                 case QuickActionCatalog.AddAs: RefactorCommands.Run(view, AliasRefactorings.AddAs, "AS added to aliases"); break;
                 case QuickActionCatalog.RemoveAs: RefactorCommands.Run(view, AliasRefactorings.RemoveAs, "AS removed from aliases"); break;
+                case QuickActionCatalog.ScriptOutline: ShowOutline(view); break;
                 case QuickActionCatalog.AddCommas: LineCommands.Run(view, LineTools.AddCommas, "commas"); break;
                 case QuickActionCatalog.AddQuotesAndCommas: LineCommands.Run(view, LineTools.AddQuotesAndCommas, "quotes and commas"); break;
             }

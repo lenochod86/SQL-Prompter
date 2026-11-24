@@ -98,6 +98,30 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public async Task RaisesSnapshotReplacedAfterLoadAndAfterChange()
+        {
+            var now = new DateTime(2026, 1, 1);
+            var loader = new FakeLoader();
+            var cache = new DatabaseMetadataCache(clock: () => now);
+            var raised = 0;
+            cache.SnapshotReplaced += (s, e) => raised++;
+            var changed = 0;
+            cache.ObjectsChanged += (s, e) => changed++;
+
+            await cache.EnsureLoaded(loader);
+            Assert.Equal(1, raised);
+
+            await cache.CheckForChanges(loader, force: true);
+            Assert.Equal(1, raised);
+
+            loader.Version = "v2";
+            await cache.CheckForChanges(loader, force: true);
+            Assert.Equal(2, raised);
+            Assert.Equal(1, changed);
+            Assert.Equal("v2", cache.Current.Version);
+        }
+
+        [Fact]
         public async Task ForcedCheckIgnoresInterval()
         {
             var now = new DateTime(2026, 1, 1);
@@ -128,6 +152,61 @@ namespace SqlPrompter.Tests
             Assert.Null(cache.Current);
         }
 
+        [Fact]
+        public async Task StatusGoesFromLoadingToDone()
+        {
+            var loader = new FakeLoader { Gate = new TaskCompletionSource<bool>() };
+            var cache = new DatabaseMetadataCache();
+            var replaced = 0;
+            cache.SnapshotReplaced += (s, e) => replaced++;
+
+            var pending = cache.EnsureLoaded(loader);
+            Assert.True(cache.Status.IsLoading);
+            Assert.Null(cache.Current);
+
+            loader.Gate.SetResult(true);
+            await pending;
+
+            Assert.True(cache.Status.IsDone);
+            Assert.Equal(1, replaced);
+        }
+
+        [Fact]
+        public async Task FailedLoadReportsReasonAndRaisesLoadFailed()
+        {
+            var loader = new FakeLoader { Fail = true };
+            var cache = new DatabaseMetadataCache();
+            var failed = 0;
+            string reasonInHandler = null;
+            cache.LoadFailed += (s, e) => { failed++; reasonInHandler = cache.Status.Error; };
+
+            await cache.EnsureLoaded(loader);
+
+            Assert.Equal("db down", cache.Status.Error);
+            Assert.Equal(1, failed);
+            Assert.Equal("db down", reasonInHandler);
+        }
+
+        [Fact]
+        public async Task LoadsOfTwoDatabasesDoNotMix()
+        {
+            // Every database has its own cache: a slow load of the previous database never fills the cache of the current one (#470).
+            var manager = new MetadataCacheManager();
+            var first = manager.Get(new ConnectionSettings("srv", "a", AuthenticationKind.Windows, null, null, "False", "True"));
+            var second = manager.Get(new ConnectionSettings("srv", "b", AuthenticationKind.Windows, null, null, "False", "True"));
+            var slow = new FakeLoader { Gate = new TaskCompletionSource<bool>() };
+            var fast = new FakeLoader();
+
+            var pending = first.EnsureLoaded(slow);
+            await second.EnsureLoaded(fast);
+
+            Assert.True(first.Status.IsLoading);
+            Assert.True(second.Status.IsDone);
+            Assert.NotSame(first, second);
+            slow.Gate.SetResult(true);
+            await pending;
+            Assert.True(first.Status.IsDone);
+        }
         [Fact]
         public void CacheKeyDoesNotContainPassword()
         {

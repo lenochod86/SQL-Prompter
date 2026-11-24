@@ -1,3 +1,4 @@
+using System;
 using SqlPrompter.Core.Lexing;
 
 namespace SqlPrompter.Core.Editing
@@ -12,17 +13,50 @@ namespace SqlPrompter.Core.Editing
 
         /// <summary>The closing character is already after the caret: step over it instead of typing a second one.</summary>
         Overtype,
+
+        /// <summary>
+        /// The <c>*</c> of a block comment that was closed automatically is typed: the caret steps over the (optional) space and the star of the closing <c> */</c>, so that
+        /// typing <c>*/</c> ends the comment (the <c>/</c> is then stepped over by <see cref="Overtype"/>).
+        /// </summary>
+        OvertypeCommentStar,
+    }
+
+    /// <summary>The pairs that are closed automatically (the switches of the settings, #440).</summary>
+    [Flags]
+    public enum AutoClosePairs
+    {
+        None = 0,
+
+        /// <summary><c>'</c> closes with <c>'</c>.</summary>
+        Quote = 1,
+
+        /// <summary><c>(</c> closes with <c>)</c>.</summary>
+        Parenthesis = 2,
+
+        /// <summary><c>[</c> closes with <c>]</c>.</summary>
+        Bracket = 4,
+
+        /// <summary><c>/*</c> closes with <c> */</c>.</summary>
+        BlockComment = 8,
+
+        All = Quote | Parenthesis | Bracket | BlockComment,
     }
 
     /// <summary>
-    /// Auto-closing of <c>'</c>, <c>[</c> and <c>(</c>. It decides from the text before the character is typed; the same lexer as the completion tells
-    /// strings, comments and bracketed names apart, so nothing is closed inside them.
+    /// Auto-closing of <c>'</c>, <c>[</c>, <c>(</c> and <c>/*</c>. It decides from the text before the character is typed; the same lexer as the completion tells
+    /// strings, comments and bracketed names apart, so nothing is closed inside them. Only the pairs in <c>enabled</c> do anything (no closing, no step over, no
+    /// removal of an empty pair).
     /// </summary>
     public static class AutoClose
     {
-        public static AutoCloseAction Decide(string text, int caret, char typed)
+        /// <summary>What is inserted after the caret when <c>/*</c> has been typed.</summary>
+        public const string BlockCommentClosing = " */";
+
+        public static AutoCloseAction Decide(string text, int caret, char typed) => Decide(text, caret, typed, AutoClosePairs.All);
+
+        public static AutoCloseAction Decide(string text, int caret, char typed, AutoClosePairs enabled)
         {
-            if (text == null || caret < 0 || caret > text.Length || (typed != '\'' && typed != '[' && typed != ']' && typed != '(' && typed != ')'))
+            if (text == null || caret < 0 || caret > text.Length || (enabled & PairOf(typed)) == 0)
             {
                 return AutoCloseAction.None;
             }
@@ -30,6 +64,17 @@ namespace SqlPrompter.Core.Editing
             var next = caret < text.Length ? text[caret] : '\0';
             var previous = caret > 0 ? text[caret - 1] : '\0';
             var inside = TokenAround(text, caret);
+
+            if (typed == '*')
+            {
+                return DecideStar(text, caret, previous, inside);
+            }
+
+            if (typed == '/')
+            {
+                // The slash of the closing */ that was inserted with the opening: step over it.
+                return previous == '*' && next == '/' && IsInsertedCommentEnd(inside, caret + 1) ? AutoCloseAction.Overtype : AutoCloseAction.None;
+            }
 
             if (typed == ')')
             {
@@ -85,32 +130,116 @@ namespace SqlPrompter.Core.Editing
             return AutoCloseAction.InsertPair;
         }
 
-        /// <summary>True when Backspace right after an opening character removes the empty pair <c>()</c>, <c>[]</c> or <c>''</c> around the caret.</summary>
-        public static bool DeletesPair(string text, int caret)
+        /// <summary>The star: it starts a block comment after a slash, or steps over the star of an inserted closing.</summary>
+        private static AutoCloseAction DecideStar(string text, int caret, char previous, Token inside)
         {
+            // " */" or "*/" right after the caret, the end of the comment the caret is in: the closing that was inserted with the opening.
+            if (inside != null && IsInsertedCommentEnd(inside, caret + (StartsWith(text, caret, BlockCommentClosing) ? 3 : 2)) &&
+                (StartsWith(text, caret, BlockCommentClosing) || StartsWith(text, caret, "*/")))
+            {
+                return AutoCloseAction.OvertypeCommentStar;
+            }
+
+            if (inside != null || previous != '/')
+            {
+                return AutoCloseAction.None;
+            }
+
+            // The slash must be a plain one, not the end of a comment (*/ and then a star) and not a part of a name or a number.
+            if (caret >= 2 && text[caret - 2] == '*')
+            {
+                return AutoCloseAction.None;
+            }
+
+            // Another closing of this comment is already there (a comment that is being edited): nothing to add.
+            return StartsWith(text, caret, BlockCommentClosing) || StartsWith(text, caret, "*/") ? AutoCloseAction.None : AutoCloseAction.InsertPair;
+        }
+
+        /// <summary>
+        /// Backspace right after an opening character removes the empty pair <c>()</c>, <c>[]</c> or <c>''</c> around the caret, or the <c>/*</c> in front of the caret together
+        /// with the untouched <c> */</c> behind it. <paramref name="start"/> and <paramref name="length"/> are the text to delete.
+        /// </summary>
+        public static bool TryGetPairDeletion(string text, int caret, AutoClosePairs enabled, out int start, out int length)
+        {
+            start = 0;
+            length = 0;
             if (text == null || caret < 1 || caret >= text.Length)
             {
                 return false;
             }
 
+            if (enabled.HasFlag(AutoClosePairs.BlockComment) && caret >= 2 && text[caret - 2] == '/' && text[caret - 1] == '*' && StartsWith(text, caret, BlockCommentClosing))
+            {
+                var comment = TokenAround(text, caret);
+                if (comment != null && comment.Kind == TokenKind.Comment && !comment.IsLineComment && comment.Start == caret - 2 && comment.Text == "/*" + BlockCommentClosing)
+                {
+                    start = caret - 2;
+                    length = 2 + BlockCommentClosing.Length;
+                    return true;
+                }
+
+                return false;
+            }
+
             var open = text[caret - 1];
             var close = text[caret];
-            if (!((open == '(' && close == ')') || (open == '[' && close == ']') || (open == '\'' && close == '\'')))
+            var pair = open == '(' && close == ')' ? AutoClosePairs.Parenthesis
+                : open == '[' && close == ']' ? AutoClosePairs.Bracket
+                : open == '\'' && close == '\'' ? AutoClosePairs.Quote
+                : AutoClosePairs.None;
+            if (pair == AutoClosePairs.None || (enabled & pair) == 0)
             {
                 return false;
             }
 
             var inside = TokenAround(text, caret);
+            bool deletes;
             switch (open)
             {
                 case '(':
-                    return inside == null;
+                    deletes = inside == null;
+                    break;
                 case '[':
-                    return inside != null && inside.Kind == TokenKind.QuotedIdentifier && inside.Text == "[]";
+                    deletes = inside != null && inside.Kind == TokenKind.QuotedIdentifier && inside.Text == "[]";
+                    break;
                 default:
-                    return inside != null && inside.Kind == TokenKind.String && inside.Text == "''";
+                    deletes = inside != null && inside.Kind == TokenKind.String && inside.Text == "''";
+                    break;
+            }
+
+            if (deletes)
+            {
+                start = caret - 1;
+                length = 2;
+            }
+
+            return deletes;
+        }
+
+        /// <summary>True when Backspace right after an opening character removes the empty pair <c>()</c>, <c>[]</c> or <c>''</c> around the caret.</summary>
+        public static bool DeletesPair(string text, int caret) =>
+            TryGetPairDeletion(text, caret, AutoClosePairs.Quote | AutoClosePairs.Parenthesis | AutoClosePairs.Bracket, out _, out _);
+
+        private static AutoClosePairs PairOf(char typed)
+        {
+            switch (typed)
+            {
+                case '\'': return AutoClosePairs.Quote;
+                case '(':
+                case ')': return AutoClosePairs.Parenthesis;
+                case '[':
+                case ']': return AutoClosePairs.Bracket;
+                case '*':
+                case '/': return AutoClosePairs.BlockComment;
+                default: return AutoClosePairs.None;
             }
         }
+
+        private static bool StartsWith(string text, int index, string value) => string.CompareOrdinal(text, index, value, 0, value.Length) == 0;
+
+        /// <summary>A terminated block comment that ends at <paramref name="end"/>.</summary>
+        private static bool IsInsertedCommentEnd(Token comment, int end) =>
+            comment != null && comment.Kind == TokenKind.Comment && !comment.IsLineComment && !comment.IsUnterminated && comment.End == end;
 
         private static bool IsBalanced(string text)
         {

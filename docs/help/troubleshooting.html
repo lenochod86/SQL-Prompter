@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troubleshooting - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a class="current" href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Troubleshooting</h1>
+<p class="lead">Where the files and the log are, how to see the installed version, and the known limits.</p>
+
+<h2>Log and version</h2>
+<ul>
+  <li><b>SQL Prompter &gt; Help &gt; Open Log</b> opens <code>%LOCALAPPDATA%\SqlPrompter\sqlprompter.log</code>. It records metadata loading, the result of the compatibility check and errors; it never holds passwords or script text. It is trimmed at 5 MB.</li>
+  <li>The first line of a session says <code>SQL Prompter 0.200.xx loaded.</code> That is the version of the installed extension; the same number is in <b>Extensions &gt; Manage Extensions</b>. The next lines say which SSMS build was found and how many of the undocumented requirements the extension relies on were found.</li>
+  <li><b>SQL Prompter &gt; Help &gt; Check for Updates</b> compares the installed version with the latest release.</li>
+  <li><b>SQL Prompter &gt; Help &gt; About</b> shows the installed version, the SSMS build, the log and settings paths and the result of the last update check. <b>Copy diagnostics</b> puts the version, the SSMS build and the compatibility result on the clipboard, ready to paste into a bug report.</li>
+</ul>
+
+<h2>Files</h2>
+<table>
+  <tr><th style="width:360px">File</th><th>Holds</th></tr>
+  <tr><td><code>%APPDATA%\SqlPrompter\settings.json</code></td><td>All settings, the formatting styles, the coloring rules and the update decisions.</td></tr>
+  <tr><td><code>%APPDATA%\SqlPrompter\Snippets\</code></td><td>The personal snippets (or the folder set in the settings).</td></tr>
+  <tr><td><code>%APPDATA%\SqlPrompter\usage.json</code></td><td>The counts that rank the suggestions.</td></tr>
+  <tr><td><code>%APPDATA%\SqlPrompter\history.jsonl</code>, <code>tabhistory.jsonl</code>, <code>tabs.json</code></td><td>Query history, the history of tabs and their versions, the tabs to restore.</td></tr>
+  <tr><td><code>%LOCALAPPDATA%\SqlPrompter\sqlprompter.log</code></td><td>The log.</td></tr>
+  <tr><td><code>%LOCALAPPDATA%\SqlPrompter\updates\</code></td><td>A downloaded update until it is installed (deleted at the next start).</td></tr>
+</table>
+<p>Nothing is sent anywhere. Passwords are never stored. To start over, close SSMS and delete or rename the file you want to reset.</p>
+
+<h2>Installing and removing</h2>
+<ul>
+  <li><b>Install:</b> close SSMS and double-click <code>SqlPrompter.Ssms.vsix</code>. A new version installs over the old one. For an <a href="settings.html#updates">update from inside SSMS</a> the installer waits until SSMS is closed.</li>
+  <li><b>Remove:</b> close SSMS and run <code>Uninstall SQL Prompter.cmd</code> from the <code>Uninstall</code> folder of the extension (search <code>%LOCALAPPDATA%\Microsoft\SSMS\22.0_*\Extensions</code> for the file name). It asks whether to delete your settings, snippets, history and log too (they are kept by default). By hand: <code>VSIXInstaller.exe /uninstall:SqlPrompter.0d66644a-dd92-4b87-ae9d-5d20a2df11c6</code> from the <code>Common7\IDE</code> folder of SSMS.</li>
+  <li>If SSMS says after a removal that a package did not load, it still holds the old registration: run <code>SSMS.exe /updateconfiguration</code> from the <code>Common7\IDE</code> folder while SSMS is closed.</li>
+</ul>
+
+<h2>Common questions</h2>
+<table>
+  <tr><th style="width:340px">Symptom</th><th>Check</th></tr>
+  <tr><td>The list shows no tables or columns.</td><td>Metadata loads in the background when a window is activated; right after connecting to a database the first try can be empty. Try again after a moment, or run <b>Refresh Metadata</b>. A window signed in with Microsoft Entra ID gets keywords and functions only. The log says whether the metadata loaded.</td></tr>
+  <tr><td>A new table or column is missing.</td><td>Running a script that creates, alters or drops objects refreshes within a few seconds; other changes are noticed after at most 30 seconds, or use <b>Refresh Metadata</b>.</td></tr>
+  <tr><td>The built-in SSMS list appears.</td><td><em>Enable suggestions</em> is off, or SQL Prompter has switched itself off for that window; look at the log.</td></tr>
+  <tr><td>The list does not open at some place.</td><td>It is not offered inside strings, comments and numbers. <kbd>Ctrl</kbd>+<kbd>Space</kbd> opens it elsewhere.</td></tr>
+  <tr><td>A key (F12, Shift+F5, ...) does nothing.</td><td>The default key is set only when it is free. Look in <b>Tools &gt; Options &gt; Environment &gt; Keyboard</b> for the command (names start with <code>SQLPrompter.</code>) and bind a key.</td></tr>
+  <tr><td>A restored tab is not connected.</td><td>A tab that used a SQL login needs the password, which is never stored; see <a href="history.html">History and tabs</a>.</td></tr>
+  <tr><td><em>Check for Updates</em> says the version could not be found.</td><td>The network may be unreachable, or the releases of the repository are not public. The log has the reason.</td></tr>
+  <tr><td>Typing misbehaves with <em>Run the list myself while typing</em>.</td><td>Turn that experimental option off.</td></tr>
+</table>
+
+<h2>Known limits</h2>
+<ul>
+  <li><b>The SSMS API is unsupported.</b> The extension relies on undocumented parts of SSMS 22. At each start it probes them (the compatibility check). When one is missing in a newer build, only the features that need it are switched off (the connection of the window, opening windows, restoring tabs, the results grid, the execute hook, the Ctrl+Left/Right keys) and a message names them once. It was tested with SSMS 22.11 (build 22.11.12328.437).</li>
+  <li>Built-in functions do not have parameter info; columns of tables in other databases and of names with a server part (beyond the four-part case) are not completed.</li>
+  <li>Entra ID connections have no metadata (keywords and functions only).</li>
+  <li>A snippet body box has no undo.</li>
+  <li>Not every SQL Prompt option has a counterpart; the import of settings and styles reports what was left out.</li>
+</ul>
+</main>
+</body>
+</html>

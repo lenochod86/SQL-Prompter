@@ -46,7 +46,7 @@ namespace SqlPrompter.Core.Formatting
 
         /// <summary>
         /// Reads the style from <paramref name="json"/> and adds it to <paramref name="styles"/> as a new named style (#304): the name comes from the file's
-        /// metadata, otherwise from <paramref name="fileName"/> (without extension), with a number added when the name is taken. The existing styles are not touched.
+        /// metadata, otherwise from <paramref name="fileName"/> (without extension), with " (1)", " (2)" and so on (the lowest free number) added when the name is taken. The existing styles are not touched.
         /// </summary>
         /// <exception cref="FormatException">The text is not JSON, or is JSON that is not a style.</exception>
         public static NamedFormatStyle ImportInto(IList<NamedFormatStyle> styles, string json, string fileName, out StyleImportResult result, FormatStyle baseStyle = null)
@@ -59,9 +59,9 @@ namespace SqlPrompter.Core.Formatting
             }
 
             var unique = name;
-            for (var i = 2; styles.Any(s => string.Equals(s.Name, unique, StringComparison.OrdinalIgnoreCase)); i++)
+            for (var i = 1; styles.Any(s => string.Equals(s.Name, unique, StringComparison.OrdinalIgnoreCase)); i++)
             {
-                unique = name + " " + i;
+                unique = name + " (" + i + ")";
             }
 
             var imported = new NamedFormatStyle(unique, result.Style);
@@ -179,6 +179,46 @@ namespace SqlPrompter.Core.Formatting
                 applied.Add("onOnNewLine = " + onNewLine.Value);
             }
 
+            ImportFlag("lists.alignItemsAcrossClauses", "alignAcrossClauses", v => style.AlignAcrossClauses = v);
+            ImportFlag("joinStatements.join.indentJoinTable", "indentJoinTable", v => style.IndentJoinTable = v);
+            ImportFlag("variables.placeEqualsSignOnNewLine", "equalsOnNewLine", v => style.EqualsOnNewLine = v);
+            ImportFlag("controlFlow.indentBeginAndEndKeywords", "indentBeginEnd", v => style.IndentBeginEnd = v);
+
+            ImportStyle("parentheses.parenthesisStyle", "parenOnNewLine", v => style.ParenOnNewLine = v);
+            ImportFlag("parentheses.indentParenthesesContents", "indentParenContents", v => style.IndentParenContents = v);
+            ImportStyle("cte.parenthesisStyle", "cteParenOnNewLine", v => style.CteParenOnNewLine = v);
+            ImportFlag("cte.indentContents", "cteIndentContents", v => style.CteIndentContents = v);
+            ImportFlag("cte.placeAsOnNewLine", "cteAsOnNewLine", v => style.CteAsOnNewLine = v);
+            ImportStyle("ddl.parenthesisStyle", "ddlParenOnNewLine", v => style.DdlParenOnNewLine = v);
+            ImportFlag("ddl.indentParenthesesContents", "ddlIndentContents", v => style.DdlIndentContents = v);
+            ImportFlag("ddl.alignDataTypesAndConstraints", "alignDdlColumns", v => style.AlignDdlColumns = v);
+            var procParameter = Text("ddl.placeFirstProcedureParameterOnNewLine");
+            if (procParameter != null)
+            {
+                style.ProcedureParametersOnNewLines = !string.Equals(procParameter, "never", StringComparison.OrdinalIgnoreCase);
+                applied.Add("procedureParametersOnNewLines = " + style.ProcedureParametersOnNewLines);
+            }
+
+            ImportStyle("insertStatements.columns.parenthesisStyle", "insertParenOnNewLine", v => style.InsertParenOnNewLine = v);
+            var insertColumns = Text("insertStatements.columns.placeSubsequentColumnsOnNewLines");
+            if (insertColumns != null)
+            {
+                // never = 0, always = 1, otherwise (the line is longer than the maximum) the maximum line length of the style.
+                style.InsertColumnsBreakLength = string.Equals(insertColumns, "never", StringComparison.OrdinalIgnoreCase) ? 0
+                    : string.Equals(insertColumns, "always", StringComparison.OrdinalIgnoreCase) ? 1 : style.MaxLineLength;
+                applied.Add("insertColumnsBreakLength = " + style.InsertColumnsBreakLength);
+            }
+
+            var insertValues = Text("insertStatements.values.placeSubsequentValuesOnNewLines");
+            if (insertValues != null)
+            {
+                style.InsertValuesOnNewLines = !string.Equals(insertValues, "never", StringComparison.OrdinalIgnoreCase);
+                applied.Add("insertValuesOnNewLines = " + style.InsertValuesOnNewLines);
+            }
+
+            SetLimit("caseExpressions.collapseCaseExpressionsShorterThan", "caseExpressions.collapseShortCaseExpressions", v => style.CollapseCaseShorterThan = v, "collapseCaseShorterThan");
+            ImportFlag("caseExpressions.placeExpressionOnNewLine", "caseExpressionOnNewLine", v => style.CaseExpressionOnNewLine = v);
+            ImportFlag("operators.in.addSpaceAroundInContents", "spaceAroundInContents", v => style.SpaceAroundInContents = v);
             foreach (var path in Leaves(root, string.Empty))
             {
                 if (!used.Contains(path) && !path.StartsWith("metadata.", StringComparison.Ordinal))
@@ -188,6 +228,32 @@ namespace SqlPrompter.Core.Formatting
             }
 
             return new StyleImportResult(style, applied, notes, (Find(root, "metadata.name", used) as string), approximate);
+
+            void ImportFlag(string path, string name, Action<bool> set)
+            {
+                var value = Flag(path);
+                if (value == null)
+                {
+                    return;
+                }
+
+                set(value.Value);
+                applied.Add(name + " = " + value.Value);
+            }
+
+            // "expandedToStatement" puts the opening parenthesis on a line of its own; "expandedSimple" and the compact styles keep it at the end of the line.
+            void ImportStyle(string path, string name, Action<bool> set)
+            {
+                var value = Text(path);
+                if (value == null)
+                {
+                    return;
+                }
+
+                var onNewLine = value.EndsWith("ToStatement", StringComparison.OrdinalIgnoreCase);
+                set(onNewLine);
+                applied.Add(name + " = " + onNewLine);
+            }
 
             void SetCase(string path, Action<CaseStyle> set, string name)
             {
@@ -246,16 +312,17 @@ namespace SqlPrompter.Core.Formatting
                     return "left out: comments are kept where they are written";
                 case "lists.addSpaceBeforeComma":
                     return "left out: the formatter has one fixed spacing around the commas of a list";
-                case "ddl.placeFirstProcedureParameterOnNewLine":
-                case "ddl.alignDataTypesAndConstraints":
                 case "ddl.placeConstraintColumnsOnNewLines":
-                case "ddl.parenthesisStyle":
-                case "ddl.indentParenthesesContents":
-                    return "planned: the layout of DDL statements";
-                case "parentheses.parenthesisStyle":
-                case "parentheses.indentParenthesesContents":
+                    return "left out: the constraints of CREATE TABLE are kept as one line each";
                 case "parentheses.collapseParenthesesShorterThan":
-                    return "planned: the layout of parentheses";
+                    return "left out: the length below which a subquery stays on one line is the option dml.collapseSubqueriesShorterThan; other parentheses are never broken";
+                case "cte.placeColumnsOnNewLine":
+                case "cte.columnAlignment":
+                    return "left out: the column list of a CTE is kept on one line";
+                case "cte.asAlignment":
+                    return "left out: AS of a CTE follows the name (or has a line of its own with cte.placeAsOnNewLine)";
+                case "controlFlow.collapseStatementsShorterThan":
+                    return "left out: control-flow statements (IF, WHILE, BEGIN ... END) are never collapsed to one line";
                 default:
                     break;
             }
@@ -267,27 +334,27 @@ namespace SqlPrompter.Core.Formatting
 
             if (path.StartsWith("insertStatements.", StringComparison.Ordinal))
             {
-                return "planned: the layout of INSERT columns and values";
+                return "left out: the contents of one row of VALUES and the other INSERT layout options are kept on one line";
             }
 
             if (path.StartsWith("caseExpressions.", StringComparison.Ordinal))
             {
-                return "planned: the layout of CASE expressions";
+                return "left out: the layout of CASE expressions follows the options of the CASE page";
             }
 
             if (path.StartsWith("operators.", StringComparison.Ordinal))
             {
-                return "planned: the alignment of operators (comparison, BETWEEN, IN)";
+                return "left out: BETWEEN and the values of IN are kept on one line";
             }
 
             if (path.StartsWith("controlFlow.", StringComparison.Ordinal))
             {
-                return "planned: the layout of control flow";
+                return "left out: not supported by the formatter";
             }
 
             if (path.StartsWith("joinStatements.", StringComparison.Ordinal) || path.StartsWith("variables.", StringComparison.Ordinal) || path.StartsWith("lists.", StringComparison.Ordinal))
             {
-                return "planned";
+                return "left out: not supported by the formatter";
             }
 
             return "not supported yet";

@@ -181,7 +181,7 @@ namespace SqlPrompter.Ssms
                 AddOption(next, option);
             }
 
-            next.Preview("Preview: " + info.Name + " sample", () => Render(info), currentQuery, () => currentQuery.Checked ? "Preview: your current query" : "Preview: " + info.Name + " sample");
+            next.Preview("Preview: " + info.Name + " sample", () => Render(info), currentQuery, () => currentQuery.Checked ? "Preview: your current query" : "Preview: " + info.Name + " sample", () => CollapsedNote);
             host.Controls.Clear();
             host.Controls.Add(next);
             page?.Dispose();
@@ -222,8 +222,18 @@ namespace SqlPrompter.Ssms
                 }
             }
 
-            return SqlFormatter.Format(text, current.Style).Text;
+            var result = SqlFormatter.Format(text, current.Style);
+            collapsedNote = result.Collapsed == 0
+                ? null
+                : (result.Collapsed == 1 ? "This statement is" : result.Collapsed + " statements are") + " kept on one line by Short statements (shorter than " + current.Style.CollapseStatementsShorterThan +
+                  " characters), so the options that split a statement over lines show no effect on it. Lower the limit, or set it to 0, to see them.";
+            return result.Text;
         }
+
+        private string collapsedNote;
+
+        /// <summary>The note under the preview when the style kept statements of the preview on one line (#441); null when nothing was.</summary>
+        private string CollapsedNote => collapsedNote;
 
         private static string EditorText()
         {
@@ -280,6 +290,7 @@ namespace SqlPrompter.Ssms
             if (imported != null)
             {
                 current = imported;
+                activeName = imported.Name;
                 RefreshStyles();
                 ShowPage(true);
             }

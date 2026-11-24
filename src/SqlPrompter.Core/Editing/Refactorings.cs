@@ -107,7 +107,8 @@ namespace SqlPrompter.Core.Editing
             {
                 Enabled = true, EqualsNull = false, JoinWithoutOn = false, InsertWithoutColumns = false, UnusedVariable = true, SelectStar = false, LockHint = false,
             };
-            var unused = CodeAnalyzer.Analyze(text, settings).Where(i => i.Kind == CodeIssueKind.UnusedVariable).Select(i => i.Start).ToList();
+            settings.SetOn(AnalysisRules.Of(CodeIssueKind.MI001), true);
+            var unused = CodeAnalyzer.Analyze(text, settings).Where(i => i.Kind == CodeIssueKind.UnusedVariable || i.Kind == CodeIssueKind.MI001).Select(i => i.Start).ToList();
             if (unused.Count == 0)
             {
                 return text;

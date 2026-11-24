@@ -46,12 +46,13 @@ namespace SqlPrompter.Ssms
 
             // Backspace between an empty pair of ' [ ( removes both characters (the pair the auto-closing inserted).
             var view = args.TextView;
-            if (SettingsService.Current.Behavior.AutoClose && view.Selection.IsEmpty)
+            var pairs = SettingsService.Current.Behavior.AutoClosePairs;
+            if (pairs != AutoClosePairs.None && view.Selection.IsEmpty)
             {
                 var caret = view.Caret.Position.BufferPosition;
-                if (caret.Position > 0 && caret.Position < caret.Snapshot.Length && AutoClose.DeletesPair(caret.Snapshot.GetText(), caret.Position))
+                if (caret.Position > 0 && caret.Position < caret.Snapshot.Length && AutoClose.TryGetPairDeletion(caret.Snapshot.GetText(), caret.Position, pairs, out var deleteStart, out var deleteLength))
                 {
-                    view.TextBuffer.Delete(new Span(caret.Position - 1, 2));
+                    view.TextBuffer.Delete(new Span(deleteStart, deleteLength));
                     AskAgain(view, listWasOpen);
                     return;
                 }

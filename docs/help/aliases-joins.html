@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aliases, INSERT, EXEC, joins - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a class="current" href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Aliases, INSERT, EXEC, joins</h1>
+<p class="lead">What choosing an item inserts beyond its name. Options are on the settings pages <em>Aliases and qualification</em> and <em>Inserts and joins</em>.</p>
+
+<h2 id="aliases">Aliases and qualification</h2>
+<p>After <code>CROSS APPLY</code> and <code>OUTER APPLY</code> only table-valued functions are offered. Choosing a table or view after <code>FROM</code> or <code>JOIN</code> also inserts an alias made of the initials of the name: <code>OrderItems</code> becomes <code>sales.OrderItems AS oi</code>. A clash with an alias already in the query gives <code>oi1</code>. No alias is added after <code>INSERT INTO</code>, <code>UPDATE</code>, <code>DELETE FROM</code>, for table-valued functions or when an alias is already typed.</p>
+<p>Columns are inserted as <code>alias.Column</code>. A column that exists in several tables of the query is always qualified, whatever the option says.</p>
+
+<figure>
+  <img src="images/settings-aliases.png" alt="The Aliases and qualification page" width="640">
+  <figcaption>Settings &gt; Aliases and qualification.</figcaption>
+</figure>
+
+<table>
+  <tr><th style="width:240px">Option</th><th>Effect</th></tr>
+  <tr><td>Add aliases to tables</td><td>Insert the generated alias with a table or view.</td></tr>
+  <tr><td>Include AS</td><td><code>AS oi</code> instead of <code>oi</code>.</td></tr>
+  <tr><td>Capitalise generated aliases</td><td><code>OI</code> instead of <code>oi</code>.</td></tr>
+  <tr><td>Qualify objects with schema</td><td>Insert tables and views as <code>schema.name</code>.</td></tr>
+  <tr><td>Qualify columns with alias</td><td>Insert columns as <code>alias.column</code>.</td></tr>
+  <tr><td>Custom aliases</td><td>A table of <em>table or view</em> and <em>alias</em>; wins over the generated alias (<code>OrderItems</code> &rarr; <code>oit</code>).</td></tr>
+  <tr><td>Ignored prefixes</td><td>Prefixes dropped before the alias is generated (<code>tbl_Orders</code> &rarr; <code>o</code> with the prefix <code>tbl_</code>).</td></tr>
+</table>
+<p><b>Refactor &gt; Qualify Object Names</b> puts the schema in front of single-part names after <code>FROM</code>, <code>JOIN</code>, <code>INTO</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>TRUNCATE TABLE</code> and <code>EXEC</code> in a whole script; CTE names, aliases, temporary tables, variables, system objects and unknown names stay. <b>Add AS To Aliases</b> and <b>Remove AS From Aliases</b> change the style of existing aliases.</p>
+
+<h2 id="joins">JOIN and ON conditions</h2>
+<figure>
+  <img src="images/completion-join.png" alt="Tables joinable by a foreign key after JOIN">
+  <figcaption>After <code>JOIN</code> the tables related by a foreign key to the tables of the query come first, each with the whole clause; the key name is on the right, the description area explains it.</figcaption>
+</figure>
+<p>Choosing the first entry inserts <code>sales.Customers AS c ON o.IdCustomer = c.IdCustomer</code> (the alias options apply). A foreign key over several columns is inserted joined by <code>AND</code>.</p>
+
+<figure>
+  <img src="images/completion-on.png" alt="Conditions after ON">
+  <figcaption>After <code>ON</code> (and after <code>AND</code> / <code>OR</code> in the condition) the list starts with conditions that link the joined table to the tables before it.</figcaption>
+</figure>
+<p>Conditions are ordered: the whole foreign key, then each of its columns, then columns with the same name. Columns of keys carry the key icon.</p>
+<table>
+  <tr><th style="width:290px">Option (Inserts and joins)</th><th>Effect</th></tr>
+  <tr><td>New table on the left</td><td><code>o.IdUser = u.IdUser</code> instead of <code>u.IdUser = o.IdUser</code> (<code>o</code> is the table being joined). By default the new table is on the right.</td></tr>
+  <tr><td>Foreign keys</td><td>Offer the condition of a foreign key.</td></tr>
+  <tr><td>Single columns of multi-column keys</td><td>Besides the whole condition, offer each column pair.</td></tr>
+  <tr><td>Columns with the same name</td><td>Offer a condition for every column name both tables have.</td></tr>
+  <tr><td>Same name needs the same type</td><td>Offer a name match only when both columns have the same type.</td></tr>
+</table>
+
+<h2 id="insert">INSERT</h2>
+<p>After <code>INSERT INTO</code>, choosing a table can insert it with the column list of its insertable columns (identity, computed and rowversion columns are left out). The option <em>Column list</em> chooses how:</p>
+<ul>
+  <li><b>Insert the table with its column list</b> (automatic).</li>
+  <li><b>Offer an extra item "table (columns)"</b> next to the plain table.</li>
+  <li><b>Offer the list after typing (</b> behind the table.</li>
+</ul>
+<p><em>Layout of the lists</em> (one line, each on its own line, as many on a line as fit the editor) is used for column lists, <code>VALUES</code> and <code>EXEC</code> parameters. <em>After the column list</em> chooses a new line only, or <code>VALUES</code> with a placeholder per column: <code>''</code> for text, <code>N''</code> for Unicode text, <code>0</code> for numbers, <code>NULL</code> for nullable columns.</p>
+
+<h2 id="exec">EXEC</h2>
+<p>After <code>EXEC</code>, choosing a procedure inserts all its parameters as <code>@name = value</code> (a default value as written), and <code>DECLARE</code> lines above the call for <code>OUTPUT</code> parameters. System procedures are offered too. <a href="completion.html#parameter-info">Parameter info</a> shows the signature while you fill them in.</p>
+<p>In a call you typed by hand, <code>@</code> after the procedure name (or after a comma) lists the parameters the call does not name yet, with type and default in the description; choosing one inserts <code>@name = </code>. Variables of the script follow the parameters.</p>
+
+<h2 id="names">Cross-database and linked-server names</h2>
+<ul>
+  <li>After <code>FROM</code>, the databases of the server are offered next to the schemas. <code>OtherDb.</code>, <code>OtherDb..</code> and <code>OtherDb.dbo.</code> offer the objects of that database; they load in the background on first use, so the first try can be empty. A schema of the current database wins over a database of the same name.</li>
+  <li>Linked servers are offered after <code>FROM</code>; <code>Srv.</code> lists its databases, <code>Srv.Db.</code> the schemas and objects, and a four-part source gets its columns. Each part loads in the background when you get there; a server that does not answer is only logged.</li>
+  <li>Synonyms are offered like tables; their columns come from the object they point to in the same database (chains included; targets in other databases or on other servers give no columns).</li>
+  <li><code>USE Sales</code> on a line of its own makes completion follow that database from there on.</li>
+  <li>Not supported: columns of tables in other databases and of names with a server part (outside the four-part case above).</li>
+</ul>
+</main>
+</body>
+</html>

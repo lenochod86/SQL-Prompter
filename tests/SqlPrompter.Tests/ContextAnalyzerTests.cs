@@ -21,6 +21,11 @@ namespace SqlPrompter.Tests
         [InlineData("TRUNCATE TABLE |")]
         [InlineData("SELECT * FROM a CROSS APPLY |")]
         [InlineData("SELECT 1\nSELECT * FROM |")]
+        [InlineData("CREATE PROCEDURE dbo.P @a int AS\nBEGIN\n    SELECT *\n    FROM |\nEND")]
+        [InlineData("CREATE PROCEDURE dbo.P @a int AS\nBEGIN\n    SELECT *\n    FROM |")]
+        [InlineData("SELECT * FROM |\nSELECT 2;")]
+        [InlineData("CREATE PROCEDURE dbo.P AS\nSELECT * FROM |")]
+        [InlineData("CREATE PROCEDURE dbo.P\n@a int\nAS\nBEGIN\nSELECT * FROM |")]
         public void ObjectNamePositions(string sql)
         {
             var context = Analyze(sql);
@@ -266,6 +271,7 @@ namespace SqlPrompter.Tests
         [InlineData("SELECT * FROM dbo.Users |")]
         [InlineData("SELECT * FROM dbo.Users u |")]
         [InlineData("SELECT * FROM dbo.Users u W|")]
+        [InlineData("SELECT * FROM dbo.Users AS ce\nwhe|")]
         [InlineData("SELECT * FROM (SELECT 1 AS x) d |")]
         public void AfterTableSourceOffersKeywordsWithSoftSelection(string sql)
         {
@@ -273,6 +279,61 @@ namespace SqlPrompter.Tests
 
             Assert.Equal(ContextKind.Keyword, context.Kind);
             Assert.Contains("WHERE", context.PreferredKeywords);
+            Assert.True(context.SoftSelection);
+        }
+
+        [Theory]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS |")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name is |")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS N|")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS\n|")]
+        [InlineData("SELECT * FROM dbo.Users u JOIN dbo.T t ON t.a IS |")]
+        [InlineData("SELECT * FROM dbo.Users u GROUP BY u.a HAVING u.a IS |")]
+        [InlineData("SELECT CASE WHEN u.a IS | THEN 1 END FROM dbo.Users u")]
+        [InlineData("IF @x IS |")]
+        public void AfterIsOffersNullAndNotNull(string sql)
+        {
+            var context = Analyze(sql);
+
+            Assert.Equal(new[] { "NULL", "NOT NULL" }, context.PreferredKeywords);
+            Assert.True(context.OnlyExpectedKeywords);
+        }
+
+        [Theory]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS NOT |")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name is not N|")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name IS NOT\n|")]
+        [InlineData("SELECT CASE WHEN u.a IS NOT | THEN 1 END FROM dbo.Users u")]
+        public void AfterIsNotOffersNull(string sql)
+        {
+            var context = Analyze(sql);
+
+            Assert.Equal(new[] { "NULL" }, context.PreferredKeywords);
+            Assert.True(context.OnlyExpectedKeywords);
+        }
+
+        [Theory]
+        [InlineData("SELECT * FROM dbo.Users u ORDER |", "BY")]
+        [InlineData("SELECT * FROM dbo.Users u GROUP |", "BY")]
+        [InlineData("SELECT * FROM dbo.Users u WHERE u.Name NOT |", "IN,LIKE,BETWEEN")]
+        public void AfterTheFirstWordOfATwoWordConstructTheSecondIsOffered(string sql, string expected)
+        {
+            var context = Analyze(sql);
+
+            Assert.Equal(expected.Split(','), context.PreferredKeywords);
+            Assert.True(context.OnlyExpectedKeywords);
+        }
+
+        [Theory]
+        [InlineData("SELECT * FROM dbo.Users u LEFT |")]
+        [InlineData("SELECT * FROM dbo.Users u INNER |")]
+        public void AfterAJoinModifierJoinIsOffered(string sql) => Assert.Contains("JOIN", Analyze(sql).PreferredKeywords);
+
+        [Fact]
+        public void AfterJoinConditionTheNextClauseIsSoftlySelectedToo()
+        {
+            var context = Analyze("SELECT * FROM dbo.Users AS ce\nJOIN dbo.T t ON t.a = ce.a\nWHE|");
+
             Assert.True(context.SoftSelection);
         }
 

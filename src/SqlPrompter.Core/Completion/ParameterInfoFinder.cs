@@ -169,15 +169,7 @@ namespace SqlPrompter.Core.Completion
                 return null;
             }
 
-            var schema = parts.Count > 1 ? parts[parts.Count - 2] : null;
-            var procedure = metadata.Procedures.FirstOrDefault(p => string.Equals(p.Name, parts[parts.Count - 1], StringComparison.OrdinalIgnoreCase) &&
-                (schema != null ? string.Equals(p.Schema, schema, StringComparison.OrdinalIgnoreCase) : string.Equals(p.Schema, metadata.DefaultSchema, StringComparison.OrdinalIgnoreCase)))
-                ?? (schema == null ? metadata.Procedures.FirstOrDefault(p => string.Equals(p.Name, parts[parts.Count - 1], StringComparison.OrdinalIgnoreCase) && string.Equals(p.Schema, "dbo", StringComparison.OrdinalIgnoreCase)) : null);
-            if (procedure == null && (schema == null || string.Equals(schema, SystemProcedures.Schema, StringComparison.OrdinalIgnoreCase) || string.Equals(schema, "dbo", StringComparison.OrdinalIgnoreCase)))
-            {
-                procedure = SystemProcedures.Find(parts[parts.Count - 1]);
-            }
-
+            var procedure = FindProcedure(parts, metadata);
             if (procedure == null || procedure.Parameters.Count == 0)
             {
                 return null;
@@ -216,6 +208,26 @@ namespace SqlPrompter.Core.Completion
             }
 
             return new ParameterInfo(string.Join(".", parts), procedure.Parameters.Select(Describe).ToList(), current < procedure.Parameters.Count ? current : -1);
+        }
+
+        /// <summary>The procedure a name written after EXEC points to (the default schema, dbo and the system procedures when no schema is given), or null.</summary>
+        public static DbProcedure FindProcedure(IReadOnlyList<string> parts, IDatabaseMetadata metadata)
+        {
+            if (parts == null || parts.Count == 0 || metadata == null)
+            {
+                return null;
+            }
+
+            var schema = parts.Count > 1 ? parts[parts.Count - 2] : null;
+            var procedure = metadata.Procedures.FirstOrDefault(p => string.Equals(p.Name, parts[parts.Count - 1], StringComparison.OrdinalIgnoreCase) &&
+                (schema != null ? string.Equals(p.Schema, schema, StringComparison.OrdinalIgnoreCase) : string.Equals(p.Schema, metadata.DefaultSchema, StringComparison.OrdinalIgnoreCase)))
+                ?? (schema == null ? metadata.Procedures.FirstOrDefault(p => string.Equals(p.Name, parts[parts.Count - 1], StringComparison.OrdinalIgnoreCase) && string.Equals(p.Schema, "dbo", StringComparison.OrdinalIgnoreCase)) : null);
+            if (procedure == null && (schema == null || string.Equals(schema, SystemProcedures.Schema, StringComparison.OrdinalIgnoreCase) || string.Equals(schema, "dbo", StringComparison.OrdinalIgnoreCase)))
+            {
+                procedure = SystemProcedures.Find(parts[parts.Count - 1]);
+            }
+
+            return procedure;
         }
 
         /// <summary>The name parts before the opening parenthesis (<c>dbo.fn(</c> → dbo, fn), or null when no name stands there.</summary>

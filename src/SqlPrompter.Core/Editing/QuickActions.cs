@@ -37,8 +37,10 @@ namespace SqlPrompter.Core.Editing
         public const string AddNPrefix = "addNPrefix";
         public const string AddAs = "addAs";
         public const string RemoveAs = "removeAs";
+        public const string Unformat = "unformat";
         public const string AddCommas = "addCommas";
         public const string AddQuotesAndCommas = "addQuotesAndCommas";
+        public const string ScriptOutline = "scriptOutline";
 
         /// <summary>The actions for the selection, or for the whole script when nothing is selected.</summary>
         public static IReadOnlyList<QuickAction> Actions(bool hasSelection)
@@ -55,12 +57,14 @@ namespace SqlPrompter.Core.Editing
                 new QuickAction(FixCodeIssues, "Fix Code Analysis Issues", "Repairs = NULL, @@IDENTITY and types without a length in " + scope + "."),
                 new QuickAction(PreviewAsSelect, "Preview UPDATE/DELETE As SELECT", "Opens a SELECT of the rows that the statement of " + scope + " would change in a new window."),
                 new QuickAction(DryRun, "Run And Roll Back (Dry Run)", "Opens the statement of " + scope + " inside BEGIN TRANSACTION ... ROLLBACK with its row count in a new window."),
+                new QuickAction(ScriptOutline, "Script Outline", "Lists the batches, statements, blocks, CTEs, temporary tables and variables of the script and jumps to one."),
                 new QuickAction(AddNPrefix, "Add N Prefix To Strings", "Turns 'text' into N'text' in " + scope + "."),
                 new QuickAction(AddAs, "Add AS To Aliases", "Writes AS before every alias in " + scope + "."),
                 new QuickAction(RemoveAs, "Remove AS From Aliases", "Drops AS before the aliases in " + scope + "."),
             };
             if (hasSelection)
             {
+                list.Insert(1, new QuickAction(Unformat, "Unformat Selection", "Puts the selection on one line."));
                 list.Add(new QuickAction(AddCommas, "Add Commas To Selected Lines", "Puts a comma at the end of every line but the last."));
                 list.Add(new QuickAction(AddQuotesAndCommas, "Add Quotes And Commas To Selected Lines", "Turns the lines into a list of quoted strings."));
             }

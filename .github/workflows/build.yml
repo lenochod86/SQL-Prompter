@@ -1,6 +1,6 @@
 name: Build
 
-# Billed minutes matter (the repository is private, a Windows minute counts twice), so:
+# The repository is public (minutes are free), but a pull request still builds the VSIX only when it is ready, so:
 # - every push to a pull request runs only the cheap Ubuntu job (tests and version checks);
 # - the Windows VSIX build runs for a pull request only when it has the label `build-vsix` (added when the work is ready, see CLAUDE.md), and manually;
 # - pushes to main run the tests only (the merged tree was built and tested in its pull request).
@@ -16,13 +16,7 @@ on:
       - '.github/scripts/**'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'SqlPrompter.slnx'
-      - 'nuget.config'
-      - '.github/workflows/build.yml'
-      - '.github/scripts/**'
+    # No path filter: `test` is a required check of the ruleset, so every pull request (also one that only changes docs) must report it.
   workflow_dispatch:
 
 permissions:
@@ -53,15 +47,14 @@ jobs:
         shell: pwsh
         run: ./.github/scripts/Check-Versions.ps1 -Base origin/${{ github.base_ref }}
 
-  # The Windows build runs on the self-hosted runner of the development PC (label `vsix`, no billed minutes; the Windows service in E:\actions-runner): only for a pull request with the label `build-vsix`, and on demand. When the PC is off the job waits in the queue; to use GitHub's
-  # Windows runner instead (billed twice) change `runs-on` to `windows-latest`.
+  # The Windows build runs on a GitHub-hosted runner (the repository is public, so the minutes are free): only for a pull request with the label `build-vsix`, and on demand.
   vsix:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'build-vsix') &&
        (github.event.action != 'labeled' || github.event.label.name == 'build-vsix'))
-    runs-on: [self-hosted, vsix]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6

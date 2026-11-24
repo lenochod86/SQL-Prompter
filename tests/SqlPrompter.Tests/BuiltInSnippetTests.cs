@@ -90,6 +90,66 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
+        public void ResetWritesDeletedAndEditedBuiltInSnippetsBackWithoutDuplicates()
+        {
+            var store = new SnippetStore(folder);
+            var installer = new BuiltInInstaller(store);
+            installer.Install();
+            var edited = store.Load().Snippets.First(s => s.Prefix == "cnt");
+            edited.Body = "SELECT 1";
+            store.Save(edited);
+            store.Delete(store.Load().Snippets.First(s => s.Prefix == "del").Id);
+
+            var result = installer.ResetAll();
+
+            var loaded = store.Load().Snippets;
+            Assert.Equal(BuiltInSnippets.All.Count, loaded.Count);
+            Assert.Equal(1, result.Added);
+            Assert.Equal(BuiltInSnippets.All.Count - 1, result.Restored);
+            Assert.Contains("COUNT(*)", loaded.First(s => s.Prefix == "cnt").Body);
+            Assert.Contains(loaded, s => s.Prefix == "del");
+        }
+
+        [Fact]
+        public void ResetTwiceKeepsTheNumberOfSnippetsAndLeavesTheOnesOfTheUserAlone()
+        {
+            var store = new SnippetStore(folder);
+            var installer = new BuiltInInstaller(store);
+            store.Save(Snippet.Create("mine", "my own", "SELECT 42"));
+
+            installer.ResetAll();
+            installer.ResetAll();
+
+            var loaded = store.Load().Snippets;
+            Assert.Equal(BuiltInSnippets.All.Count + 1, loaded.Count);
+            Assert.Equal("SELECT 42", Assert.Single(loaded, s => s.Prefix == "mine").Body);
+            Assert.Equal(BuiltInSnippets.All.Count, Directory.GetFiles(folder, "*.json").Length - 1);
+        }
+
+        [Fact]
+        public void ResetReplacesASnippetOfTheUserThatHasTheSamePrefixInsteadOfAddingASecondOne()
+        {
+            var store = new SnippetStore(folder);
+            store.Save(Snippet.Create("cnt", "mine", "SELECT 42"));
+
+            new BuiltInInstaller(store).ResetAll();
+
+            var cnt = Assert.Single(store.Load().Snippets, s => s.Prefix == "cnt");
+            Assert.Contains("COUNT(*)", cnt.Body);
+        }
+
+        [Fact]
+        public void AfterAResetTheAutomaticInstallWritesNothing()
+        {
+            var store = new SnippetStore(folder);
+            var installer = new BuiltInInstaller(store);
+            installer.ResetAll();
+            store.Delete(store.Load().Snippets.First(s => s.Prefix == "cnt").Id);
+
+            Assert.Equal(0, installer.Install());
+        }
+
+        [Fact]
         public void RestoreWritesTheOriginalTextBack()
         {
             var store = new SnippetStore(folder);

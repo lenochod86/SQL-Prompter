@@ -58,8 +58,8 @@ namespace SqlPrompter.Tests
                 option.Set(changed, Other(option, option.Get(baseStyle)));
                 var after = SqlFormatter.Format(group.Sample, changed).Text;
 
-                // Casing while typing only acts in the editor, not in the formatter.
-                if (option.Id != "caseKeywordsWhileTyping")
+                // Casing while typing only acts in the editor, not in the formatter; the INSERT parenthesis only acts when the columns are broken (tested on its own).
+                if (option.Id != "caseKeywordsWhileTyping" && option.Id != "insertParenOnNewLine")
                 {
                     Assert.True(before != after, option.Id);
                 }
@@ -76,6 +76,11 @@ namespace SqlPrompter.Tests
                     return (CaseStyle)current == CaseStyle.Lower ? CaseStyle.Upper : CaseStyle.Lower;
                 default:
                     var value = (int)current;
+                    if (option.Id == "insertColumnsBreakLength")
+                    {
+                        return value == 0 ? 1 : 0;
+                    }
+
                     // Zero turns a limit off; a big number turns it on for everything, a small one for little.
                     return value == 0 ? 400 : (option.Id == "tabWidth" ? (value == 4 ? 8 : 4) : (value > 50 ? 5 : 400));
             }

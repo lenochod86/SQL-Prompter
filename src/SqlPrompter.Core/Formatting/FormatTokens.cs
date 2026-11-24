@@ -92,6 +92,9 @@ namespace SqlPrompter.Core.Formatting
                     case TokenKind.Word:
                         result.Add(new R(token.Kind, Case(tokens, i, openers, style, ddl), token.Upper, space));
                         break;
+                    case TokenKind.Variable:
+                        result.Add(new R(token.Kind, CaseVariable(token, style), token.Text.ToUpperInvariant(), space));
+                        break;
                     default:
                         result.Add(new R(token.Kind, token.Text, token.Text.ToUpperInvariant(), space));
                         break;
@@ -119,7 +122,7 @@ namespace SqlPrompter.Core.Formatting
                     openers.Pop();
                 }
 
-                cased[i] = token.Kind == TokenKind.Word ? Case(tokens, i, openers, style, ddl) : token.Text;
+                cased[i] = token.Kind == TokenKind.Word ? Case(tokens, i, openers, style, ddl) : token.Kind == TokenKind.Variable ? CaseVariable(token, style) : token.Text;
             }
 
             return cased;
@@ -145,7 +148,7 @@ namespace SqlPrompter.Core.Formatting
             var previous = i > 0 ? tokens[i - 1] : null;
             var next = i + 1 < tokens.Count ? tokens[i + 1] : null;
             var nextIsParen = next != null && next.Kind == TokenKind.OpenParen;
-            if (nextIsParen && (BuiltIn.Contains(up) || FunctionLike.Contains(up)))
+            if (nextIsParen && (BuiltIn.Contains(up) || FunctionLike.Contains(up) || ContextKeywords.TableFunctions.Contains(up, StringComparer.OrdinalIgnoreCase)))
             {
                 return Apply(token.Text, style.FunctionCase);
             }
@@ -168,7 +171,57 @@ namespace SqlPrompter.Core.Formatting
                 return Apply(token.Text, style.KeywordCase);
             }
 
+            // Words that are keywords only in a fixed place and are not reserved: SET options, hints, OUTPUT, TIES (#526).
+            if (IsContextKeyword(tokens, i, openers, previous, next))
+            {
+                return Apply(token.Text, style.KeywordCase);
+            }
+
             return token.Text;
+        }
+
+        /// <summary>A global function (<c>@@ROWCOUNT</c>) follows the case of the functions; the variables of the user stay as written.</summary>
+        private static string CaseVariable(Token token, FormatStyle style) =>
+            ContextKeywords.IsGlobalFunction(token.Text) ? Apply(token.Text, style.FunctionCase) : token.Text;
+
+        private static bool IsContextKeyword(IReadOnlyList<Token> tokens, int i, Stack<string> openers, Token previous, Token next)
+        {
+            var up = tokens[i].Upper;
+            if (previous != null && previous.Kind == TokenKind.Dot || next != null && next.Kind == TokenKind.Dot)
+            {
+                return false;
+            }
+
+            // SET NOCOUNT ON, SET STATISTICS IO ON, SET TRANSACTION ISOLATION LEVEL ...
+            if (i > 0 && i <= 4 && tokens[0].IsWord("SET") && tokens[1].Kind == TokenKind.Word && ContextKeywords.IsSetOption(up))
+            {
+                return true;
+            }
+
+            // FROM t WITH (NOLOCK, INDEX (ix)).
+            if (openers.Count > 0 && openers.Peek() == "WITH" && ContextKeywords.IsTableHint(up))
+            {
+                return true;
+            }
+
+            // OPTION (RECOMPILE, MAXDOP 1, OPTIMIZE FOR UNKNOWN).
+            if (openers.Contains("OPTION") && ContextKeywords.IsQueryHint(up))
+            {
+                return true;
+            }
+
+            switch (up)
+            {
+                case "TIES":
+                    return previous != null && previous.IsWord("WITH");
+                case "OUTPUT":
+                case "READONLY":
+                    return previous == null || previous.Kind != TokenKind.Dot;
+                case "OUT":
+                    return previous != null && (previous.Kind == TokenKind.Variable || previous.Kind == TokenKind.CloseParen || previous.Kind == TokenKind.Number || Types.Contains(previous.Upper ?? string.Empty));
+                default:
+                    return false;
+            }
         }
 
         /// <summary>A word like <c>int</c> or <c>date</c> is a type name after a variable, in CAST (… AS type), CONVERT(type …), RETURNS and in a table definition.</summary>
@@ -197,7 +250,7 @@ namespace SqlPrompter.Core.Formatting
                 return true;
             }
 
-            if (ddl && previous.IsNamePart && i >= 2 && (tokens[i - 2].Kind == TokenKind.OpenParen || tokens[i - 2].Kind == TokenKind.Comma))
+            if ((ddl || opener == "WITH") && previous.IsNamePart && i >= 2 && (tokens[i - 2].Kind == TokenKind.OpenParen || tokens[i - 2].Kind == TokenKind.Comma))
             {
                 return true;
             }
@@ -235,7 +288,8 @@ namespace SqlPrompter.Core.Formatting
                     return false;
                 }
 
-                var same = a.Kind == TokenKind.Word
+                // A global function (@@ROWCOUNT) is cased like a function; the variables of the user are never touched.
+                var same = a.Kind == TokenKind.Word || (a.Kind == TokenKind.Variable && ContextKeywords.IsGlobalFunction(a.Text))
                     ? string.Equals(a.Text, b.Text, StringComparison.OrdinalIgnoreCase)
                     : a.Text == b.Text;
                 if (!same)

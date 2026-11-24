@@ -62,7 +62,7 @@ namespace SqlPrompter.Ssms
 
                 var connection = SsmsConnection.GetActive();
                 var database = SqlBatch.FindUsedDatabase(snapshot, view.Caret.Position.BufferPosition.Position) ?? connection?.Database;
-                if (connection == null || !SsmsConnection.OpenNewWindow(database, result.Text))
+                if (connection == null || !SsmsConnection.OpenNewWindow(database, result.Text, kind: SqlPrompter.Core.History.OpenedTabKind.Generated))
                 {
                     SetStatus("SQL Prompter: the new window could not be opened (is the window connected?).");
                     return;

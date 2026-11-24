@@ -38,6 +38,7 @@ namespace SqlPrompter.Ssms
         private readonly TabShutdownGuard shutdown = new TabShutdownGuard();
         private DispatcherTimer shutdownTimer;
         private CommandEvents commandEvents;
+        private SaveAsNamer saveAsNamer;
         private string lastSummary;
         private readonly ClosedTabs closedTabs = new ClosedTabs();
         private bool sawTabs;
@@ -56,6 +57,7 @@ namespace SqlPrompter.Ssms
         {
             this.dte = dte;
             Current = this;
+            saveAsNamer = SaveAsNamer.Start(() => { ThreadHelper.ThrowIfNotOnUIThread(); try { return dte.ActiveDocument?.FullName; } catch { return null; } }, NameOf);
         }
 
         /// <summary>SSMS is shutting down or a shutdown has begun: the closing of the windows is not the user's doing.</summary>
@@ -70,6 +72,17 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
+            // A name that an open tab has already is kept apart with a number (SQLQuery2 (2).sql), so two tabs do not look the same (#511).
+            var taken = new List<string>();
+            foreach (Document known in dte.Documents.Cast<Document>().ToList())
+            {
+                if (known.Windows.Count > 0 && !IsClosedWindow(known) && !string.Equals(known.FullName, document, StringComparison.OrdinalIgnoreCase))
+                {
+                    taken.Add(NameOf(known.FullName) ?? TabCaption.DisplayName(known.FullName));
+                }
+            }
+
+            name = SqlPrompter.Core.History.HistoryTabName.Unique(name.Trim(), taken);
             names[document] = name;
             TabCaption.Apply(document, name);
         }
@@ -95,6 +108,45 @@ namespace SqlPrompter.Ssms
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The active window was opened for the definition of an object (F12, quick open, find in code, dependencies, #437): its tab is named <c>schema.object1.sql</c>
+        /// (<c>DefinitionTabName</c>), the lowest number the open tabs of this object do not have. The name is kept like a name from <c>Rename Query Tab</c>, so it comes back with
+        /// the tab after a restart.
+        /// </summary>
+        public void NameDefinitionTab(string schema, string objectName)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var document = dte.ActiveDocument;
+                if (document == null || !IsQuery(document))
+                {
+                    return;
+                }
+
+                var open = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (Document known in dte.Documents.Cast<Document>().ToList())
+                {
+                    if (known.Windows.Count > 0 && !IsClosedWindow(known) && !string.Equals(known.FullName, document.FullName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        open.Add(known.FullName);
+                    }
+                }
+
+                var taken = names.Where(pair => open.Contains(pair.Key)).Select(pair => pair.Value).ToList();
+                var tabName = SqlPrompter.Core.Navigation.DefinitionTabName.Next(schema, objectName, taken);
+                names[document.FullName] = tabName;
+                if (!TabCaption.Apply(document.FullName, tabName))
+                {
+                    names.Remove(document.FullName);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Naming the tab of a definition failed", ex);
+            }
         }
 
         /// <summary>The name the user gave the tab of the document, or null.</summary>
@@ -203,6 +255,10 @@ namespace SqlPrompter.Ssms
                     service.timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(5) };
                     service.timer.Tick += (s2, e2) => service.Save();
                     service.timer.Start();
+                    // SSMS gives a tab its own caption back when a query runs (#515): the names are checked every second and put back.
+                    service.captionTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
+                    service.captionTimer.Tick += (s2, e2) => service.ReapplyNames();
+                    service.captionTimer.Start();
                     service.Subscribe();
                 };
                 wait.Start();
@@ -255,6 +311,33 @@ namespace SqlPrompter.Ssms
         }
 
         private DispatcherTimer afterEvent;
+        private DispatcherTimer captionTimer;
+
+        /// <summary>Puts the name back on the tabs that have a name of ours and whose caption SSMS has reset (#515).</summary>
+        private void ReapplyNames()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (names.Count == 0 || shuttingDown)
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (Document known in dte.Documents.Cast<Document>().ToList())
+                {
+                    if (known.Windows.Count > 0 && !IsClosedWindow(known) && names.TryGetValue(known.FullName, out var name) && !TabCaption.HasName(known.FullName, name))
+                    {
+                        TabCaption.Apply(known.FullName, name);
+                        Log.Write("The caption of " + System.IO.Path.GetFileName(known.FullName) + " was reset by SSMS; the name " + name + " is put back.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Checking the names of the tabs failed", ex);
+            }
+        }
 
         private const int WmClose = 0x0010;
         private const int WmQueryEndSession = 0x0011;
@@ -296,6 +379,7 @@ namespace SqlPrompter.Ssms
                     }
                 };
                 WatchTabDoubleClick(window);
+                WatchNativeRenameDialog();
                 commandEvents = dte.Events.CommandEvents;
                 commandEvents.BeforeExecute += (string guid, int id, object customIn, object customOut, ref bool cancelDefault) =>
                 {
@@ -304,11 +388,68 @@ namespace SqlPrompter.Ssms
                     {
                         BeginShutdown("File.Exit");
                     }
+
                 };
             }
             catch (Exception ex)
             {
                 Log.Error("Watching the shutdown failed", ex);
+            }
+        }
+
+        private static bool nativeRenameWatched;
+
+        /// <summary>
+        /// The native <i>Rename Tab</i> of the tab menu (the command <c>OtherContextMenus.DocumentWindowTab.RenameTab</c>; it does not raise <c>CommandEvents</c>) offers the name of the temporary
+        /// file (<c>SQLQuery8</c>) and would rename that file, while the tab shows another name (#534). For a new query window the dialog is closed as soon as it has loaded and our prompt,
+        /// which starts with the name the tab has, opens instead (as for a double click on the tab). A file the user saved is left to SSMS.
+        /// </summary>
+        private void WatchNativeRenameDialog()
+        {
+            if (nativeRenameWatched)
+            {
+                return;
+            }
+
+            nativeRenameWatched = true;
+            System.Windows.EventManager.RegisterClassHandler(typeof(System.Windows.Window), System.Windows.FrameworkElement.LoadedEvent, new System.Windows.RoutedEventHandler((sender, args) =>
+            {
+                try
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    if (!(sender is System.Windows.Window dialog) || dialog.Title != "Rename Tab" || !IsActiveTemporaryQuery())
+                    {
+                        return;
+                    }
+
+                    dialog.Close();
+                    var rename = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(60) };
+                    rename.Tick += (s, e) =>
+                    {
+                        rename.Stop();
+                        ThreadHelper.ThrowIfNotOnUIThread();
+                        RenameActiveTab();
+                    };
+                    rename.Start();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Redirecting the native Rename Tab dialog failed", ex);
+                }
+            }));
+        }
+
+        private bool IsActiveTemporaryQuery()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var document = dte.ActiveDocument;
+                return document != null && IsQuery(document) && SqlPrompter.Core.History.TemporaryQueryFile.Is(document.FullName, System.IO.Path.GetTempPath());
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 
@@ -782,6 +923,11 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var opened = OpenTabCore(tab, out var connected);
+            if (opened && !string.IsNullOrEmpty(tab.HistoryId) && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
+            {
+                TabHistoryService.Continue(tab.HistoryId, dte.ActiveDocument.FullName);
+            }
+
             if (opened && tab.Pinned && dte.ActiveDocument != null && IsQuery(dte.ActiveDocument))
             {
                 TabCaption.Pin(dte.ActiveDocument.FullName);
@@ -936,6 +1082,21 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>True when the active document of the shell is a query tab (#503); null when it cannot be told.</summary>
+        public bool? HasActiveQueryDocument()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var document = dte.ActiveDocument;
+                return document != null && IsQuery(document) && dte.ActiveWindow?.Kind == "Document";
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         private static bool IsQuery(Document document)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -947,8 +1108,7 @@ namespace SqlPrompter.Ssms
             ThreadHelper.ThrowIfNotOnUIThread();
             var name = document.FullName;
             // A new window is backed by a file in the temp folder (SQLQuery1.sql); that is not a document of the user.
-            var isFile = Path.IsPathRooted(name) && File.Exists(name) &&
-                !(string.Equals(Path.GetDirectoryName(name), Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) && Path.GetFileName(name).StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase));
+            var isFile = Path.IsPathRooted(name) && File.Exists(name) && !SqlPrompter.Core.History.TemporaryQueryFile.Is(name, Path.GetTempPath());
             string text = null;
             if (!isFile || !document.Saved)
             {
@@ -981,6 +1141,7 @@ namespace SqlPrompter.Ssms
                 Active = active,
                 Pinned = TabCaption.IsPinned(name),
                 Name = names.TryGetValue(name, out var tabName) ? tabName : null,
+                HistoryId = TabHistoryService.IdOf(name),
             };
         }
     }

@@ -12,6 +12,7 @@ namespace SqlPrompter.Tests
         {
             var ids = QuickActionCatalog.Actions(true).Select(a => a.Id).ToList();
 
+            Assert.Equal(1, ids.IndexOf(QuickActionCatalog.Unformat));
             Assert.Contains(QuickActionCatalog.AddCommas, ids);
             Assert.Contains(QuickActionCatalog.AddQuotesAndCommas, ids);
             Assert.Equal("Format Selection", QuickActionCatalog.Actions(true).Single(a => a.Id == QuickActionCatalog.Format).Name);
@@ -23,6 +24,7 @@ namespace SqlPrompter.Tests
             var actions = QuickActionCatalog.Actions(false);
 
             Assert.DoesNotContain(actions, a => a.Id == QuickActionCatalog.AddCommas);
+            Assert.DoesNotContain(actions, a => a.Id == QuickActionCatalog.Unformat);
             Assert.Equal("Format Document", actions.Single(a => a.Id == QuickActionCatalog.Format).Name);
             Assert.All(actions, a => Assert.Contains("the script", a.Description));
         }

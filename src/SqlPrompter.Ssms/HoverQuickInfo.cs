@@ -59,7 +59,8 @@ namespace SqlPrompter.Ssms
                 }
 
                 var cache = metadata?.CacheForActiveWindow(out _, SqlBatch.FindUsedDatabase(snapshot, position));
-                var info = HoverInfo.At(batch, position - batchStart, cache?.Current);
+                var others = metadata?.OtherDatabases();
+                var info = HoverInfo.At(batch, position - batchStart, cache?.Current, others == null ? (System.Func<string, SqlPrompter.Core.Model.IDatabaseMetadata>)null : others.Snapshot);
                 if (info == null)
                 {
                     return null;
@@ -67,11 +68,13 @@ namespace SqlPrompter.Ssms
 
                 // The description from the database (MS_Description) of the table, column or procedure (#220, #206): asked for lazily, never waited for long.
                 var text = info.Text;
-                if (info.DescriptionObject != null && cache?.Current is DatabaseSnapshot && SettingsService.Current.Behavior.ShowDbDescriptions)
+                // The database the object is in: the window's own, or another one of the server (a three-part name, #443).
+                var objectDatabase = info.Database == null ? cache?.Current as DatabaseSnapshot : others?.Snapshot(info.Database);
+                if (info.DescriptionObject != null && objectDatabase != null && SettingsService.Current.Behavior.ShowDbDescriptions)
                 {
                     SqlPrompter.Metadata.ObjectDescriptions got = null;
                     var arrived = new TaskCompletionSource<bool>();
-                    DescriptionPreview.RequestAll(new DefinitionRef(cache.Current.DatabaseName, info.DescriptionSchema, info.DescriptionObject), d =>
+                    DescriptionPreview.RequestAll(new DefinitionRef(objectDatabase.DatabaseName, info.DescriptionSchema, info.DescriptionObject), d =>
                     {
                         got = d;
                         arrived.TrySetResult(true);
@@ -90,8 +93,17 @@ namespace SqlPrompter.Ssms
                 }
 
                 var span = snapshot.CreateTrackingSpan(batchStart + info.Start, info.Length, SpanTrackingMode.EdgeInclusive);
-                var lines = text.Split('\n').Select(l => (object)new ClassifiedTextElement(new ClassifiedTextRun("natural language", l))).ToList();
-                if (info.DescriptionObject != null && info.DescriptionColumn == null && cache?.Current is DatabaseSnapshot database)
+                // SSMS already shows the kind, name (and parameters) of an object: leave those lines out, keep the description (#422).
+                if (info.LinesInSsms > 0)
+                {
+                    var rest = text.Split(new[] { '\n' }, info.LinesInSsms + 1);
+                    text = rest.Length > info.LinesInSsms ? rest[info.LinesInSsms].TrimStart('\n') : string.Empty;
+                }
+
+                var lines = text.Length == 0
+                    ? new System.Collections.Generic.List<object>()
+                    : text.Split('\n').Select(l => (object)new ClassifiedTextElement(new ClassifiedTextRun("natural language", l))).ToList();
+                if (info.DescriptionObject != null && info.DescriptionColumn == null && objectDatabase is DatabaseSnapshot database)
                 {
                     // The definition of the object below the short info, loaded in the background (#350).
                     lines.Add(HoverDefinitionPanel.Create(new DefinitionRef(database.DatabaseName, info.DescriptionSchema, info.DescriptionObject),

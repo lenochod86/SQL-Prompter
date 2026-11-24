@@ -11,7 +11,7 @@ namespace SqlPrompter.Tests
   ""metadata"": { ""id"": ""x"", ""name"": ""Sample"" },
   ""whitespace"": { ""spacesOrTabs"": ""spaces"", ""newLines"": { ""preserveExistingEmptyLinesAfterBatchSeparator"": false } },
   ""lists"": { ""placeCommasBeforeItems"": false, ""alignAliases"": true },
-  ""parentheses"": { ""parenthesisStyle"": ""expandedSimple"" },
+  ""parentheses"": { ""collapseParenthesesShorterThan"": 35 },
   ""casing"": { ""reservedKeywords"": ""lowercase"", ""builtInFunctions"": ""uppercase"", ""builtInDataTypes"": ""leaveAsIs"" },
   ""dml"": { ""addNewLineAfterDistinctAndTopClauses"": true, ""collapseStatementsShorterThan"": 40, ""collapseShortSubqueries"": false,
            ""collapseSubqueriesShorterThan"": 99, ""listItems"": { ""placeWhereConditionOnNewLine"": ""never"" } },
@@ -43,7 +43,7 @@ namespace SqlPrompter.Tests
 
             Assert.Equal(8, result.Style.TabWidth);
             Assert.Equal(90, result.Style.MaxLineLength);
-            Assert.Contains(result.Notes, n => n.StartsWith("parentheses.parenthesisStyle: ", StringComparison.Ordinal));
+            Assert.Contains(result.Notes, n => n.StartsWith("parentheses.collapseParenthesesShorterThan: left out", StringComparison.Ordinal));
             Assert.Contains("alignAliases = True", result.Applied);
             Assert.DoesNotContain(result.Notes, n => n.StartsWith("lists.alignAliases", StringComparison.Ordinal));
             Assert.DoesNotContain(result.Notes, n => n.StartsWith("casing.reservedKeywords", StringComparison.Ordinal));

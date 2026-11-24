@@ -151,8 +151,18 @@ namespace SqlPrompter.Ssms
             {
                 if (known)
                 {
-                    strip.BackColor = original.Back;
-                    strip.ForeColor = original.Fore;
+                    Unhook(strip, original);
+                    settingOurselves = true;
+                    try
+                    {
+                        strip.BackColor = original.Back;
+                        strip.ForeColor = original.Fore;
+                    }
+                    finally
+                    {
+                        settingOurselves = false;
+                    }
+
                     Applied.Remove(strip);
                     Log.Write("Status bar color of a query window removed.");
                 }
@@ -168,11 +178,61 @@ namespace SqlPrompter.Ssms
 
             var color = wanted.Value;
             original.Applied = color;
+            Hook(strip, original);
             if (strip.BackColor != color)
+            {
+                Set(strip, color);
+                Log.Write("Status bar of a query window set to " + color.Name + ".");
+            }
+        }
+
+        private static bool settingOurselves;
+
+        private static void Set(StatusStrip strip, Color color)
+        {
+            settingOurselves = true;
+            try
             {
                 strip.BackColor = color;
                 strip.ForeColor = Luminance(color) < 140 ? Color.White : Color.Black;
-                Log.Write("Status bar of a query window set to " + color.Name + ".");
+            }
+            finally
+            {
+                settingOurselves = false;
+            }
+        }
+
+        /// <summary>
+        /// SSMS paints the strip itself when a query starts and ends (the state text and color of the run, #476), which showed its color until the next tick of the timer.
+        /// A watch on the colors puts ours back in the same call, before the strip is drawn; our own writes are not answered.
+        /// </summary>
+        private static void Hook(StatusStrip strip, Original original)
+        {
+            if (original.Handler != null)
+            {
+                return;
+            }
+
+            original.Handler = (s, e) =>
+            {
+                if (settingOurselves || strip.BackColor == original.Applied)
+                {
+                    return;
+                }
+
+                original.Back = strip.BackColor;
+                original.Fore = strip.ForeColor;
+                Set(strip, original.Applied);
+            };
+            strip.BackColorChanged += original.Handler;
+        }
+
+        private static void Unhook(StatusStrip strip, Original original)
+        {
+            if (original.Handler != null)
+            {
+                strip.BackColorChanged -= original.Handler;
+                original.Handler = null;
             }
         }
 
@@ -183,6 +243,7 @@ namespace SqlPrompter.Ssms
             public Color Back;
             public Color Fore;
             public Color Applied;
+            public EventHandler Handler;
         }
     }
 }

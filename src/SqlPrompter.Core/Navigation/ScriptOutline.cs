@@ -100,11 +100,24 @@ namespace SqlPrompter.Core.Navigation
                     items.Add(new OutlineItem("Batch", batch.ToString(), LineOf(head.Start), head.Start, 0));
                 }
 
-                items.Add(new OutlineItem("Statement", Shortened(head.Start, tokens[end - 1].End), LineOf(head.Start), head.Start, 1));
+                var kind = IsBlockHead(tokens, first, end) ? "Block" : "Statement";
+                items.Add(new OutlineItem(kind, Shortened(head.Start, tokens[end - 1].End), LineOf(head.Start), head.Start, 1));
                 AddDetails(items, tokens, first, end, LineOf);
             }
 
             return items;
+        }
+
+        /// <summary>IF, ELSE, WHILE, BEGIN TRY and BEGIN CATCH start a block (a plain BEGIN, END and the like stay statements).</summary>
+        private static bool IsBlockHead(List<Token> tokens, int first, int end)
+        {
+            var head = tokens[first];
+            if (head.IsWord("IF") || head.IsWord("ELSE") || head.IsWord("WHILE"))
+            {
+                return true;
+            }
+
+            return head.IsWord("BEGIN") && first + 1 < end && (tokens[first + 1].IsWord("TRY") || tokens[first + 1].IsWord("CATCH"));
         }
 
         private static void AddDetails(List<OutlineItem> items, List<Token> tokens, int first, int end, Func<int, int> lineOf)
@@ -147,6 +160,23 @@ namespace SqlPrompter.Core.Navigation
                     if (name.Length > 0)
                     {
                         items.Add(new OutlineItem("Module", tokens[k].Upper + " " + name, lineOf(head.Start), head.Start, 2));
+                        var open = 0;
+                        for (var i = k + 1; i < end; i++)
+                        {
+                            if (tokens[i].Kind == TokenKind.OpenParen)
+                            {
+                                open++;
+                            }
+                            else if (tokens[i].Kind == TokenKind.CloseParen)
+                            {
+                                open = Math.Max(0, open - 1);
+                            }
+                            else if (open <= 1 && tokens[i].Kind == TokenKind.Variable && i > k + 1 &&
+                                     (tokens[i - 1].Kind == TokenKind.Comma || tokens[i - 1].Kind == TokenKind.OpenParen || tokens[i - 1].IsNamePart || tokens[i - 1].Kind == TokenKind.Dot))
+                            {
+                                items.Add(new OutlineItem("Parameter", tokens[i].Text, lineOf(tokens[i].Start), tokens[i].Start, 2));
+                            }
+                        }
                     }
                 }
                 else if (k + 1 < end && tokens[k].IsWord("TABLE") && tokens[k + 1].Text.StartsWith("#", StringComparison.Ordinal))

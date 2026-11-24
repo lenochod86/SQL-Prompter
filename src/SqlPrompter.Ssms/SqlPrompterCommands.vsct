@@ -36,6 +36,14 @@
           <CommandName>Formatting Styles</CommandName>
         </Strings>
       </Menu>
+      <!-- The Help submenu (#502): Documentation, Check for Updates, Open Log and About. -->
+      <Menu guid="guidSqlPrompterCmdSet" id="HelpMenu" priority="0x00FA" type="Menu">
+        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+        <Strings>
+          <ButtonText>Help</ButtonText>
+          <CommandName>Help</CommandName>
+        </Strings>
+      </Menu>
       <!-- The Tab Color item of the context menu of a document tab: the environments of the coloring settings (dynamic items) and Edit Environments. -->
       <Menu guid="guidSqlPrompterCmdSet" id="TabColorMenu" priority="0x0200" type="Menu">
         <Parent guid="guidSqlPrompterCmdSet" id="TabColorHostGroup" />
@@ -100,6 +108,9 @@
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="RefactoringGroup" priority="0x0100">
         <Parent guid="guidSqlPrompterCmdSet" id="RefactorMenu" />
+      </Group>
+      <Group guid="guidSqlPrompterCmdSet" id="HelpGroup" priority="0x0100">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpMenu" />
       </Group>
       <Group guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" priority="0x0F00">
         <Parent guid="guidSqlPrompterCmdSet" id="SqlPrompterMenu" />
@@ -205,6 +216,12 @@
           <ButtonText>Run Statement At Caret</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidRunStatementsUpToCaret" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="NavigationGroup" />
+        <Strings>
+          <ButtonText>Run Statements Up To Caret</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidQueryHistoryToolbar" priority="0x0100" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="ToolbarGroup" />
         <Icon guid="ImageCatalogGuid" id="History" />
@@ -248,10 +265,10 @@
           <ButtonText>Script As Temp Table</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidScriptOutline" priority="0x0118" type="Button">
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenGridInExcel" priority="0x0104" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="EditingGroup" />
         <Strings>
-          <ButtonText>Script Outline</ButtonText>
+          <ButtonText>Open in Excel</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidQuickOpen" priority="0x0119" type="Button">
@@ -326,6 +343,12 @@
           <ButtonText>Format Selection</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidUnformatSelection" priority="0x0102" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="FormattingGroup" />
+        <Strings>
+          <ButtonText>Unformat Selection</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidSqlPrompterCmdSet" id="cmdidAddNPrefix" priority="0x0210" type="Button">
         <Parent guid="guidSqlPrompterCmdSet" id="RefactoringGroup" />
         <Strings>
@@ -398,10 +421,28 @@
           <ButtonText>Run And Roll Back (Dry Run)</ButtonText>
         </Strings>
       </Button>
-      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0100" type="Button">
-        <Parent guid="guidSqlPrompterCmdSet" id="DiagnosticsGroup" />
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidHelp" priority="0x0100" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
+        <Strings>
+          <ButtonText>Documentation</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidCheckForUpdates" priority="0x0110" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
+        <Strings>
+          <ButtonText>Check for Updates</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidOpenLog" priority="0x0120" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
         <Strings>
           <ButtonText>Open Log</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidSqlPrompterCmdSet" id="cmdidAbout" priority="0x0130" type="Button">
+        <Parent guid="guidSqlPrompterCmdSet" id="HelpGroup" />
+        <Strings>
+          <ButtonText>About</ButtonText>
         </Strings>
       </Button>
     </Buttons>
@@ -426,6 +467,8 @@
       <IDSymbol name="CopyAsGroup" value="0x101B" />
       <IDSymbol name="MetadataGroup" value="0x1010" />
       <IDSymbol name="DiagnosticsGroup" value="0x1011" />
+      <IDSymbol name="HelpMenu" value="0x1021" />
+      <IDSymbol name="HelpGroup" value="0x1022" />
       <IDSymbol name="SettingsGroup" value="0x1012" />
       <IDSymbol name="SnippetsGroup" value="0x1013" />
       <IDSymbol name="NavigationGroup" value="0x1014" />
@@ -437,6 +480,7 @@
       <IDSymbol name="cmdidQueryHistoryToolbar" value="0x0131" />
       <IDSymbol name="cmdidFormatDocument" value="0x011A" />
       <IDSymbol name="cmdidFormatSelection" value="0x011B" />
+      <IDSymbol name="cmdidUnformatSelection" value="0x0136" />
       <IDSymbol name="cmdidAddNPrefix" value="0x011C" />
       <IDSymbol name="cmdidAddAs" value="0x011D" />
       <IDSymbol name="cmdidRemoveAs" value="0x011E" />
@@ -449,7 +493,6 @@
       <IDSymbol name="cmdidFixCodeIssues" value="0x0124" />
       <IDSymbol name="cmdidPreviewAsSelect" value="0x0125" />
       <IDSymbol name="cmdidDryRun" value="0x0126" />
-      <IDSymbol name="cmdidScriptOutline" value="0x012C" />
       <IDSymbol name="cmdidQuickOpen" value="0x012D" />
       <IDSymbol name="cmdidFindInCode" value="0x012E" />
       <IDSymbol name="cmdidShowDependencies" value="0x012F" />
@@ -463,10 +506,12 @@
       <IDSymbol name="cmdidAddCommas" value="0x010F" />
       <IDSymbol name="cmdidQueryHistory" value="0x0111" />
       <IDSymbol name="cmdidScriptGridAsInsert" value="0x0112" />
+      <IDSymbol name="cmdidOpenGridInExcel" value="0x0137" />
       <IDSymbol name="cmdidAddQuotesAndCommas" value="0x0110" />
       <IDSymbol name="cmdidGoToDefinition" value="0x010B" />
       <IDSymbol name="cmdidLocateInObjectExplorer" value="0x0133" />
       <IDSymbol name="cmdidRunStatement" value="0x010C" />
+      <IDSymbol name="cmdidRunStatementsUpToCaret" value="0x0135" />
       <IDSymbol name="cmdidParameterInfo" value="0x010D" />
       <IDSymbol name="cmdidSurroundWithSnippet" value="0x0107" />
       <IDSymbol name="cmdidNewSnippetFromSelection" value="0x0108" />
@@ -478,6 +523,9 @@
       <IDSymbol name="cmdidFormattingStyles" value="0x0120" />
       <IDSymbol name="cmdidRefreshMetadata" value="0x0100" />
       <IDSymbol name="cmdidOpenLog" value="0x0101" />
+      <IDSymbol name="cmdidCheckForUpdates" value="0x0138" />
+      <IDSymbol name="cmdidHelp" value="0x0139" />
+      <IDSymbol name="cmdidAbout" value="0x013A" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>

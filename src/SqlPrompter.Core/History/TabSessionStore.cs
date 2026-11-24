@@ -46,6 +46,10 @@ namespace SqlPrompter.Core.History
         [DataMember(Name = "pinned", EmitDefaultValue = false)]
         public bool Pinned { get; set; }
 
+        /// <summary>The id of the history entry of the tab (#529), so that the restored tab continues it instead of starting a new one.</summary>
+        [DataMember(Name = "historyId", EmitDefaultValue = false)]
+        public string HistoryId { get; set; }
+
         /// <summary>The tab was the one in front.</summary>
         [DataMember(Name = "active")]
         public bool Active { get; set; }

@@ -87,6 +87,12 @@ namespace SqlPrompter.Ssms
             try
             {
                 text = text ?? PlainText;
+                if (IsReadOnly)
+                {
+                    // A preview shows the tabs at the tab stops of the editor; the text of an editor being edited keeps them (#450).
+                    text = SqlPrompter.Core.Editing.TabExpander.Expand(text, EditorTabSize.Current());
+                }
+
                 var kinds = SnippetHighlighter.Classify(text);
                 var brushes = Palette();
                 var document = new FlowDocument { PageWidth = 10000, FontFamily = FontFamily, FontSize = FontSize, Foreground = brushes[0] };

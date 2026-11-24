@@ -11,11 +11,12 @@ namespace SqlPrompter.Core.Formatting
     /// <summary>The result of formatting: the new text and what happened to the statements.</summary>
     public sealed class FormatResult
     {
-        internal FormatResult(string text, int formatted, int kept)
+        internal FormatResult(string text, int formatted, int kept, int collapsed = 0)
         {
             Text = text;
             Formatted = formatted;
             Kept = kept;
+            Collapsed = collapsed;
         }
 
         public string Text { get; }
@@ -25,6 +26,12 @@ namespace SqlPrompter.Core.Formatting
 
         /// <summary>Statements left as they were (only the case of words changed) because they contain comments inside, or because the formatted text was not the same script.</summary>
         public int Kept { get; }
+
+        /// <summary>
+        /// Statements of <see cref="Formatted"/> that the style keeps on one line because they are shorter than <c>CollapseStatementsShorterThan</c> (#441): the options that
+        /// break a statement over lines do not apply to them (the spacing and the case of words do).
+        /// </summary>
+        public int Collapsed { get; }
     }
 
     /// <summary>
@@ -61,10 +68,12 @@ namespace SqlPrompter.Core.Formatting
         private sealed class Engine
         {
             private readonly string text;
-            private readonly FormatStyle style;
+            private FormatStyle style;
             private readonly string nl;
             private int formatted;
             private int kept;
+            private int collapsed;
+            private bool collapsedNow;
 
             public Engine(string text, FormatStyle style, string newLine)
             {
@@ -86,6 +95,7 @@ namespace SqlPrompter.Core.Formatting
                 var output = new StringBuilder();
                 var level = 0;
                 var blocks = new Stack<int>();
+                var extras = new Stack<int>();
                 var bodyDepth = 0;
                 string carry = null; // "ELSE " in front of the IF that follows
                 var previousEnd = -1;
@@ -94,7 +104,8 @@ namespace SqlPrompter.Core.Formatting
                 {
                     var statement = statements[s];
                     var first = statement.Leading.Count > 0 ? statement.Leading[0].Start : statement.Body[0].Start;
-                    if (output.Length > 0)
+                    // The IF after "ELSE" continues the line of the ELSE that was already started: no new line (#525).
+                    if (output.Length > 0 && carry == null)
                     {
                         output.Append(nl);
                         if (style.KeepBlankLines && !previousWasGo && BlankLineBetween(previousEnd, first))
@@ -111,12 +122,14 @@ namespace SqlPrompter.Core.Formatting
                                        secondWord != "DIALOG" && secondWord != "CONVERSATION";
                     var isBlockEnd = head == "END";
                     var isHeader = head == "IF" || head == "WHILE" || head == "ELSE";
+                    var endExtra = 0;
                     if (isBlockEnd && blocks.Count > 0 && style.IndentBlocks)
                     {
                         level -= blocks.Pop();
+                        endExtra = extras.Pop();
                     }
 
-                    var effective = isGo ? 0 : level + (isBlockEnd ? 0 : isBlockStart ? Math.Max(0, bodyDepth - 1) : bodyDepth);
+                    var effective = isGo ? 0 : level + (isBlockEnd ? endExtra : isBlockStart ? (style.IndentBeginEnd ? bodyDepth : Math.Max(0, bodyDepth - 1)) : bodyDepth);
                     foreach (var comment in statement.Leading)
                     {
                         output.Append(Indent(effective * style.TabWidth)).Append(comment.Text).Append(nl);
@@ -128,6 +141,7 @@ namespace SqlPrompter.Core.Formatting
                         body = FormatTokens.Apply("GO", style.KeywordCase) + string.Concat(statement.Body.Skip(1).Select(t => " " + t.Text));
                         level = 0;
                         blocks.Clear();
+                        extras.Clear();
                         bodyDepth = 0;
                     }
                     else
@@ -161,7 +175,8 @@ namespace SqlPrompter.Core.Formatting
                         {
                             if (style.IndentBlocks)
                             {
-                                var offset = Math.Max(0, bodyDepth - 1);
+                                var offset = style.IndentBeginEnd ? bodyDepth : Math.Max(0, bodyDepth - 1);
+                                extras.Push(style.IndentBeginEnd ? bodyDepth : 0);
                                 blocks.Push(offset + 1);
                                 level += offset + 1;
                             }
@@ -181,7 +196,7 @@ namespace SqlPrompter.Core.Formatting
                 // Comments after the last statement.
                 var tail = statements[statements.Count - 1];
                 _ = tail;
-                return new FormatResult(output.ToString(), formatted, kept);
+                return new FormatResult(output.ToString(), formatted, kept, collapsed);
             }
 
             private static int LastEnd(Statement s) => s.Trailing.Count > 0 ? s.Trailing[s.Trailing.Count - 1].End : s.Body[s.Body.Count - 1].End;
@@ -309,24 +324,42 @@ namespace SqlPrompter.Core.Formatting
                 var prefix = carry ?? string.Empty;
                 string layout = null;
                 var hasInnerComment = body.Any(t => t.Kind == TokenKind.Comment);
-                if (!hasInnerComment)
+                var normalStyle = style;
+                try
                 {
-                    try
+                    collapsedNow = false;
+                    if (hasInnerComment)
                     {
-                        layout = Layout(codeTokens, column);
+                        // A comment needs its line: the statement is laid out in full, then every comment is put back next to the token it followed (#528).
+                        style = LongLayout(style);
                     }
-                    catch (Exception)
+
+                    layout = Layout(codeTokens, column);
+                    if (hasInnerComment && layout != null)
                     {
-                        layout = null;
+                        layout = PutCommentsBack(layout, body, codeTokens);
                     }
+                }
+                catch (Exception)
+                {
+                    layout = null;
+                }
+                finally
+                {
+                    style = normalStyle;
                 }
 
                 if (layout != null)
                 {
                     var check = Lexer.Tokenize(layout).ToList();
-                    if (FormatTokens.Equivalent(codeTokens, check))
+                    if (FormatTokens.Equivalent(hasInnerComment ? body : codeTokens, check))
                     {
                         formatted++;
+                        if (collapsedNow)
+                        {
+                            collapsed++;
+                        }
+
                         if (codeTokens[0].IsWord("ELSE") && codeTokens.Count == 1 && next != null && next.Body[0].IsWord("IF") && next.Leading.Count == 0)
                         {
                             consumed = true;
@@ -339,6 +372,110 @@ namespace SqlPrompter.Core.Formatting
 
                 kept++;
                 return Indent(column) + prefix + Verbatim(body);
+            }
+
+            private static FormatStyle LongLayout(FormatStyle style)
+            {
+                var copy = style.Clone();
+                copy.CollapseStatementsShorterThan = 0;
+                copy.CollapseSubqueriesShorterThan = 0;
+                copy.CollapseDdlShorterThan = 0;
+                copy.CollapseCaseShorterThan = 0;
+                return copy;
+            }
+
+            /// <summary>
+            /// The layout of the code tokens with the comments of the statement put back: each comment goes right behind the code token it followed in the original;
+            /// a <c>--</c> comment always ends its line (the rest of the line moves to a new line with the indentation of the line). Null when the layout does not
+            /// have the code tokens of the statement.
+            /// </summary>
+            private string PutCommentsBack(string layout, List<Token> body, List<Token> codeTokens)
+            {
+                var laid = Lexer.Tokenize(layout).Where(t => t.Kind != TokenKind.Comment).ToList();
+                if (!FormatTokens.Equivalent(codeTokens, laid))
+                {
+                    return null;
+                }
+
+                var after = new Dictionary<int, List<Token>>();
+                var code = -1;
+                foreach (var token in body)
+                {
+                    if (token.Kind != TokenKind.Comment)
+                    {
+                        code++;
+                    }
+                    else
+                    {
+                        if (!after.TryGetValue(code, out var list))
+                        {
+                            after[code] = list = new List<Token>();
+                        }
+
+                        list.Add(token);
+                    }
+                }
+
+                if (after.ContainsKey(-1))
+                {
+                    return null;
+                }
+
+                var sb = new StringBuilder();
+                var position = 0;
+                foreach (var key in after.Keys.OrderBy(k => k))
+                {
+                    var end = laid[key].End;
+                    sb.Append(layout, position, end - position);
+                    position = end;
+                    var lineStarted = false;
+                    var previousEndsLine = false;
+                    var lineStart = layout.LastIndexOf('\n', Math.Max(0, laid[key].Start - 1)) + 1;
+                    var indentEnd = lineStart;
+                    while (indentEnd < layout.Length && (layout[indentEnd] == ' ' || layout[indentEnd] == '\t'))
+                    {
+                        indentEnd++;
+                    }
+
+                    foreach (var comment in after[key])
+                    {
+                        if (previousEndsLine)
+                        {
+                            // A line comment ends its line: the next comment starts a new one.
+                            sb.Append(nl).Append(layout, lineStart, indentEnd - lineStart);
+                        }
+                        else if (!lineStarted)
+                        {
+                            sb.Append(' ');
+                        }
+
+                        lineStarted = false;
+                        sb.Append(comment.Text);
+                        previousEndsLine = comment.Text.StartsWith("--", StringComparison.Ordinal);
+                        if (!previousEndsLine)
+                        {
+                            continue;
+                        }
+
+                        // The rest of the line moves down, unless the line ends here anyway.
+                        var next = position;
+                        while (next < layout.Length && (layout[next] == ' ' || layout[next] == '\t'))
+                        {
+                            next++;
+                        }
+
+                        if (next < layout.Length && layout[next] != '\r' && layout[next] != '\n')
+                        {
+                            sb.Append(nl).Append(layout, lineStart, indentEnd - lineStart);
+                            position = next;
+                            lineStarted = true;
+                            previousEndsLine = false;
+                        }
+                    }
+                }
+
+                sb.Append(layout, position, layout.Length - position);
+                return sb.ToString();
             }
 
             private string PutOnLineOf(string prefix, string layout)
@@ -377,6 +514,7 @@ namespace SqlPrompter.Core.Formatting
             private string Layout(List<Token> code, int column)
             {
                 var r = FormatTokens.Prepare(code, style);
+                spaceInIn = style.SpaceAroundInContents;
                 var semicolon = r.Count > 0 && r[r.Count - 1].Kind == TokenKind.Semicolon;
                 if (semicolon)
                 {
@@ -392,6 +530,19 @@ namespace SqlPrompter.Core.Formatting
                 else if (head == "CREATE" && r.Count > 2 && r[1].IsWord("TABLE"))
                 {
                     lines = LayoutCreateTable(r, column);
+                }
+                else if ((head == "CREATE" || head == "ALTER") && style.ProcedureParametersOnNewLines && r.Count > 3 && r[1].IsWord("PROC", "PROCEDURE"))
+                {
+                    lines = LayoutProcedureHeader(r, column);
+                }
+                else if (head == "SET" && style.EqualsOnNewLine && r.Count > 3 && r[1].Kind == TokenKind.Variable && r[2].Kind == TokenKind.Operator && r[2].Text == "=")
+                {
+                    // SET @x = value with the equals sign on a line of its own, unless the statement is short enough to stay on one line (#305).
+                    var flat = Flat(r, 0, r.Count);
+                    if (style.CollapseStatementsShorterThan <= 0 || flat.Length >= style.CollapseStatementsShorterThan)
+                    {
+                        lines = new List<string> { Indent(column) + Flat(r, 0, 2), Indent(column + style.TabWidth) + Flat(r, 2, r.Count) };
+                    }
                 }
 
                 if (lines == null || lines.Count == 0)
@@ -412,6 +563,7 @@ namespace SqlPrompter.Core.Formatting
                 var flat = Flat(r, 0, r.Count);
                 if (style.CollapseStatementsShorterThan > 0 && flat.Length < style.CollapseStatementsShorterThan)
                 {
+                    collapsedNow = true;
                     return new List<string> { Indent(column) + flat };
                 }
 
@@ -427,13 +579,40 @@ namespace SqlPrompter.Core.Formatting
                 }
 
                 var lines = new List<string>();
+                var minContent = 0;
+                if (style.AlignAcrossClauses)
+                {
+                    foreach (var clause in clauses)
+                    {
+                        if (!IsJoinClause(clause))
+                        {
+                            minContent = Math.Max(minContent, NextStop(column + string.Join(" ", clause.Keyword.Select(k => k.Text)).Length));
+                        }
+                    }
+                }
+
+                var fromContent = 0;
                 foreach (var clause in clauses)
                 {
-                    LayoutClause(clause, column, lines);
+                    if (clause.Keyword[0].IsWord("FROM") && clause.Keyword.Count == 1)
+                    {
+                        fromContent = Math.Max(NextStop(column + clause.Keyword[0].Text.Length), minContent);
+                    }
+
+                    if (style.IndentJoinTable && fromContent > 0 && IsJoinClause(clause))
+                    {
+                        LayoutClause(clause, fromContent, lines);
+                    }
+                    else
+                    {
+                        LayoutClause(clause, column, lines, minContent);
+                    }
                 }
 
                 return lines;
             }
+
+            private static bool IsJoinClause(Clause clause) => clause.Keyword[clause.Keyword.Count - 1].IsWord("JOIN", "APPLY");
 
             private List<string> LayoutCte(List<R> r, int column)
             {
@@ -473,27 +652,38 @@ namespace SqlPrompter.Core.Formatting
                         return null;
                     }
 
-                    var header = Flat(r, i, asIndex + 1);
+                    var name = Flat(r, i, asIndex);
+                    var asText = r[asIndex].Text;
+                    var header = name + " " + asText;
                     var inner = r.GetRange(open + 1, close - open - 1);
                     var innerFlat = Flat(inner, 0, inner.Count);
                     var lead = firstCte ? FormatTokens.Apply("WITH", style.KeywordCase) + " " : style.CommaBeforeItems ? ", " : string.Empty;
-                    var width = lead.Length;
-                    var comma = !firstCte || true;
-                    _ = comma;
                     if (style.CollapseSubqueriesShorterThan > 0 && innerFlat.Length < style.CollapseSubqueriesShorterThan)
                     {
                         lines.Add(Indent(column) + lead + header + " (" + innerFlat + ")");
                     }
                     else
                     {
-                        lines.Add(Indent(column) + lead + header);
-                        lines.Add(Indent(column) + "(");
-                        var nested = LayoutDml(inner, column + style.TabWidth) ?? new List<string> { Indent(column + style.TabWidth) + innerFlat };
+                        if (style.CteAsOnNewLine)
+                        {
+                            lines.Add(Indent(column) + lead + name);
+                            lines.Add(Indent(column) + asText + (style.CteParenOnNewLine ? string.Empty : " ("));
+                        }
+                        else
+                        {
+                            lines.Add(Indent(column) + lead + header + (style.CteParenOnNewLine ? string.Empty : " ("));
+                        }
+
+                        if (style.CteParenOnNewLine)
+                        {
+                            lines.Add(Indent(column) + "(");
+                        }
+
+                        var nested = LayoutDml(inner, column + (style.CteIndentContents ? style.TabWidth : 0)) ?? new List<string> { Indent(column + style.TabWidth) + innerFlat };
                         lines.AddRange(nested);
                         lines.Add(Indent(column) + ")");
                     }
 
-                    _ = width;
                     firstCte = false;
                     var after = close + 1;
                     if (after < r.Count && r[after].Kind == TokenKind.Comma)
@@ -627,7 +817,7 @@ namespace SqlPrompter.Core.Formatting
                 }
             }
 
-            private void LayoutClause(Clause clause, int column, List<string> lines)
+            private void LayoutClause(Clause clause, int column, List<string> lines, int minContent = 0)
             {
                 var keyword = string.Join(" ", clause.Keyword.Select(k => k.Text));
                 var body = clause.Body;
@@ -646,11 +836,16 @@ namespace SqlPrompter.Core.Formatting
                     }
                 }
 
-                var contentColumn = NextStop(column + keyword.Length);
+                var contentColumn = Math.Max(NextStop(column + keyword.Length), minContent);
                 var head = Indent(column) + keyword;
                 if (body.Count == 0)
                 {
                     lines.Add(head);
+                    return;
+                }
+
+                if (name == "INSERT" && style.InsertColumnsBreakLength > 0 && LayoutInsertColumns(keyword, body, column, contentColumn, lines))
+                {
                     return;
                 }
 
@@ -663,7 +858,7 @@ namespace SqlPrompter.Core.Formatting
                 else if (isList)
                 {
                     // GROUP BY and ORDER BY can stay on the line of their keyword (#305).
-                    items = (name == "GROUP" || name == "ORDER") && !style.GroupOrderBySeparateLines
+                    items = ((name == "GROUP" || name == "ORDER") && !style.GroupOrderBySeparateLines) || (name == "VALUES" && !style.InsertValuesOnNewLines)
                         ? new List<List<R>> { body }
                         : SplitCommas(body);
                 }
@@ -799,6 +994,72 @@ namespace SqlPrompter.Core.Formatting
                 }
 
                 return result;
+            }
+
+            /// <summary>
+            /// INSERT INTO table (columns): the columns one per line under the table when the line is longer than <see cref="FormatStyle.InsertColumnsBreakLength"/> (1 =
+            /// always), the parenthesis at the end of the first line or on its own line (#305). False when the INSERT has no column list worth breaking.
+            /// </summary>
+            private bool LayoutInsertColumns(string keyword, List<R> body, int column, int contentColumn, List<string> lines)
+            {
+                if (body.Count < 4 || body[body.Count - 1].Kind != TokenKind.CloseParen)
+                {
+                    return false;
+                }
+
+                var depth = 0;
+                var open = -1;
+                for (var i = body.Count - 1; i >= 0; i--)
+                {
+                    if (body[i].Kind == TokenKind.CloseParen)
+                    {
+                        depth++;
+                    }
+                    else if (body[i].Kind == TokenKind.OpenParen && --depth == 0)
+                    {
+                        open = i;
+                        break;
+                    }
+                }
+
+                if (open <= 0)
+                {
+                    return false;
+                }
+
+                var table = Flat(body, 0, open);
+                var parenthesis = Flat(body, open, body.Count);
+                if (style.InsertColumnsBreakLength > 1 && keyword.Length + 1 + table.Length + 1 + parenthesis.Length <= style.InsertColumnsBreakLength)
+                {
+                    return false;
+                }
+
+                var items = SplitCommas(body.GetRange(open + 1, body.Count - open - 2));
+                if (items.Count < 2)
+                {
+                    return false;
+                }
+
+                var head = Indent(column) + keyword + Pad(column + keyword.Length, contentColumn) + table;
+                if (style.InsertParenOnNewLine)
+                {
+                    lines.Add(head);
+                    lines.Add(Indent(column) + "(");
+                }
+                else
+                {
+                    lines.Add(head + " (");
+                }
+
+                var itemColumn = column + style.TabWidth;
+                for (var k = 0; k < items.Count; k++)
+                {
+                    var lead = style.CommaBeforeItems ? (k == 0 ? Indent(itemColumn) + "  " : Indent(itemColumn) + ", ") : Indent(itemColumn);
+                    lines.Add(lead + Flat(items[k], 0, items[k].Count) + (!style.CommaBeforeItems && k < items.Count - 1 ? "," : string.Empty));
+                }
+
+                lines.Add(Indent(column) + ")");
+                return true;
             }
 
             private static readonly string[] ComparisonOperators = { "=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>" };
@@ -1071,11 +1332,125 @@ namespace SqlPrompter.Core.Formatting
             }
 
             /// <summary>
+            /// A CASE expression at the top level of the item that is not shorter than <see cref="FormatStyle.CollapseCaseShorterThan"/>: CASE, then a line for every WHEN
+            /// and ELSE one level under it, then END with the rest of the item (#305). Null when the item has none or it stays on one line.
+            /// </summary>
+            private List<string> ExpandCase(List<R> item, int startColumn)
+            {
+                var depth = 0;
+                var start = -1;
+                for (var i = 0; i < item.Count; i++)
+                {
+                    if (item[i].Kind == TokenKind.OpenParen)
+                    {
+                        depth++;
+                    }
+                    else if (item[i].Kind == TokenKind.CloseParen)
+                    {
+                        depth--;
+                    }
+                    else if (depth == 0 && item[i].IsWord("CASE"))
+                    {
+                        start = i;
+                        break;
+                    }
+                }
+
+                if (start < 0)
+                {
+                    return null;
+                }
+
+                var nest = 0;
+                var end = -1;
+                for (var i = start; i < item.Count; i++)
+                {
+                    if (item[i].IsWord("CASE"))
+                    {
+                        nest++;
+                    }
+                    else if (item[i].IsWord("END") && --nest == 0)
+                    {
+                        end = i;
+                        break;
+                    }
+                }
+
+                if (end < 0 || (style.CollapseCaseShorterThan > 0 && Flat(item, start, end + 1).Length < style.CollapseCaseShorterThan))
+                {
+                    return null;
+                }
+
+                var breaks = new List<int>();
+                depth = 0;
+                nest = 0;
+                for (var i = start + 1; i < end; i++)
+                {
+                    if (item[i].Kind == TokenKind.OpenParen)
+                    {
+                        depth++;
+                    }
+                    else if (item[i].Kind == TokenKind.CloseParen)
+                    {
+                        depth--;
+                    }
+                    else if (item[i].IsWord("CASE"))
+                    {
+                        nest++;
+                    }
+                    else if (item[i].IsWord("END"))
+                    {
+                        nest--;
+                    }
+                    else if (depth == 0 && nest == 0 && item[i].IsWord("WHEN", "ELSE"))
+                    {
+                        breaks.Add(i);
+                    }
+                }
+
+                if (breaks.Count == 0)
+                {
+                    return null;
+                }
+
+                var prefix = Flat(item, 0, start);
+                var first = prefix + (prefix.Length > 0 && NeedsSpace(item, start - 1, start) ? " " : string.Empty) + item[start].Text;
+                var expression = Flat(item, start + 1, breaks[0]);
+                var branchColumn = startColumn + style.TabWidth;
+                var lines = new List<string>();
+                if (expression.Length > 0 && !style.CaseExpressionOnNewLine)
+                {
+                    first += " " + expression;
+                }
+
+                lines.Add(first);
+                if (expression.Length > 0 && style.CaseExpressionOnNewLine)
+                {
+                    lines.Add(Indent(branchColumn) + expression);
+                }
+
+                for (var k = 0; k < breaks.Count; k++)
+                {
+                    var to = k + 1 < breaks.Count ? breaks[k + 1] : end;
+                    lines.Add(Indent(branchColumn) + Flat(item, breaks[k], to));
+                }
+
+                lines.Add(Indent(startColumn) + item[end].Text + (end + 1 < item.Count ? (NeedsSpace(item, end, end + 1) ? " " : string.Empty) + Flat(item, end + 1, item.Count) : string.Empty));
+                return lines;
+            }
+
+            /// <summary>
             /// The lines of an item that starts at <paramref name="startColumn"/>: the first one without indentation (the caller puts the keyword
             /// or comma in front), the others complete. A long subquery in parentheses is laid out on its own lines.
             /// </summary>
             private List<string> Expand(List<R> item, int startColumn)
             {
+                var caseLines = ExpandCase(item, startColumn);
+                if (caseLines != null)
+                {
+                    return caseLines;
+                }
+
                 var lines = new List<string>();
                 var from = 0;
                 var current = string.Empty;
@@ -1100,15 +1475,20 @@ namespace SqlPrompter.Core.Formatting
                         continue;
                     }
 
-                    var nested = LayoutDml(inner, startColumn + style.TabWidth);
+                    var nested = LayoutDml(inner, startColumn + (style.IndentParenContents ? style.TabWidth : 0));
                     if (nested == null)
                     {
                         continue;
                     }
 
-                    var before = Flat(item, from, i + 1);
+                    var before = Flat(item, from, style.ParenOnNewLine ? i : i + 1);
                     current += (current.Length > 0 && from > 0 && NeedsSpace(item, from - 1, from) ? " " : string.Empty) + before;
                     lines.Add(current);
+                    if (style.ParenOnNewLine)
+                    {
+                        lines.Add(Indent(startColumn) + "(");
+                    }
+
                     lines.AddRange(nested);
                     var rest = Flat(item, close, item.Count);
                     var tailRest = Expand(item.GetRange(close + 1, item.Count - close - 1), startColumn);
@@ -1133,6 +1513,54 @@ namespace SqlPrompter.Core.Formatting
                 return lines;
             }
 
+            /// <summary>
+            /// CREATE / ALTER PROCEDURE with every parameter on a line of its own, indented one level, and AS (or WITH ...) on the line after them (#305); null when
+            /// the procedure has no parameters.
+            /// </summary>
+            private List<string> LayoutProcedureHeader(List<R> r, int column)
+            {
+                var first = r.FindIndex(2, t => t.Kind == TokenKind.Variable);
+                if (first < 0)
+                {
+                    return null;
+                }
+
+                var end = r.Count;
+                var depth = 0;
+                for (var k = first; k < r.Count; k++)
+                {
+                    if (r[k].Kind == TokenKind.OpenParen)
+                    {
+                        depth++;
+                    }
+                    else if (r[k].Kind == TokenKind.CloseParen)
+                    {
+                        depth--;
+                    }
+                    else if (depth == 0 && r[k].IsWord("AS", "WITH"))
+                    {
+                        end = k;
+                        break;
+                    }
+                }
+
+                var items = SplitCommas(r.GetRange(first, end - first));
+                var lines = new List<string> { Indent(column) + Flat(r, 0, first) };
+                var itemColumn = column + style.TabWidth;
+                for (var k = 0; k < items.Count; k++)
+                {
+                    var lead = style.CommaBeforeItems ? (k == 0 ? Indent(itemColumn) + "  " : Indent(itemColumn) + ", ") : Indent(itemColumn);
+                    lines.Add(lead + Flat(items[k], 0, items[k].Count) + (!style.CommaBeforeItems && k < items.Count - 1 ? "," : string.Empty));
+                }
+
+                if (end < r.Count)
+                {
+                    lines.Add(Indent(column) + Flat(r, end, r.Count));
+                }
+
+                return lines;
+            }
+
             private List<string> LayoutCreateTable(List<R> r, int column)
             {
                 var flat = Flat(r, 0, r.Count);
@@ -1154,20 +1582,22 @@ namespace SqlPrompter.Core.Formatting
                 }
 
                 var items = SplitCommas(r.GetRange(open + 1, close - open - 1));
-                var lines = new List<string> { Indent(column) + Flat(r, 0, open), Indent(column) + "(" };
+                var lines = style.DdlParenOnNewLine
+                    ? new List<string> { Indent(column) + Flat(r, 0, open), Indent(column) + "(" }
+                    : new List<string> { Indent(column) + Flat(r, 0, open) + " (" };
                 var nameWidth = items
                     .Where(i => i.Count > 1 && i[0].Kind != TokenKind.Word || (i.Count > 1 && !i[0].IsWord("CONSTRAINT", "PRIMARY", "UNIQUE", "FOREIGN", "CHECK", "INDEX")))
                     .Select(i => i[0].Text.Length)
                     .DefaultIfEmpty(0)
                     .Max();
-                var itemColumn = column + style.TabWidth;
+                var itemColumn = column + (style.DdlIndentContents ? style.TabWidth : 0);
                 for (var k = 0; k < items.Count; k++)
                 {
                     var item = items[k];
                     string rendered;
                     if (item.Count > 1 && !item[0].IsWord("CONSTRAINT", "PRIMARY", "UNIQUE", "FOREIGN", "CHECK", "INDEX"))
                     {
-                        rendered = item[0].Text.PadRight(nameWidth) + " " + Flat(item, 1, item.Count);
+                        rendered = (style.AlignDdlColumns ? item[0].Text.PadRight(nameWidth) : item[0].Text) + " " + Flat(item, 1, item.Count);
                     }
                     else
                     {
@@ -1255,10 +1685,42 @@ namespace SqlPrompter.Core.Formatting
                 }
             }
 
+            [ThreadStatic]
+            private static bool spaceInIn;
+
             private static bool NeedsSpace(List<R> r, int p, int c)
             {
                 var previous = r[p];
                 var current = r[c];
+                if (spaceInIn)
+                {
+                    if (previous.Kind == TokenKind.OpenParen && p > 0 && r[p - 1].IsWord("IN") && current.Kind != TokenKind.CloseParen)
+                    {
+                        return true;
+                    }
+
+                    if (current.Kind == TokenKind.CloseParen && previous.Kind != TokenKind.OpenParen)
+                    {
+                        var depth = 0;
+                        for (var k = c; k >= 0; k--)
+                        {
+                            if (r[k].Kind == TokenKind.CloseParen)
+                            {
+                                depth++;
+                            }
+                            else if (r[k].Kind == TokenKind.OpenParen && --depth == 0)
+                            {
+                                if (k > 0 && r[k - 1].IsWord("IN"))
+                                {
+                                    return true;
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 if (current.Kind == TokenKind.Comma || current.Kind == TokenKind.CloseParen || current.Kind == TokenKind.Semicolon || current.Kind == TokenKind.Dot)
                 {
                     return false;

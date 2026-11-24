@@ -323,6 +323,12 @@ namespace SqlPrompter.Core.Analysis
                 return Of(new[] { "TRANSACTION", "TRAN", "TRY" }, new[] { "CATCH", "DISTRIBUTED TRANSACTION" }.Concat(StatementFirst.Where(k => k != "BEGIN")).ToArray());
             }
 
+            var afterIs = AfterFirstWord(top);
+            if (afterIs != null)
+            {
+                return afterIs;
+            }
+
             if (head == "IF" || head == "WHILE")
             {
                 return InCondition(top, head, anchor);
@@ -360,6 +366,33 @@ namespace SqlPrompter.Core.Analysis
             }
 
             return InStatement(part, anchor, operand, followingFrom);
+        }
+
+        /// <summary>The second word of a two-word construct: <c>x IS |</c> takes NULL or NOT NULL, <c>x IS NOT |</c> takes NULL, <c>ORDER |</c> and <c>GROUP |</c> take BY, <c>x NOT |</c> takes IN, LIKE or BETWEEN (#444); null elsewhere.</summary>
+        private static KeywordPosition AfterFirstWord(List<Token> part)
+        {
+            var last = part.Count - 1;
+            if (part[last].IsWord("IS") && last > 0)
+            {
+                return Of(new[] { "NULL", "NOT NULL" }, null, true);
+            }
+
+            if (part[last].IsWord("NOT") && last > 1 && part[last - 1].IsWord("IS"))
+            {
+                return Of(new[] { "NULL" }, null, true);
+            }
+
+            if (last > 0 && (part[last].IsWord("ORDER") || part[last].IsWord("GROUP")))
+            {
+                return Of(new[] { "BY" }, null, true);
+            }
+
+            if (last > 0 && part[last].IsWord("NOT") && IsOperandToken(part[last - 1]))
+            {
+                return Of(new[] { "IN", "LIKE", "BETWEEN" }, null, true);
+            }
+
+            return null;
         }
 
         private static readonly string[] BodyStarters = { "SELECT", "SET", "PRINT", "EXEC", "RETURN", "UPDATE", "INSERT INTO", "DELETE FROM", "THROW", "BREAK", "CONTINUE" };

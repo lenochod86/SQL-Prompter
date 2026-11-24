@@ -25,6 +25,8 @@ namespace SqlPrompter.Ssms
         private Func<string> previewText;
         private Func<string> previewHeading;
         private Label previewTitle;
+        private Func<string> previewNote;
+        private Label previewNoteLabel;
 
         public SettingsPage(string title, string intro = null)
         {
@@ -87,12 +89,20 @@ namespace SqlPrompter.Ssms
         }
 
         /// <summary>A colored preview under the options; it is drawn again after every change (<paramref name="render"/> returns the text to show).</summary>
-        public void Preview(string heading, Func<string> render, Control headerExtra = null, Func<string> title = null)
+        public void Preview(string heading, Func<string> render, Control headerExtra = null, Func<string> title = null, Func<string> note = null)
         {
             previewText = render;
+            previewNote = note;
             previewBox = new FormatPreview { Dock = DockStyle.Fill };
             var panel = new Panel { Dock = DockStyle.Bottom, Height = 250, Padding = new Padding(14, 4, 14, 10) };
             panel.Controls.Add(previewBox);
+            if (note != null)
+            {
+                // A line under the preview that says why options seem to have no effect (a short statement kept on one line); empty text hides it.
+                previewNoteLabel = new Label { Dock = DockStyle.Bottom, AutoSize = false, Height = 34, ForeColor = SystemColors.GrayText, Visible = false, Padding = new Padding(0, 4, 0, 0) };
+                panel.Controls.Add(previewNoteLabel);
+            }
+
             var header = new Panel { Dock = DockStyle.Top, Height = 26 };
             previewTitle = new Label { Text = heading, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font(Font, FontStyle.Bold) };
             previewHeading = title;
@@ -118,6 +128,13 @@ namespace SqlPrompter.Ssms
             try
             {
                 previewBox.ShowText(previewText());
+                if (previewNoteLabel != null)
+                {
+                    var noteText = previewNote() ?? string.Empty;
+                    previewNoteLabel.Text = noteText;
+                    previewNoteLabel.Visible = noteText.Length > 0;
+                }
+
                 if (previewHeading != null)
                 {
                     previewTitle.Text = previewHeading();
@@ -227,7 +244,7 @@ namespace SqlPrompter.Ssms
             AddRow(label, box, suffix, help, enabledWhen, box);
         }
 
-        public void Folder(string label, string help, Func<string> get, Action<string> set)
+        public void Folder(string label, string help, Func<string> get, Action<string> set, Action<string> open = null)
         {
             var text = new TextBox { Width = 380 };
             var browse = new Button { Text = "Browse...", AutoSize = true };
@@ -252,6 +269,13 @@ namespace SqlPrompter.Ssms
             var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0) };
             panel.Controls.Add(text);
             panel.Controls.Add(browse);
+            if (open != null)
+            {
+                text.Width = 280;
+                var openButton = new Button { Text = "Open folder", AutoSize = true };
+                openButton.Click += (s, e) => open(text.Text);
+                panel.Controls.Add(openButton);
+            }
             AddRow(label, panel, null, help, null, null);
         }
 
@@ -319,6 +343,115 @@ namespace SqlPrompter.Ssms
             {
                 Help(help);
             }
+        }
+
+        /// <summary>
+        /// The rules of the code analysis grouped by category (#403): a filter box, Enable all / Disable all for the whole list and for each category, and a check box with
+        /// the code and the title of every rule above its description.
+        /// </summary>
+        public void RuleCatalog(IReadOnlyList<SqlPrompter.Core.Analysis.AnalysisRule> rules, Func<SqlPrompter.Core.Analysis.AnalysisRule, bool> get, Action<SqlPrompter.Core.Analysis.AnalysisRule, bool> set, Func<bool> enabledWhen)
+        {
+            var rows = new List<KeyValuePair<SqlPrompter.Core.Analysis.AnalysisRule, Control[]>>();
+            var headers = new List<KeyValuePair<SqlPrompter.Core.Analysis.RuleCategory, Control>>();
+
+            void SetAll(IEnumerable<SqlPrompter.Core.Analysis.AnalysisRule> which, bool on)
+            {
+                foreach (var rule in which)
+                {
+                    set(rule, on);
+                }
+
+                Reload();
+            }
+
+            Control Buttons(Action<bool> all, string enableText = "Enable all", string disableText = "Disable all")
+            {
+                var row = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
+                var enable = new Button { Text = enableText, AutoSize = true, Margin = new Padding(0, 0, 6, 0) };
+                var disable = new Button { Text = disableText, AutoSize = true, Margin = new Padding(0) };
+                enable.Click += (s, e) => all(true);
+                disable.Click += (s, e) => all(false);
+                if (enabledWhen != null)
+                {
+                    enablers.Add(() => enable.Enabled = disable.Enabled = enabledWhen());
+                }
+
+                row.Controls.Add(enable);
+                row.Controls.Add(disable);
+                return row;
+            }
+
+            var filterRow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0, 12, 0, 0) };
+            filterRow.Controls.Add(new Label { Text = "Filter:", AutoSize = false, Width = 50, Height = 24, TextAlign = ContentAlignment.MiddleLeft });
+            var filter = new TextBox { Width = 320 };
+            filterRow.Controls.Add(filter);
+            flow.Controls.Add(filterRow);
+            flow.Controls.Add(new Label { Text = "All rules:", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 10, 0, 0) });
+            flow.Controls.Add(Buttons(on => SetAll(rules, on), "Enable all rules", "Disable all rules"));
+
+            foreach (var category in rules.Select(r => r.Category).Distinct())
+            {
+                var inCategory = rules.Where(r => r.Category == category).ToList();
+                var header = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0, 16, 0, 0) };
+                header.Controls.Add(new Label { Text = SqlPrompter.Core.Analysis.AnalysisRules.CategoryName(category) + " (" + inCategory.Count + ")", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 8, 14, 0) });
+                var buttons = Buttons(on => SetAll(inCategory, on));
+                buttons.Margin = new Padding(0);
+                header.Controls.Add(buttons);
+                flow.Controls.Add(header);
+                headers.Add(new KeyValuePair<SqlPrompter.Core.Analysis.RuleCategory, Control>(category, header));
+                foreach (var rule in inCategory)
+                {
+                    var captured = rule;
+                    var box = new CheckBox { Text = rule.Code + "   " + rule.Title, AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
+                    refreshers.Add(() => box.Checked = get(captured));
+                    box.CheckedChanged += (s, e) =>
+                    {
+                        if (!loading)
+                        {
+                            set(captured, box.Checked);
+                            UpdateEnabled();
+                        }
+                    };
+                    if (enabledWhen != null)
+                    {
+                        enablers.Add(() => box.Enabled = enabledWhen());
+                    }
+
+                    var help = new Label
+                    {
+                        Text = rule.Description + " (" + (rule.Severity == SqlPrompter.Core.Analysis.CodeIssueSeverity.Warning ? "warning" : "hint") + (rule.DefaultOn ? string.Empty : ", off by default") + ")",
+                        AutoSize = true,
+                        MaximumSize = new Size(TextWidth, 0),
+                        ForeColor = SystemColors.GrayText,
+                        Margin = new Padding(20, 0, 0, 0),
+                    };
+                    flow.Controls.Add(box);
+                    flow.Controls.Add(help);
+                    rows.Add(new KeyValuePair<SqlPrompter.Core.Analysis.AnalysisRule, Control[]>(rule, new Control[] { box, help }));
+                }
+            }
+
+            filter.TextChanged += (s, e) =>
+            {
+                var words = filter.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                flow.SuspendLayout();
+                foreach (var row in rows)
+                {
+                    var text = row.Key.Code + " " + row.Key.Title + " " + row.Key.Description;
+                    var visible = words.All(w => text.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
+                    foreach (var control in row.Value)
+                    {
+                        control.Visible = visible;
+                    }
+                }
+
+                foreach (var header in headers)
+                {
+                    header.Value.Visible = rows.Any(r => r.Key.Category == header.Key && r.Value[0].Visible);
+                }
+
+                flow.ResumeLayout(true);
+            };
         }
 
         /// <summary>Puts a ready-made editor on the page below the heading.</summary>

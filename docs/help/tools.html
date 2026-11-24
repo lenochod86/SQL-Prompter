@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor and grid tools - SQL Prompter help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="brand">SQL Prompter</div>
+  <a href="index.html">Overview</a>
+  <a href="completion.html">Completion</a>
+  <a href="aliases-joins.html">Aliases, INSERT, EXEC, joins</a>
+  <a href="snippets.html">Snippets</a>
+  <a href="formatting.html">Formatting</a>
+  <a href="coloring.html">Coloring and confirmations</a>
+  <a href="analysis.html">Code analysis and fixes</a>
+  <a href="quick-actions.html">Quick actions and navigation</a>
+  <a href="history.html">History and tabs</a>
+  <a class="current" href="tools.html">Editor and grid tools</a>
+  <a href="settings.html">Settings</a>
+  <a href="commands.html">Commands and keys</a>
+  <a href="troubleshooting.html">Troubleshooting</a>
+</nav>
+<main>
+<h1>Editor and grid tools</h1>
+<p class="lead">Running part of a script, previewing a change before it runs, small editor helpers and the results grid.</p>
+
+<h2 id="run-statement">Run a statement</h2>
+<table>
+  <tr><th style="width:290px">Command</th><th>What it runs</th></tr>
+  <tr><td>Run Statement At Caret <kbd>Shift</kbd>+<kbd>F5</kbd></td><td>The statement the caret is in, from its first to its last token (a trailing semicolon included). Statements are separated as in completion, and by <code>GO</code>. An existing selection is run as it is, like <kbd>F5</kbd>.</td></tr>
+  <tr><td>Run Statements Up To Caret <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F5</kbd></td><td>From the start of the script (earlier batches included) to the end of the statement at the caret. A caret between statements, after the last one or on a <code>GO</code> line runs through the last statement before it. With nothing before the caret, the status bar says so.</td></tr>
+</table>
+<p>Both run through the normal <b>Execute</b>, so the <a href="coloring.html">confirmations</a> and the query history apply.</p>
+
+<h2 id="preview">Preview and dry run</h2>
+<table>
+  <tr><th style="width:290px">Command</th><th>What it does</th></tr>
+  <tr><td>Preview UPDATE/DELETE As SELECT</td><td>Opens, in a new window on the same connection, a <code>SELECT</code> over the same rows as the <code>UPDATE</code> or <code>DELETE</code> at the caret (or in the selection); nothing is run. For an <code>UPDATE</code>, the new value of every assigned column is shown as <code>expr AS [New col]</code>. <code>TOP</code> and <code>OPTION</code> are kept. It refuses, with the reason in the status bar, a statement that starts with a CTE, has <code>OUTPUT</code>, table hints or an alias before <code>SET</code>, sets only variables or is several statements.</td></tr>
+  <tr><td>Run And Roll Back (Dry Run)</td><td>Wraps an <code>UPDATE</code>, <code>DELETE</code>, <code>INSERT</code> or <code>MERGE</code> in <code>BEGIN TRANSACTION; ... SELECT @@ROWCOUNT AS [Rows affected]; ROLLBACK TRANSACTION;</code> in a new window. An <code>OUTPUT</code> clause stays and shows the rows.</td></tr>
+</table>
+
+<h2>Editor helpers</h2>
+<figure>
+  <img src="images/settings-editor.png" alt="Settings: Editor helpers" width="640">
+  <figcaption>Settings &gt; Editor helpers.</figcaption>
+</figure>
+<ul>
+  <li><b>Auto-close</b> (settings page <em>Editor helpers</em>, each pair separately): typing <code>'</code>, <code>(</code>, <code>[</code> or <code>/*</code> also inserts the closing character (<code> */</code> for a block comment, with a space in front); typing the closing character steps over the inserted one, and <kbd>Backspace</kbd> between an empty pair removes both. Nothing is closed inside strings, comments and bracketed names.</li>
+  <li><b>Highlight matching names:</b> the other places in the script where the name under the caret appears, compared by name ignoring case and brackets.</li>
+  <li><b>Highlight matching keywords of a block:</b> the keywords that belong together with the one at the caret: <code>BEGIN</code> / <code>END</code>, <code>BEGIN TRY</code> / <code>END TRY</code> with <code>BEGIN CATCH</code> / <code>END CATCH</code>, <code>BEGIN TRAN</code> with <code>COMMIT</code> or <code>ROLLBACK</code>, <code>CASE</code> with <code>WHEN</code>, <code>THEN</code>, <code>ELSE</code>, <code>END</code>, <code>IF</code> with <code>ELSE</code>, <code>WHILE</code> with its block. Nothing is highlighted across a <code>GO</code> line or in unbalanced code.</li>
+  <li><b>Add Commas To Selected Lines</b> and <b>Add Quotes And Commas To Selected Lines</b> (<a href="analysis.html">Refactor menu</a>) prepare a list of values from lines of text.</li>
+</ul>
+
+<h2>The results grid</h2>
+<figure>
+  <img src="images/grid-menu.png" alt="The grid context menu with the Copy as submenu">
+  <figcaption>The right-click menu of the results grid: <em>Script As Temp Table</em>, <em>Copy as</em> with five formats, and <em>Open in Excel</em>.</figcaption>
+</figure>
+<table>
+  <tr><th style="width:290px">Command</th><th>What it does</th></tr>
+  <tr><td>Copy as IN List</td><td>The selected values of <b>one column</b> as <code>('a', 'b', 3)</code>; disabled while the selection covers several columns.</td></tr>
+  <tr><td>Copy as VALUES</td><td>The selected rows as <code>VALUES</code> rows.</td></tr>
+  <tr><td>Copy as JSON, CSV, Markdown Table</td><td>The selection (with its column names) in that format.</td></tr>
+  <tr><td>Script As Temp Table</td><td>Scripts the selected rows, with their column names, as <code>INSERT</code> statements into <code>#temptable</code> (<code>NULL</code> as <code>NULL</code>, plain numbers as numbers (also those the grid shows with the decimal comma of your regional settings, written with a point; they become <code>decimal</code>, a number with an exponent becomes <code>float</code>), binary values <code>0x...</code> as <code>varbinary</code>, everything else as <code>N'...'</code>; a new statement for every 1000 rows) in a new query window.</td></tr>
+  <tr><td>Open in Excel</td><td>Writes the selection (the whole result when nothing or one cell is selected) as an <code>.xlsx</code> file in the temporary folder and opens it. Names are in a bold, frozen first row; text is never turned into formulas; <code>NULL</code> is an empty cell; each column is typed by the look of its values (for example whole numbers up to 15 digits without a leading zero, and decimals). Needs Excel, or any program that opens <code>.xlsx</code>.</td></tr>
+</table>
+<p>The same commands are in the <b>SQL Prompter</b> menu (<em>Copy Grid Selection As</em>, <em>Script As Temp Table</em>, <em>Open in Excel</em>).</p>
+
+<h2>Check for updates</h2>
+<p><b>SQL Prompter &gt; Help &gt; Check for Updates</b> asks GitHub for the latest release now. When a newer version exists a window shows the installed and the new version with <b>Update</b>, <b>Remind me tomorrow</b> and <b>Skip this version</b>. <b>Update</b> downloads the VSIX from the releases of the repository, verifies its SHA-256 against the checksum of the same release and starts the installer of SSMS, which waits until SSMS is closed. The daily automatic check can be turned off (<a href="settings.html#updates">Settings &gt; Updates</a>).</p>
+</main>
+</body>
+</html>

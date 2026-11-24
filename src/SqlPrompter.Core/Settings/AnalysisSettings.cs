@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using SqlPrompter.Core.Analysis;
 using System.Runtime.Serialization;
 
 namespace SqlPrompter.Core.Settings
@@ -73,7 +77,64 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "implicitConversion")]
         public bool ImplicitConversion { get; set; }
 
-        public AnalysisSettings Clone() => (AnalysisSettings)MemberwiseClone();
+        /// <summary>alias.column where the alias is a temporary table or table variable of the script whose columns are all known and the column is not one of them (#452).</summary>
+        [DataMember(Name = "unknownColumn")]
+        public bool UnknownColumn { get; set; }
+
+        /// <summary>The switches of the rules of the catalog that were changed from their default, as <c>CODE:on</c> or <c>CODE:off</c> (the rules that had their own property above are kept there). Older versions ignore it.</summary>
+        [DataMember(Name = "rules")]
+        public List<string> RuleOverrides { get; set; } = new List<string>();
+
+        /// <summary>Whether a rule of the catalog is switched on (its own property for the old rules, else the override, else the default of the rule).</summary>
+        public bool IsOn(AnalysisRule rule)
+        {
+            if (rule.LegacyGet != null)
+            {
+                return rule.LegacyGet(this);
+            }
+
+            var overrides = RuleOverrides;
+            if (overrides != null)
+            {
+                for (var i = overrides.Count - 1; i >= 0; i--)
+                {
+                    if (overrides[i].StartsWith(rule.Code + ":", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return overrides[i].EndsWith(":on", StringComparison.OrdinalIgnoreCase);
+                    }
+                }
+            }
+
+            return rule.DefaultOn;
+        }
+
+        public bool IsOn(CodeIssueKind kind)
+        {
+            var rule = AnalysisRules.Of(kind);
+            return rule != null && IsOn(rule);
+        }
+
+        public void SetOn(AnalysisRule rule, bool on)
+        {
+            if (rule.LegacySet != null)
+            {
+                rule.LegacySet(this, on);
+                return;
+            }
+
+            RuleOverrides = (RuleOverrides ?? new List<string>()).Where(o => !o.StartsWith(rule.Code + ":", StringComparison.OrdinalIgnoreCase)).ToList();
+            if (on != rule.DefaultOn)
+            {
+                RuleOverrides.Add(rule.Code + (on ? ":on" : ":off"));
+            }
+        }
+
+        public AnalysisSettings Clone()
+        {
+            var copy = (AnalysisSettings)MemberwiseClone();
+            copy.RuleOverrides = new List<string>(RuleOverrides ?? new List<string>());
+            return copy;
+        }
 
         [OnDeserializing]
         private void OnDeserializing(StreamingContext context) => SetDefaults();
@@ -82,6 +143,7 @@ namespace SqlPrompter.Core.Settings
         {
             // SELECT * and NOLOCK are everyday in ad-hoc queries, so they are off until the user asks for them.
             Enabled = true;
+            RuleOverrides = new List<string>();
             EqualsNull = true;
             JoinWithoutOn = true;
             InsertWithoutColumns = true;
@@ -98,6 +160,7 @@ namespace SqlPrompter.Core.Settings
             OldStyleJoin = true;
             AmbiguousColumn = true;
             ImplicitConversion = true;
+            UnknownColumn = true;
         }
     }
 }

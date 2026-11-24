@@ -59,6 +59,60 @@ namespace SqlPrompter.Ssms
             }
         }
 
+        /// <summary>
+        /// The name of the tab for the history (#511): the file name of the document, or, when SSMS backs the unsaved window with a temporary file (<c>~vsr5khfdjz.sql</c>),
+        /// the name in the caption of the window (<c>SQLQuery2.sql</c>, or the name the user gave it). The temporary name when the caption has none.
+        /// </summary>
+        public static string DisplayName(string documentPath)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            string fileName;
+            try
+            {
+                fileName = System.IO.Path.GetFileName(documentPath);
+            }
+            catch (ArgumentException)
+            {
+                return documentPath;
+            }
+
+            if (!SqlPrompter.Core.History.HistoryTabName.IsTemporary(fileName))
+            {
+                return fileName;
+            }
+
+            try
+            {
+                if (VsShellUtilities.IsDocumentOpen(ServiceProvider.GlobalProvider, documentPath, Guid.Empty, out _, out _, out var frame) && frame != null &&
+                    frame.GetProperty((int)__VSFPROPID.VSFPROPID_Caption, out var caption) == VSConstants.S_OK &&
+                    frame.GetProperty((int)__VSFPROPID.VSFPROPID_EditorCaption, out var editorCaption) == VSConstants.S_OK)
+                {
+                    return SqlPrompter.Core.History.HistoryTabName.FromCaption(caption as string, editorCaption as string) ?? fileName;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reading the caption of the tab failed", ex);
+            }
+
+            return fileName;
+        }
+
+        /// <summary>Whether the window of the document has the caption <paramref name="name"/> set by <see cref="Apply"/>; false when the frame is not found or has another name (SSMS gives its own back when a query runs, #515).</summary>
+        public static bool HasName(string documentPath, string name)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                return VsShellUtilities.IsDocumentOpen(ServiceProvider.GlobalProvider, documentPath, Guid.Empty, out _, out _, out var frame) && frame != null &&
+                    frame.GetProperty((int)__VSFPROPID.VSFPROPID_OwnerCaption, out var value) == VSConstants.S_OK && string.Equals(value as string, name, StringComparison.Ordinal);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         /// <summary>Gives the window of the document the caption <paramref name="name"/>; an empty name gives the caption back to SSMS. Returns false when the frame was not found.</summary>
         public static bool Apply(string documentPath, string name)
         {

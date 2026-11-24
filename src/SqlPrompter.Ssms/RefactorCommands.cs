@@ -144,7 +144,7 @@ namespace SqlPrompter.Ssms
                 var text = view.Selection.IsEmpty ? snapshot.GetText() : view.Selection.StreamSelectionSpan.SnapshotSpan.GetText();
                 var newLine = snapshot.LineCount > 1 ? snapshot.GetLineFromLineNumber(0).GetLineBreakText() : "\r\n";
                 var summary = SqlPrompter.Core.Editing.ScriptSummary.Build(text, newLine.Length > 0 ? newLine : "\r\n");
-                if (!SsmsConnection.OpenNewWindow(SsmsConnection.GetActive()?.Database, summary))
+                if (!SsmsConnection.OpenNewWindow(SsmsConnection.GetActive()?.Database, summary, kind: SqlPrompter.Core.History.OpenedTabKind.Generated))
                 {
                     System.Windows.Clipboard.SetText(summary);
                     SetStatus("SQL Prompter: the summary is on the clipboard (no connected window to open it in).");
@@ -201,6 +201,44 @@ namespace SqlPrompter.Ssms
             catch (Exception ex)
             {
                 Log.Error("Formatting failed", ex);
+            }
+        }
+
+        /// <summary>Puts the selection on one line (GO lines stay); one undo step, the new text stays selected.</summary>
+        public static void UnformatSelection(ITextView view)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (view == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (view.Selection.IsEmpty)
+                {
+                    SetStatus("SQL Prompter: select the text to put on one line first.");
+                    return;
+                }
+
+                var span = view.Selection.StreamSelectionSpan.SnapshotSpan;
+                var original = span.GetText();
+                var changed = SqlPrompter.Core.Editing.Unformatter.ToOneLine(original);
+                if (changed == original)
+                {
+                    SetStatus("SQL Prompter: the selection is already on one line.");
+                    return;
+                }
+
+                var edited = view.TextBuffer.Replace(span, changed);
+                view.Selection.Select(new SnapshotSpan(edited, span.Start.Position, changed.Length), false);
+                view.Caret.MoveTo(new SnapshotPoint(edited, span.Start.Position + changed.Length));
+                SetStatus("SQL Prompter: the selection is on one line.");
+                Log.Write("Unformatted the selection.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Unformatting failed", ex);
             }
         }
 

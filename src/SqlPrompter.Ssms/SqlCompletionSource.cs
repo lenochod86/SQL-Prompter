@@ -64,6 +64,9 @@ namespace SqlPrompter.Ssms
         internal const string BlockKey = "SqlPrompter.Block";
         internal const string ModuleKey = "SqlPrompter.Module";
         internal const string UsageKeyKey = "SqlPrompter.UsageKey";
+
+        /// <summary>The <see cref="SuggestionKind"/> of an item, for the color of its name in the list (#418).</summary>
+        internal const string KindKey = "SqlPrompter.Kind";
         internal const string DefinitionKey = "SqlPrompter.Definition";
 
         /// <summary>The table or view of a column item and the column, for its description from the database (#206).</summary>
@@ -255,7 +258,7 @@ namespace SqlPrompter.Ssms
                 remoteColumns = source =>
                 {
                     var columns = inner(source);
-                    if (columns == null && source.NameParts.Count == 4)
+                    if (columns == null && (source.NameParts.Count == 4 || Readiness.IsOtherDatabase(source, prepared.Metadata)))
                     {
                         var status = prepared.ColumnStatus(source);
                         if (!status.IsDone && (columnsStatus == null || status.IsLoading))
@@ -271,7 +274,8 @@ namespace SqlPrompter.Ssms
 
             options = SettingsService.Current.ToSuggestionOptions().WithRemoteColumns(remoteColumns).WithSnippets(SnippetService.Snippets).WithEditor(prepared.Editor);
             var items = SuggestionBuilder.Build(prepared.Context, prepared.Metadata, script, options).Select(s => ToItem(s, prepared)).ToList();
-            waitingForLinked = (prepared.LinkedStatus != null && prepared.LinkedStatus.IsLoading) || (columnsStatus != null && columnsStatus.IsLoading);
+            // A failed load is waited for as well: the retry (after the delay) may succeed and then the list is made again (#470).
+            waitingForLinked = (prepared.LinkedStatus != null && !prepared.LinkedStatus.IsDone) || (columnsStatus != null && columnsStatus.IsLoading);
             if (prepared.LinkedStatus != null && !prepared.LinkedStatus.IsDone)
             {
                 items.Insert(0, LoadingItem(prepared.LinkedWhat, prepared.LinkedStatus, prepared.Context.TypedPrefix));
@@ -292,7 +296,7 @@ namespace SqlPrompter.Ssms
             var typed = typedPrefix ?? string.Empty;
             var item = new CompletionItem(text, this, Icon(failed ? KnownMonikers.StatusWarning : KnownMonikers.Refresh, failed ? "Failed" : "Loading"), Filters, string.Empty, string.Empty, "\u0001", typed, ImmutableArray<ImageElement>.Empty);
             item.Properties.AddProperty(LoadingKey, true);
-            item.Properties.AddProperty(DescriptionKey, failed ? "The linked server could not be read. The list asks again after a minute." : "The list updates itself when the linked server has answered; typing is never blocked.");
+            item.Properties.AddProperty(DescriptionKey, failed ? "The metadata could not be read. The list asks again after a minute." : "The list updates itself when the metadata has arrived; typing is never blocked.");
             return item;
         }
 
@@ -426,6 +430,17 @@ namespace SqlPrompter.Ssms
                 loader = null;
             }
 
+            if (metadata == null && cache != null && linkedStatus == null)
+            {
+                // The objects of the window's database are not loaded yet (or failed): the list says so instead of looking like the database has no tables (#470).
+                var status = cache.Status;
+                if (!status.IsDone)
+                {
+                    linkedStatus = status;
+                    linkedWhat = "objects of " + (usedDatabase ?? SsmsConnection.GetActive()?.Database ?? "the database");
+                }
+            }
+
             prepared = new Prepared(snapshot, context, metadata, batch, batchStart, triggerLocation.Position - batchStart, cache, loader, service.LinkedColumns(), BuildEditorLayout(snapshot, batchStart + context.ReplaceStart))
             {
                 ColumnStatus = service.LinkedColumnStatus(),
@@ -518,6 +533,7 @@ namespace SqlPrompter.Ssms
                 suggestion.FilterText,
                 ImmutableArray<ImageElement>.Empty);
             item.Properties.AddProperty(UsageKeyKey, usageKey);
+            item.Properties.AddProperty(KindKey, suggestion.Kind);
             if (suggestion.Tag is SqlPrompter.Core.Snippets.Snippet snippet)
             {
                 item.Properties.AddProperty(SnippetKey, snippet);
@@ -736,6 +752,14 @@ namespace SqlPrompter.Ssms
 
             // A space typed while nothing has been typed yet (the list opened after a comma) only closes the list.
             if (typedChar == ' ' && applicable.GetSpan(buffer.CurrentSnapshot).Length == 0)
+            {
+                return CloseWithoutInserting;
+            }
+
+            // IS + Space, ORDER + Space: the first words of a multi-word keyword are typed, not completed; the list for the next position follows (#444).
+            if (typedChar == ' ' && item.Properties.TryGetProperty(SqlCompletionSource.KindKey, out SqlPrompter.Core.Completion.SuggestionKind itemKind) &&
+                itemKind == SqlPrompter.Core.Completion.SuggestionKind.Keyword &&
+                SqlPrompter.Core.Completion.MultiWordKeywords.IsLeadingWords(applicable.GetText(buffer.CurrentSnapshot), item.InsertText))
             {
                 return CloseWithoutInserting;
             }
