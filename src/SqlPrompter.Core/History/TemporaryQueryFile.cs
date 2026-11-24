@@ -8,6 +8,8 @@ namespace SqlPrompter.Core.History
     /// </summary>
     public static class TemporaryQueryFile
     {
+        private const char Separator = (char)92; // a backslash
+
         /// <summary>True when <paramref name="path"/> is a file called <c>SQLQuery...</c> directly in <paramref name="tempFolder"/>; only the text of the paths is compared (both separators are accepted).</summary>
         public static bool Is(string path, string tempFolder)
         {
@@ -16,9 +18,9 @@ namespace SqlPrompter.Core.History
                 return false;
             }
 
-            var file = path.Replace('/', '\');
-            var folder = tempFolder.Replace('/', '\').TrimEnd('\');
-            var slash = file.LastIndexOf('\');
+            var file = path.Replace('/', Separator);
+            var folder = tempFolder.Replace('/', Separator).TrimEnd(Separator);
+            var slash = file.LastIndexOf(Separator);
             return slash > 0 &&
                 string.Equals(file.Substring(0, slash), folder, StringComparison.OrdinalIgnoreCase) &&
                 file.Substring(slash + 1).StartsWith("SQLQuery", StringComparison.OrdinalIgnoreCase);
