@@ -32,13 +32,7 @@ namespace SqlPrompter.Core.Sql
         };
 
         /// <summary>The global functions (<c>@@ROWCOUNT</c>), with the two at signs.</summary>
-        public static readonly IReadOnlyList<string> GlobalFunctions = new[]
-        {
-            "@@ROWCOUNT", "@@ERROR", "@@TRANCOUNT", "@@IDENTITY", "@@VERSION", "@@SERVERNAME", "@@SPID", "@@FETCH_STATUS", "@@DBTS", "@@LANGUAGE",
-            "@@LOCK_TIMEOUT", "@@MAX_CONNECTIONS", "@@NESTLEVEL", "@@OPTIONS", "@@PROCID", "@@SERVICENAME", "@@TEXTSIZE", "@@TIMETICKS", "@@CONNECTIONS",
-            "@@CPU_BUSY", "@@CURSOR_ROWS", "@@DATEFIRST", "@@IDLE", "@@IO_BUSY", "@@LANGID", "@@MAX_PRECISION", "@@MICROSOFTVERSION", "@@PACKET_ERRORS",
-            "@@PACK_RECEIVED", "@@PACK_SENT", "@@REMSERVER", "@@TOTAL_ERRORS", "@@TOTAL_READ", "@@TOTAL_WRITE",
-        };
+        public static readonly IReadOnlyList<string> GlobalFunctions = GlobalVariables.Names.ToArray();
 
         /// <summary>The table-valued functions that are not reserved words; a parenthesis follows them.</summary>
         public static readonly IReadOnlyList<string> TableFunctions = new[] { "OPENJSON", "STRING_SPLIT", "GENERATE_SERIES", "OPENXML" };

@@ -308,7 +308,7 @@ namespace SqlPrompter.Core.Completion
                         ? SchemaFunctionSuggestions(context, metadata).ToList()
                         : (IReadOnlyList<Suggestion>)Array.Empty<Suggestion>();
                 case ContextKind.Variable:
-                    return ExecParameterSuggestions(context, metadata).Concat(VariableSuggestions(context, script, context.ExecProcedure != null ? 1 : 0)).ToList();
+                    return ExecParameterSuggestions(context, metadata).Concat(VariableSuggestions(context, script, context.ExecProcedure != null ? 1 : 0)).Concat(GlobalVariableSuggestions(context)).ToList();
                 case ContextKind.DataType:
                     return ColumnTypeSuggestions(context, metadata).Concat(SizedTypeSuggestions(context)).Concat(DataTypeSuggestions(context, 0)).ToList();
                 case ContextKind.Fallback:
@@ -536,6 +536,22 @@ namespace SqlPrompter.Core.Completion
                     (variable.TypeName.Length > 0 ? " " + variable.TypeName : string.Empty);
                 yield return new Suggestion(SuggestionKind.Variable, variable.Name, variable.Name, variable.Name,
                     variable.TypeName.Length > 0 ? variable.TypeName : null, description, fits ? 0 : group);
+            }
+        }
+
+        /// <summary>The global variables (<c>@@ROWCOUNT</c>), after the variables of the script (#546). At a parameter of EXEC only once two at signs are typed.</summary>
+        private static IEnumerable<Suggestion> GlobalVariableSuggestions(CaretContext context)
+        {
+            if (context.ExecProcedure != null && !context.TypedPrefix.StartsWith("@@", StringComparison.Ordinal))
+            {
+                yield break;
+            }
+
+            foreach (var global in GlobalVariables.All)
+            {
+                var text = Keywords.ApplyCase(global.Name, context.TypedPrefix);
+                yield return new Suggestion(SuggestionKind.Variable, text, text, text, global.TypeName,
+                    "global variable " + global.Name + " " + global.TypeName + "\n\n" + global.Meaning, 2);
             }
         }
 
