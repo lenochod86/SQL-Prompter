@@ -265,7 +265,7 @@ namespace SqlPrompter.Tests
         {
             var items = BuildWithScript("DECLARE @count int, @name varchar(10)\nSELECT * FROM dbo.Users WHERE Name = @|");
 
-            Assert.Equal(new[] { "@count", "@name" }, items.Select(i => i.InsertText).OrderBy(t => t).ToArray());
+            Assert.Equal(new[] { "@count", "@name" }, items.Where(i => !i.InsertText.StartsWith("@@")).Select(i => i.InsertText).OrderBy(t => t).ToArray());
             Assert.All(items, i => Assert.Equal(SuggestionKind.Variable, i.Kind));
             Assert.Equal("varchar(10)", items.Single(i => i.DisplayText == "@name").Suffix);
         }
@@ -275,7 +275,7 @@ namespace SqlPrompter.Tests
         {
             var items = BuildWithScript("CREATE PROCEDURE dbo.p @id int AS\nSELECT * FROM dbo.Users WHERE Id = @|");
 
-            var id = Assert.Single(items);
+            var id = Assert.Single(items, i => !i.InsertText.StartsWith("@@"));
             Assert.Equal("@id", id.InsertText);
             Assert.StartsWith("parameter", id.Description);
         }
@@ -289,9 +289,9 @@ namespace SqlPrompter.Tests
         }
 
         [Fact]
-        public void VariableListIsEmptyWithoutDeclarations()
+        public void OnlyGlobalVariablesWithoutDeclarations()
         {
-            Assert.Empty(BuildWithScript("SELECT @|"));
+            Assert.All(BuildWithScript("SELECT @|"), i => Assert.StartsWith("@@", i.InsertText));
         }
 
         [Fact]
