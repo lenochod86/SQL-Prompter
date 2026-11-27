@@ -145,10 +145,30 @@ namespace SqlPrompter.Ssms
                 _ = ThreadHelper.JoinableTaskFactory.StartOnIdle(() =>
                 {
                     ThreadHelper.ThrowIfNotOnUIThread();
-                    refreshing = false;
-                    Refresh();
+                    if (refreshing)
+                    {
+                        refreshing = false;
+                        Refresh();
+                    }
                 });
             }
+        }
+
+        /// <summary>
+        /// The filter that waits for an idle moment runs now: a key that chooses an item must act on the items of the text typed so far. Typed fast,
+        /// Space after <c>FROM</c> inserted the first item of the filter for <c>F</c> (a column) and Space after a snippet prefix a keyword (#187).
+        /// False when the list closed.
+        /// </summary>
+        private bool FlushRefresh()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (refreshing)
+            {
+                refreshing = false;
+                Refresh();
+            }
+
+            return IsOpen;
         }
 
         /// <summary>Opens the list at the caret of the view (does nothing where SQL Prompter has no suggestions). <paramref name="picker"/> starts in the column picker.</summary>
@@ -202,19 +222,74 @@ namespace SqlPrompter.Ssms
         private int typingRequest;
         private bool typingMode;
 
+        // The typing request whose items are still being built off the UI thread (0 when none is).
+        private int pendingRequest;
+
         private async System.Threading.Tasks.Task OpenForTypingAsync(char typed)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
             var request = ++typingRequest;
+            pendingRequest = request;
             var snapshot = view.TextSnapshot;
             var caret = view.Caret.Position.BufferPosition;
-            var built = await source.BuildForTypingAsync(caret, typed);
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            InvokedSuggestions built;
+            try
+            {
+                built = await source.BuildForTypingAsync(caret, typed);
+            }
+            finally
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                if (pendingRequest == request)
+                {
+                    pendingRequest = 0;
+                }
+            }
+
             if (request != typingRequest || view.TextSnapshot != snapshot || built == null || built.Items.Length == 0)
             {
                 return;
             }
 
+            OpenTyping(built);
+        }
+
+        /// <summary>
+        /// A key that chooses or moves (Space, Tab, Enter, a comma, an arrow) arrives while the items of the list that typing opens are still being built:
+        /// the build is dropped and the list is opened at once on the UI thread, so that the key acts on it as if the user had waited. Without it a
+        /// snippet prefix typed fast and followed by Space or Tab was not expanded (#187).
+        /// </summary>
+        internal void CatchUp()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (IsOpen || pendingRequest == 0)
+            {
+                return;
+            }
+
+            pendingRequest = 0;
+            ++typingRequest;
+            var built = source.BuildForInvoke(view.Caret.Position.BufferPosition);
+            if (built != null && built.Items.Length > 0 && built.Span.GetSpan(view.TextSnapshot).Length > 0)
+            {
+                OpenTyping(built);
+            }
+        }
+
+        /// <summary>Esc before the list that typing is opening has appeared: it does not appear.</summary>
+        internal void CancelPending()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (pendingRequest != 0)
+            {
+                pendingRequest = 0;
+                ++typingRequest;
+            }
+        }
+
+        private void OpenTyping(InvokedSuggestions built)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
             Close();
             suggestions = built;
             typingMode = true;
@@ -547,6 +622,11 @@ namespace SqlPrompter.Ssms
             try
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
+                if (!FlushRefresh())
+                {
+                    return false;
+                }
+
                 switch (key)
                 {
                     case Key.Down: Move(1); handled = true; break;
@@ -628,6 +708,12 @@ namespace SqlPrompter.Ssms
             try
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
+                var wordChar = char.IsLetterOrDigit(c) || c == '_' || c == '@' || c == '#';
+                if (!wordChar && !FlushRefresh())
+                {
+                    return false;
+                }
+
                 if (pickerMode)
                 {
                     if (c == ' ')
@@ -650,11 +736,19 @@ namespace SqlPrompter.Ssms
                     return false;
                 }
 
-                var wordChar = char.IsLetterOrDigit(c) || c == '_' || c == '@' || c == '#';
                 if (typingMode && wordChar)
                 {
                     // The list that was opened by typing stays and filters (the editor inserts the character).
                     return false;
+                }
+
+                if (!wordChar && suggestions.SoftSelection && shown.Count > 0 && c == ' ' && SettingsService.Current.Behavior.CommitOnSpace)
+                {
+                    var softResult = SoftSpace();
+                    if (softResult.HasValue)
+                    {
+                        return softResult.Value;
+                    }
                 }
 
                 if (wordChar || suggestions.SoftSelection || shown.Count == 0)
@@ -673,6 +767,54 @@ namespace SqlPrompter.Ssms
             }
 
             return handled;
+        }
+
+        /// <summary>
+        /// Space in a list with soft selection (it opened where an alias may be typed). The list may have opened before the word that is typed now: when
+        /// the place of the caret is no longer one for a name of the user's own (<c>FROM t AS a WH|</c>), Space inserts the selected item as in any other
+        /// list. Otherwise the rules of the editor's list apply (#442): a snippet prefix typed in full expands, a keyword (or the start of one) is inserted
+        /// and the space typed. Null when Space just ends the list.
+        /// </summary>
+        private bool? SoftSpace()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var typed = TypedText();
+            if (typed.Length == 0)
+            {
+                return null;
+            }
+
+            var fresh = source.BuildForInvoke(view.Caret.Position.BufferPosition);
+            if (fresh != null && !fresh.SoftSelection)
+            {
+                var result = Commit(shown[selected].CompletionItem, ' ');
+                return result.Behavior.HasFlag(CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
+            }
+
+            var snippet = shown.Select(x => x.CompletionItem).FirstOrDefault(i =>
+                i.Properties.ContainsProperty(SqlCompletionSource.SnippetKey) &&
+                (string.Equals(i.InsertText, typed, StringComparison.OrdinalIgnoreCase) || string.Equals(i.DisplayText, typed, StringComparison.OrdinalIgnoreCase)));
+            if (snippet != null)
+            {
+                var result = Commit(snippet, ' ');
+                return result.Behavior.HasFlag(CommitBehavior.SuppressFurtherTypeCharCommandHandlers);
+            }
+
+            var keyword = shown.Select(x => x.CompletionItem).FirstOrDefault(i =>
+                i.Properties.TryGetProperty(SqlCompletionSource.KindKey, out SuggestionKind kind) && kind == SuggestionKind.Keyword && SoftSpaceCommit.Commits(typed, i.InsertText));
+            if (keyword == null)
+            {
+                return null;
+            }
+
+            // The keyword in the casing of the list; the space is typed as usual so that the list of the next place opens.
+            var span = suggestions.Span;
+            Close();
+            var buffer = view.TextBuffer;
+            var target = span.GetSpan(buffer.CurrentSnapshot);
+            buffer.Replace(target, keyword.InsertText);
+            view.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, target.Start.Position + keyword.InsertText.Length));
+            return false;
         }
 
         private void Move(int step)
