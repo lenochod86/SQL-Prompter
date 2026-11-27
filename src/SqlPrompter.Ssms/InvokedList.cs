@@ -243,6 +243,7 @@ namespace SqlPrompter.Ssms
                 return;
             }
 
+            DismissEditorSession();
             suggestions = built;
             selected = 0;
             pickerMode = picker && built.Picker != null;
@@ -256,6 +257,22 @@ namespace SqlPrompter.Ssms
 
             presenter.Show();
             Show();
+        }
+
+        /// <summary>
+        /// The editor's own completion session that is still alive (the one of the snippet prefix, #517) is dismissed when our list opens. It shares the
+        /// popup with our list: left alive, it showed its own items over ours, and after our list closed on a typed letter it went on filtering while
+        /// the popup stayed hidden, so Enter inserted its selected (first) item that the user never saw.
+        /// </summary>
+        private void DismissEditorSession()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var session = SqlCompletionSourceProvider.Current?.Broker?.GetSession(view);
+            if (session != null && !session.IsDismissed)
+            {
+                Log.Write("The editor's completion session is dismissed: the suggestion list of SQL Prompter opens.");
+                session.Dismiss();
+            }
         }
 
         /// <summary>Whether the column picker is offered at the caret of the view (the caret stands where columns are picked and they are known).</summary>
