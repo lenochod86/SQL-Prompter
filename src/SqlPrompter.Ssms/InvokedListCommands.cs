@@ -66,6 +66,12 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var list = InvokedList.Of(args.TextView);
+            if (list != null && !IsWordChar(args.TypedChar))
+            {
+                // A character that may insert the selected item waits for the list that typing is opening (#187).
+                list.CatchUp();
+            }
+
             if (list != null && list.IsOpen && list.OnTypedChar(args.TypedChar))
             {
                 return;
@@ -85,7 +91,21 @@ namespace SqlPrompter.Ssms
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             var list = InvokedList.Of(view);
+            if (list != null)
+            {
+                if (key == System.Windows.Input.Key.Escape)
+                {
+                    list.CancelPending();
+                }
+                else
+                {
+                    list.CatchUp();
+                }
+            }
+
             return list != null && list.IsOpen && list.OnKey(key);
         }
+
+        private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_' || c == '@' || c == '#';
     }
 }
