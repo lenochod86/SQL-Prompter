@@ -384,12 +384,6 @@ namespace SqlPrompter.Ssms
                 return CompletionStartData.DoesNotParticipateInCompletion;
             }
 
-            if (SnippetSession.IsActive(textView))
-            {
-                // The text of a snippet field is being typed: no list, but ours still takes part so that the built-in one does not show.
-                return new CompletionStartData(CompletionParticipation.ProvidesItems, new SnapshotSpan(triggerLocation, 0));
-            }
-
             var snapshot = triggerLocation.Snapshot;
             if (!SqlBatch.TryGet(snapshot, triggerLocation.Position, out var batchStart, out var batch))
             {
