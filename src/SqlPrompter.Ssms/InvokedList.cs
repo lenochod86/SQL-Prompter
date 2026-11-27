@@ -177,7 +177,7 @@ namespace SqlPrompter.Ssms
             ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
-                if (!SettingsService.Current.Behavior.SuggestionsEnabled || SnippetSession.IsActive(view))
+                if (!SettingsService.Current.Behavior.SuggestionsEnabled)
                 {
                     return;
                 }

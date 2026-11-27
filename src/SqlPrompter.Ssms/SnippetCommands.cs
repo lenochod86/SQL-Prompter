@@ -26,13 +26,14 @@ namespace SqlPrompter.Ssms
         public abstract string DisplayName { get; }
 
         public CommandState GetCommandState(T args) =>
-            SnippetSession.IsActive(args.TextView) ? CommandState.Available : CommandState.Unspecified;
+            SnippetSession.IsActive(args.TextView) && !ListOpen(args.TextView) ? CommandState.Available : CommandState.Unspecified;
 
         public bool ExecuteCommand(T args, CommandExecutionContext executionContext)
         {
             var session = SnippetSession.Of(args.TextView);
-            if (session == null)
+            if (session == null || ListOpen(args.TextView))
             {
+                // A suggestion list is open in a field: Tab and Enter insert its item and Esc closes it; the next key moves on (#551).
                 return false;
             }
 
@@ -41,6 +42,11 @@ namespace SqlPrompter.Ssms
         }
 
         protected abstract void Run(SnippetSession session);
+
+        /// <summary>True while a suggestion list is shown: the list of SQL Prompter or the editor's session in our presenter.</summary>
+        private static bool ListOpen(ITextView view) =>
+            InvokedList.Of(view)?.IsOpen == true ||
+            (view.Properties.TryGetProperty(typeof(SqlCompletionPresenter), out SqlCompletionPresenter presenter) && presenter.IsOpen);
     }
 
     [Export(typeof(ICommandHandler))]
