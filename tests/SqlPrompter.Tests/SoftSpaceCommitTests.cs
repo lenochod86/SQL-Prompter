@@ -23,5 +23,15 @@ namespace SqlPrompter.Tests
         [InlineData("wherex", "WHERE")]
         [InlineData("", "WHERE")]
         public void SpaceKeepsAnAliasAsTyped(string typed, string keyword) => Assert.False(SoftSpaceCommit.Commits(typed, keyword));
+
+        // FROM t ORDER + Space gave ORDER BY, and the BY typed next became GROUP BY (#550): a complete first word is typed, as in #444.
+        [Theory]
+        [InlineData("ORDER", "ORDER BY")]
+        [InlineData("order", "ORDER BY")]
+        [InlineData("group", "GROUP BY")]
+        [InlineData("inner", "INNER JOIN")]
+        [InlineData("left", "LEFT OUTER JOIN")]
+        [InlineData("left outer", "LEFT OUTER JOIN")]
+        public void SpaceAfterTheFirstWordsOfAKeywordIsTyped(string typed, string keyword) => Assert.False(SoftSpaceCommit.Commits(typed, keyword));
     }
 }

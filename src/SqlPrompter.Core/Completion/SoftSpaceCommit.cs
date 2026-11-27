@@ -20,7 +20,8 @@ namespace SqlPrompter.Core.Completion
                 return false;
             }
 
-            if (!keyword.StartsWith(typed, StringComparison.OrdinalIgnoreCase))
+            // ORDER + Space: the complete first word of ORDER BY is typed, not completed, so that a BY typed next is not doubled (#550, as #444).
+            if (!keyword.StartsWith(typed, StringComparison.OrdinalIgnoreCase) || MultiWordKeywords.IsLeadingWords(typed, keyword))
             {
                 return false;
             }
