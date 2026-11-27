@@ -293,6 +293,10 @@ namespace SqlPrompter.Core.Settings
         [DataMember(Name = "highlightBlockKeywords")]
         public bool HighlightBlockKeywords { get; set; }
 
+        /// <summary>The column of an INSERT and the value at the same position are highlighted for one another (#554).</summary>
+        [DataMember(Name = "highlightInsertPairs")]
+        public bool HighlightInsertPairs { get; set; }
+
         /// <summary>Every executed query is written to the history on this machine.</summary>
         [DataMember(Name = "keepHistory")]
         public bool KeepHistory { get; set; }
@@ -387,6 +391,7 @@ namespace SqlPrompter.Core.Settings
             SuggestAfterComma = true;
             HighlightMatches = true;
             HighlightBlockKeywords = true;
+            HighlightInsertPairs = true;
             PickerTableOrder = false;
             ShowColumnPickerHint = true;
             OwnTypingList = false;

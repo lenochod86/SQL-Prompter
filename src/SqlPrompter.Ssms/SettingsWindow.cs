@@ -311,6 +311,8 @@ namespace SqlPrompter.Ssms
                 () => work.Behavior.HighlightMatches, v => work.Behavior.HighlightMatches = v);
             editor.Check("Highlight matching keywords of a block", "Highlights the keywords that belong together with the keyword at the caret: BEGIN and END, BEGIN TRY / END TRY with BEGIN CATCH / END CATCH, BEGIN TRAN with COMMIT or ROLLBACK, CASE with WHEN, THEN, ELSE and END, IF with ELSE, WHILE with its block. Nothing is highlighted across a GO line or in unbalanced code.",
                 () => work.Behavior.HighlightBlockKeywords, v => work.Behavior.HighlightBlockKeywords = v);
+            editor.Check("Highlight matching INSERT columns and values", "In an INSERT with a column list, the caret on a column highlights its value in every VALUES row or its expression in the SELECT list, and the caret on a value highlights its column.",
+                () => work.Behavior.HighlightInsertPairs, v => work.Behavior.HighlightInsertPairs = v);
 
             var updates = Add("Updates", "SQL Prompter can tell you when a new version is released.");
             updates.Check("Check for a new version", "Once a day, a little after SSMS starts, SQL Prompter asks GitHub (api.github.com) for the latest release of the repository: one anonymous HTTPS request that sends nothing about you, your computer or your queries, " +
